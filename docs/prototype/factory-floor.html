@@ -1,0 +1,1147 @@
+<meta charset="utf-8">
+<title>Promptory Factory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a lantern-lit factory floor (canvas) framed by a pixel HUD — header with views, inspector on the right, megaphone dock at the bottom. Single committed dusk look. */
+:root{
+  --night:#14120e;      /* page ground */
+  --panel:#201c16;      /* HUD panels */
+  --panel-2:#2a241c;    /* raised rows */
+  --edge:#0a0907;       /* pixel outline */
+  --bevel:#3d3428;      /* inner bevel */
+  --parchment:#efe3c2;  /* text */
+  --muted:#a6977a;      /* secondary text */
+  --lantern:#f0a845;    /* accent */
+  --contract:#79c2b6;   /* contracts / data */
+  --ok:#8bc96b; --warn:#e9c46a; --fail:#e5583f;
+  --display:"Pixelify Sans", "Silkscreen", ui-monospace, monospace;
+  --body:"Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+html,body{height:100%}
+body{background:var(--night);color:var(--parchment);font-family:var(--body);font-size:14px;overflow:hidden}
+*{box-sizing:border-box}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--lantern);outline-offset:2px}
+
+#app{height:100%;display:grid;grid-template-rows:auto 1fr auto;gap:10px;padding-inline:16px;padding-block:10px}
+
+.frame{background:var(--panel);border:2px solid var(--edge);box-shadow:inset 0 0 0 2px var(--bevel)}
+
+/* header */
+.bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:8px 12px;min-width:0}
+.brand{display:flex;align-items:baseline;gap:8px;font-family:var(--display);font-size:20px;letter-spacing:.02em;white-space:nowrap}
+.brand small{font-size:12px;color:var(--muted);letter-spacing:.06em}
+.tabs{display:flex;gap:4px;overflow-x:auto;min-width:0}
+.tab{font-family:var(--display);font-size:14px;padding:5px 10px;background:var(--panel-2);border:2px solid var(--edge);cursor:pointer;white-space:nowrap}
+.tab[aria-selected="true"]{background:var(--lantern);color:#2a1a06}
+.pills{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--display);font-size:13px;padding:3px 8px;background:var(--panel-2);border:2px solid var(--edge);cursor:pointer;white-space:nowrap}
+.pill i{width:8px;height:8px;display:inline-block;background:var(--muted)}
+.pill.fire i{background:var(--fail)} .pill.wait i{background:var(--warn)} .pill.ship i{background:var(--ok)}
+.concept{font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;border:1px dashed var(--bevel);padding:2px 6px;white-space:nowrap}
+.iconbtn{font-family:var(--display);background:var(--panel-2);border:2px solid var(--edge);padding:3px 9px;cursor:pointer}
+
+/* stage */
+.stage{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;min-height:0}
+.view{position:relative;min-width:0;min-height:0;overflow:hidden}
+#view-floor{background:#1b2014}
+#world{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;cursor:grab;touch-action:none}
+#world.pan{cursor:grabbing} #world.hot{cursor:pointer}
+.vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 55%,rgba(8,6,4,.55) 100%)}
+.alarm .vignette{animation:alarm 1.6s steps(6) infinite}
+@keyframes alarm{0%,100%{box-shadow:inset 0 0 0 0 rgba(229,88,63,0)}50%{box-shadow:inset 0 0 90px 10px rgba(229,88,63,.45)}}
+.zoomctl{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:4px}
+.zoomctl button{width:30px;height:30px;font-family:var(--display);font-size:16px;background:var(--panel);border:2px solid var(--edge);cursor:pointer}
+
+/* radio log */
+.radio{position:absolute;left:10px;bottom:10px;width:min(420px,calc(100% - 20px));max-height:42%;display:flex;flex-direction:column}
+.radio header{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;font-family:var(--display);font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.radio ol{list-style:none;margin:0;padding:0 10px 8px;overflow-y:auto;display:flex;flex-direction:column;gap:3px;font-size:12.5px;line-height:1.35}
+.radio.collapsed ol{display:none}
+.ev{display:grid;grid-template-columns:42px 104px minmax(0,1fr);gap:6px}
+.ev time{font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ev b{font-weight:700;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev span{min-width:0;overflow-wrap:anywhere}
+.ev.ok span{color:var(--ok)} .ev.warn span{color:var(--warn)} .ev.fail span{color:var(--fail)}
+.ev.you span{color:var(--parchment)} .ev.you b{color:var(--lantern)}
+.ev.foreman span{color:var(--contract)} .ev.foreman b{color:var(--contract)}
+
+/* inspector */
+.inspector{width:330px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.inspector[hidden]{display:none!important}
+.insp-head{display:flex;gap:10px;align-items:center;padding:10px 12px;border-bottom:2px solid var(--edge)}
+.insp-head canvas{image-rendering:pixelated;flex:none;background:#1b2014;border:2px solid var(--edge)}
+.insp-head h2{margin:0;font-family:var(--display);font-size:19px;font-weight:600;line-height:1.1}
+.insp-head p{margin:2px 0 0;color:var(--muted);font-size:12px}
+.insp-head .x{margin-left:auto;align-self:flex-start}
+.insp-body{overflow-y:auto;padding:10px 12px 14px;display:flex;flex-direction:column;gap:12px;min-height:0}
+.kv{display:grid;grid-template-columns:86px minmax(0,1fr);gap:4px 10px;font-size:13px}
+.kv dt{color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;padding-top:2px}
+.kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.kv code,.path{font-family:var(--mono);font-size:12px;color:var(--contract)}
+.state{display:inline-flex;align-items:center;gap:6px;font-family:var(--display);font-size:13px}
+.state i{width:9px;height:9px;display:inline-block}
+.sec-title{font-family:var(--display);font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 4px}
+pre.json,pre.tx{margin:0;background:#15120e;border:2px solid var(--edge);padding:8px;font-family:var(--mono);font-size:11.5px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow-y:auto}
+pre.tx .tool{color:var(--lantern)} pre.tx .ret{color:var(--muted)} pre.tx .bad{color:var(--fail)} pre.tx .good{color:var(--ok)}
+.actions{display:flex;flex-wrap:wrap;gap:6px}
+.btn{font-family:var(--display);font-size:14px;padding:6px 11px;background:var(--panel-2);border:2px solid var(--edge);box-shadow:inset 0 -3px 0 rgba(0,0,0,.35);cursor:pointer}
+.btn:active{transform:translateY(1px);box-shadow:none}
+.btn.primary{background:var(--lantern);color:#2a1a06}
+.btn.danger{background:#5a2018;color:#ffd9cf}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* dock */
+.dock{display:flex;flex-direction:column;gap:8px;padding:10px 12px;position:relative}
+.modecard{border:2px solid var(--edge);background:var(--panel-2);padding:10px 12px;display:flex;flex-direction:column;gap:10px;max-height:38vh;overflow-y:auto}
+.modecard[hidden]{display:none!important}
+.modecard h3{margin:0;font-family:var(--display);font-size:17px;font-weight:600}
+.modecard p{margin:0;color:var(--muted);font-size:13px;max-width:70ch}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:end}
+.field{display:flex;flex-direction:column;gap:3px;min-width:0}
+.field label{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.field input,.field select{background:#15120e;border:2px solid var(--edge);padding:6px 8px;min-width:0}
+.firecards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px}
+.firecard{border:2px solid var(--edge);background:#2a1813;padding:8px 10px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.firecard strong{font-family:var(--display);font-size:15px;color:#ffb39f}
+.firecard .err{font-family:var(--mono);font-size:11.5px;color:#ffd0c4;overflow-wrap:anywhere}
+.checklist{list-style:none;margin:0;padding:0;display:grid;gap:6px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.checklist li{display:flex;align-items:center;gap:8px;background:#15120e;border:2px solid var(--edge);padding:6px 8px;font-size:13px}
+.checklist i{width:10px;height:10px;display:inline-block;flex:none}
+.key{display:flex;align-items:center;gap:8px;cursor:pointer}
+.modes{display:flex;gap:6px;flex-wrap:wrap}
+.mode{font-family:var(--display);font-size:14px;padding:6px 12px;background:var(--panel-2);border:2px solid var(--edge);cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+.mode[aria-pressed="true"]{background:var(--parchment);color:#1d170f}
+.mode .badge{background:var(--fail);color:#fff;font-size:12px;padding:0 5px;line-height:16px}
+.mode .badge.w{background:var(--warn);color:#2a1a06}
+.mode .badge[hidden]{display:none!important}
+.cmd{display:flex;gap:8px;position:relative}
+.cmd .prompt{font-family:var(--display);font-size:16px;color:var(--lantern);align-self:center}
+#cmd{flex:1;min-width:0;background:#15120e;border:2px solid var(--edge);padding:9px 10px;font-family:var(--mono);font-size:13px}
+.suggest{position:absolute;left:22px;right:80px;bottom:calc(100% + 6px);list-style:none;margin:0;padding:4px;background:var(--panel);border:2px solid var(--edge);box-shadow:inset 0 0 0 2px var(--bevel);max-height:240px;overflow-y:auto;z-index:5}
+.suggest[hidden]{display:none!important}
+.suggest li{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr);gap:12px;padding:5px 8px;cursor:pointer;font-size:13px}
+.suggest li code{font-family:var(--mono);color:var(--lantern);white-space:nowrap}
+.suggest li span{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.suggest li[aria-selected="true"]{background:var(--panel-2)}
+
+/* other views */
+.scroll{position:absolute;inset:0;overflow:auto;padding:14px}
+.andon{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.acard{border:2px solid var(--edge);background:var(--panel);box-shadow:inset 0 0 0 2px var(--bevel);padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.acard h3{margin:0;font-family:var(--display);font-size:20px;font-weight:600;display:flex;justify-content:space-between;gap:8px}
+.acard h3 small{font-size:12px;color:var(--muted);font-family:var(--body);font-weight:400}
+.stations{display:flex;flex-wrap:wrap;gap:4px}
+.st{font-family:var(--display);font-size:12px;padding:6px 8px;border:2px solid var(--edge);color:#1d170f;cursor:pointer}
+.st.idle{background:#6d6556;color:var(--parchment)} .st.busy{background:var(--ok)} .st.hold{background:var(--warn)} .st.fire{background:var(--fail);color:#fff;animation:blink 1s steps(2) infinite} .st.halt{background:#3a3428;color:var(--muted)}
+@keyframes blink{50%{filter:brightness(1.35)}}
+.nums{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.nums div{background:#15120e;border:2px solid var(--edge);padding:6px 8px}
+.nums b{display:block;font-family:var(--display);font-size:22px;font-variant-numeric:tabular-nums}
+.nums span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.ledger{display:grid;grid-template-columns:150px minmax(0,1fr);gap:4px 10px;min-width:560px}
+.ledger .lh{font-family:var(--display);color:var(--muted);font-size:13px;padding-top:10px;grid-column:1/-1;border-bottom:2px solid var(--bevel)}
+.ledger .ln{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;align-self:center}
+.lane{position:relative;height:18px;background:#15120e;border:1px solid var(--edge)}
+.lane i{position:absolute;top:2px;bottom:2px;min-width:2px}
+.lane i.ok{background:var(--ok)} .lane i.run{background:var(--lantern)} .lane i.bad{background:repeating-linear-gradient(45deg,var(--fail) 0 4px,#7a2618 4px 8px)}
+.axis{grid-column:2;display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.bp{display:grid;grid-template-columns:240px minmax(0,1fr);gap:12px}
+.tree{font-family:var(--mono);font-size:12.5px;line-height:1.7;background:var(--panel);border:2px solid var(--edge);padding:10px 12px;white-space:pre;overflow-x:auto}
+.tree .d{color:var(--lantern)} .tree .f{color:var(--parchment)} .tree .m{color:var(--muted)}
+.yaml{margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.55;background:#15120e;border:2px solid var(--edge);padding:12px 14px;overflow-x:auto;white-space:pre}
+.yaml .c{color:var(--muted)} .yaml .k{color:var(--lantern)} .yaml .s{color:var(--contract)}
+.bp-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+.gitline{font-family:var(--mono);font-size:12px;color:var(--muted);margin:0 0 8px}
+.gitline b{color:var(--ok);font-weight:600}
+
+/* legend */
+.legend{position:absolute;right:50px;top:10px;width:min(360px,calc(100% - 70px));padding:10px 12px;z-index:4;display:flex;flex-direction:column;gap:8px}
+.legend[hidden]{display:none!important}
+.legend h3{margin:0;font-family:var(--display);font-size:16px}
+.lg{display:grid;grid-template-columns:56px minmax(0,1fr);gap:10px;align-items:center;font-size:12.5px}
+.lg canvas{image-rendering:pixelated;background:#1b2014;border:2px solid var(--edge)}
+.lg b{font-family:var(--display);font-size:14px;font-weight:600;display:block}
+.lg span{color:var(--muted)}
+
+@media (max-width: 820px){
+  .stage{grid-template-columns:minmax(0,1fr)}
+  .inspector{position:absolute;left:0;right:0;bottom:0;width:auto;max-height:62%;z-index:6}
+  .bp{grid-template-columns:minmax(0,1fr)}
+  .pills{margin-left:0}
+  .suggest{right:0;left:0}
+}
+@media (prefers-reduced-motion: reduce){ .alarm .vignette,.st.fire{animation:none} }
+</style>
+
+<div id="app">
+  <header class="bar frame">
+    <div class="brand">promptory <small>factory · ops-floor</small></div>
+    <nav class="tabs" role="tablist" aria-label="Views">
+      <button class="tab" role="tab" data-view="floor" aria-selected="true">Floor</button>
+      <button class="tab" role="tab" data-view="andon" aria-selected="false">Andon</button>
+      <button class="tab" role="tab" data-view="ledger" aria-selected="false">Ledger</button>
+      <button class="tab" role="tab" data-view="blueprint" aria-selected="false">Blueprint</button>
+    </nav>
+    <div class="pills">
+      <button class="pill fire" id="p-fire" title="Open firefight"><i></i><span>0 fires</span></button>
+      <button class="pill wait" id="p-wait" title="Show what waits on you"><i></i><span>0 waiting on you</span></button>
+      <span class="pill ship"><i></i><span id="p-ship">0 shipped</span></span>
+      <span class="concept">Concept · example data</span>
+    </div>
+  </header>
+
+  <main class="stage" id="stage">
+    <section class="view frame" id="view-floor" aria-label="Factory floor">
+      <canvas id="world" aria-label="Factory floor with three production lines"></canvas>
+      <div class="vignette"></div>
+      <div class="zoomctl">
+        <button id="z-in" aria-label="Zoom in">+</button>
+        <button id="z-out" aria-label="Zoom out">−</button>
+        <button id="z-fit" aria-label="Fit factory">◻</button>
+        <button id="lg-btn" aria-label="Legend">?</button>
+      </div>
+      <div class="legend frame" id="legend" hidden>
+        <h3>Reading the floor</h3>
+        <div class="lg"><canvas width="56" height="40" data-sprite="machine"></canvas><div><b>Machine</b><span>A step. One role runs headless, and the step ends when the process exits.</span></div></div>
+        <div class="lg"><canvas width="56" height="40" data-sprite="crate"></canvas><div><b>Crate</b><span>A contract-valid output. Click one on a belt to open its JSON.</span></div></div>
+        <div class="lg"><canvas width="56" height="40" data-sprite="probe"></canvas><div><b>Probe</b><span>A deterministic check: a script whose exit code passes or stops the line.</span></div></div>
+        <div class="lg"><canvas width="56" height="40" data-sprite="lock"></canvas><div><b>Lock</b><span>A human gate. Crates wait until you, or two keys, release them.</span></div></div>
+        <div class="lg"><canvas width="56" height="40" data-sprite="split"></canvas><div><b>Splitter</b><span>Routes crates on a contract field, not on a model's judgment.</span></div></div>
+        <div class="lg"><canvas width="56" height="40" data-sprite="fire"></canvas><div><b>Fire</b><span>A step that ran out of contract attempts. The line stops behind it.</span></div></div>
+      </div>
+      <div class="radio frame" id="radio">
+        <header><span>Floor radio</span><button class="iconbtn" id="radio-toggle" aria-expanded="true">–</button></header>
+        <ol id="radio-list" aria-live="polite"></ol>
+      </div>
+    </section>
+
+    <section class="view frame" id="view-andon" hidden><div class="scroll"><div class="andon" id="andon"></div></div></section>
+    <section class="view frame" id="view-ledger" hidden><div class="scroll"><div class="ledger" id="ledger"></div></div></section>
+    <section class="view frame" id="view-blueprint" hidden><div class="scroll"><div class="bp"><div><p class="gitline">branch <b>main</b> · clean · 3f2a1c9</p><div class="tree" id="tree"></div></div><div style="min-width:0"><div class="bp-tabs" id="bp-tabs"></div><pre class="yaml" id="yaml"></pre></div></div></div></section>
+
+    <aside class="inspector frame" id="inspector" hidden aria-label="Inspector"></aside>
+  </main>
+
+  <footer class="dock frame">
+    <div class="modecard" id="modecard" hidden></div>
+    <div class="modes" role="group" aria-label="Situations">
+      <button class="mode" data-mode="start" aria-pressed="false">Start a run</button>
+      <button class="mode" data-mode="fire" aria-pressed="false">Firefight <span class="badge" id="b-fire" hidden>0</span></button>
+      <button class="mode" data-mode="ship" aria-pressed="false">Ship to prod <span class="badge w" id="b-ship" hidden>!</span></button>
+    </div>
+    <form class="cmd" id="cmd-form" autocomplete="off">
+      <span class="prompt">›</span>
+      <input id="cmd" placeholder="Talk to the floor: @incident why is it burning?  ·  /retry investigate  ·  /approve review" aria-label="Command">
+      <button class="btn primary" type="submit">Send</button>
+      <ul class="suggest" id="suggest" role="listbox" hidden></ul>
+    </form>
+  </footer>
+</div>
+
+<script>
+(() => {
+'use strict';
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pick = a => a[Math.floor(Math.random()*a.length)];
+const rint = (a,b) => a + Math.floor(Math.random()*(b-a+1));
+
+/* ---------- world definition (what lives in .promptory/workflows/*.yaml) ---------- */
+const ROLE = {
+  triager:'#5b8fd3', planner:'#9a70d3', implementer:'#d47b48', responder:'#45b1a0',
+  correlator:'#c9a43b', investigator:'#d4566b', mitigator:'#6aa84f', deployer:'#e07b39'
+};
+const SECTORS = [
+  { id:'eng', slug:'ticket-to-pr', name:'Ticket to PR', file:'ticket-to-pr.yaml', dir:1, spawnEvery:10,
+    trigger:'jira: label agent-ready', triggerYaml:'{ jira: { label: agent-ready } }',
+    nodes:[
+      {id:'intake', kind:'in', label:'Jira intake'},
+      {id:'triage', kind:'machine', label:'Triage', role:'triager', contract:'triage.v1', needs:['intake'], dur:3.5},
+      {id:'route', kind:'split', label:'route', needs:['triage'], by:'type', routes:{bug:'plan', question:'respond'}},
+      {id:'plan', kind:'machine', label:'Planner', role:'planner', contract:'plan.v2', needs:['route'], dur:4.5},
+      {id:'implement', kind:'machine', label:'Implementer', role:'implementer', contract:'change.v1', needs:['plan'], dur:7},
+      {id:'tests', kind:'probe', label:'Tests', run:'npm test', needs:['implement'], dur:1.6},
+      {id:'review', kind:'lock', label:'Review', approvers:'you', needs:['tests']},
+      {id:'pr', kind:'out', label:'Draft PR', needs:['review']},
+      {id:'respond', kind:'machine', label:'Responder', role:'responder', contract:'reply.v1', needs:['route'], dur:3},
+      {id:'comment', kind:'out', label:'Jira comment', needs:['respond']},
+    ]},
+  { id:'inc', slug:'incident-response', name:'Incident response', file:'incident-response.yaml', dir:1, spawnEvery:0,
+    trigger:'incident.io: sev1, sev2', triggerYaml:'{ incident_io: { severity: [sev1, sev2] } }',
+    nodes:[
+      {id:'alert', kind:'in', label:'Alert'},
+      {id:'correlate', kind:'machine', label:'Correlator', role:'correlator', contract:'signals.v1', needs:['alert'], dur:3, mcp:['new-relic']},
+      {id:'investigate', kind:'machine', label:'Investigator', role:'investigator', contract:'findings.v1', needs:['correlate'], dur:5, mcp:['new-relic','incident-io'], failFirst:true},
+      {id:'signoff', kind:'lock', label:'Mitigation OK', approvers:'you', needs:['investigate']},
+      {id:'mitigate', kind:'machine', label:'Mitigator', role:'mitigator', contract:'action.v1', needs:['signoff'], dur:4},
+      {id:'errrate', kind:'probe', label:'Error rate <1%', run:'probes/error-rate.sh orders-api', needs:['mitigate'], dur:3},
+      {id:'update', kind:'out', label:'Slack update', needs:['errrate']},
+    ]},
+  { id:'dep', slug:'ship-to-prod', name:'Ship to prod', file:'ship-to-prod.yaml', dir:-1, spawnEvery:0,
+    trigger:'manual: release tag', triggerYaml:'{ manual: { input: tag } }',
+    nodes:[
+      {id:'tag', kind:'in', label:'Release tag'},
+      {id:'ci', kind:'probe', label:'CI green', run:'gh pr checks --required', needs:['tag'], dur:2},
+      {id:'nonprod', kind:'probe', label:'Non-prod applied', run:'probes/env-applied.sh staging', needs:['tag'], dur:2.6},
+      {id:'launch', kind:'lock', label:'Two-key launch', approvers:'you + release owner', keys:2, needs:['ci','nonprod']},
+      {id:'deploy', kind:'machine', label:'Deployer', role:'deployer', contract:'rollout.v1', needs:['launch'], dur:6},
+      {id:'canary', kind:'probe', label:'Canary healthy', run:'probes/canary.sh 10%', needs:['deploy'], dur:3.5},
+      {id:'prod', kind:'out', label:'Production', needs:['canary']},
+    ]},
+];
+
+const TOOLS = {
+  triager:[['▸ jira.getJiraIssue', '◂ summary, labels, components'],['▸ read AGENTS.md','◂ 212 lines']],
+  planner:[['▸ grep -rn "create_order" src/','◂ 9 matches'],['▸ read orders/api.py','◂ 418 lines']],
+  implementer:[['▸ edit orders/api.py','◂ +31 −6'],['▸ npm test -- orders','◂ 48 passed'],['▸ edit orders/tests/test_api.py','◂ +11 −1']],
+  responder:[['▸ confluence.search "label printing"','◂ 3 pages'],['▸ jira.addComment (draft)','◂ held for output']],
+  correlator:[['▸ new-relic.run_nrql_query error rate, 30 min','◂ 14.2% (baseline 0.4%)'],['▸ git log --since=2h','◂ 1 deploy: v4.17.3']],
+  investigator:[['▸ new-relic.run_nrql_query traces, slowest db spans','◂ pool wait p95 2.8s'],['▸ incident-io.alert_show','◂ sev2 · orders-api 5xx spike']],
+  mitigator:[['▸ helm rollback orders-api 41','◂ revision 43 deployed'],['▸ kubectl rollout status','◂ 6/6 ready']],
+  deployer:[['▸ argocd app sync orders-api --revision v4.18.0','◂ canary 10%'],['▸ argocd app wait --health','◂ Healthy']],
+};
+
+/* ---------- layout: the factory forms itself from the DAG ---------- */
+const T = 16, COLW = 86, LANE = 58, SIGN_W = 70, PADT = 50, GAP = 30, MARGIN = 24;
+const nodesById = {}; // key sec.id + '.' + node.id
+let worldW = 0, worldH = 0;
+(function layout(){
+  let y = MARGIN;
+  for (const sec of SECTORS){
+    sec.halted = false; sec.shipped = 0;
+    const byId = {}; sec.nodes.forEach(n => { n.sec = sec; n.needs = n.needs || []; byId[n.id] = n; nodesById[sec.id+'.'+n.id] = n; });
+    sec.byId = byId;
+    const kids = {}; sec.nodes.forEach(n => n.needs.forEach(p => (kids[p] = kids[p] || []).push(n.id)));
+    const depth = {}; const lane = {};
+    const d = n => depth[n.id] ?? (depth[n.id] = n.needs.length ? 1 + Math.max(...n.needs.map(p => d(byId[p]))) : 0);
+    sec.nodes.forEach(d);
+    const ordered = [...sec.nodes].sort((a,b) => depth[a.id]-depth[b.id]);
+    for (const n of ordered){
+      if (!n.needs.length) lane[n.id] = 0;
+      else if (n.needs.length > 1) lane[n.id] = n.needs.reduce((s,p) => s + lane[p], 0) / n.needs.length;
+      else { const p = n.needs[0], k = kids[p]; lane[n.id] = k.length === 1 ? lane[p] : lane[p] + (k.indexOf(n.id) - (k.length-1)/2); }
+    }
+    const lanes = Object.values(lane), minL = Math.min(...lanes), maxL = Math.max(...lanes);
+    const maxD = Math.max(...Object.values(depth));
+    sec.x = MARGIN; sec.y = y;
+    sec.w = SIGN_W + (maxD+1)*COLW + 20;
+    sec.h = PADT + (maxL-minL)*LANE + 34;
+    for (const n of sec.nodes){
+      const col = sec.dir > 0 ? depth[n.id] : maxD - depth[n.id];
+      n.x = Math.round(sec.x + SIGN_W + col*COLW + COLW/2);
+      n.y = Math.round(sec.y + PADT + (lane[n.id]-minL)*LANE);
+      n.hw = {machine:20, probe:8, lock:10, split:6, in:12, out:12}[n.kind];
+      n.inX = n.x - sec.dir*n.hw; n.outX = n.x + sec.dir*n.hw;
+      Object.assign(n, {state:'idle', inbox:[], outs:[], prog:0, cur:null, out:null, tx:[], ver:0, timer: 2, approved:0, keys:{you:false, owner:false}, attempts:0});
+    }
+    // belts
+    sec.edges = [];
+    for (const n of sec.nodes) for (const p of n.needs){
+      const a = byId[p]; const sx = a.outX, sy = a.y, ex = n.inX, ey = n.y;
+      let pts;
+      if (sy === ey) pts = [[sx,sy],[ex,ey]];
+      else { const mx = n.needs.length > 1 ? ex - sec.dir*12 : sx + sec.dir*12; pts = [[sx,sy],[mx,sy],[mx,ey],[ex,ey]]; }
+      let len = 0; for (let i=1;i<pts.length;i++) len += Math.abs(pts[i][0]-pts[i-1][0]) + Math.abs(pts[i][1]-pts[i-1][1]);
+      const e = {sec, from:a, to:n, pts, len, crates:[]};
+      sec.edges.push(e); a.outs.push(e);
+    }
+    worldW = Math.max(worldW, sec.x + sec.w + MARGIN);
+    y += sec.h + GAP;
+  }
+  worldH = y - GAP + MARGIN;
+})();
+
+function pointAt(e, t){
+  let left = t;
+  for (let i=1;i<e.pts.length;i++){
+    const [x0,y0] = e.pts[i-1], [x1,y1] = e.pts[i];
+    const seg = Math.abs(x1-x0) + Math.abs(y1-y0);
+    if (left <= seg){ const f = seg ? left/seg : 0; return [x0+(x1-x0)*f, y0+(y1-y0)*f]; }
+    left -= seg;
+  }
+  return e.pts[e.pts.length-1];
+}
+
+/* ---------- simulation ---------- */
+let clock = 0, crateSeq = 1, ticketSeq = 812;
+const spans = [], radio = [], particles = [];
+let radioDirty = true;
+function log(secName, level, text){ radio.push({t:clock, who:secName, level, text}); if (radio.length > 80) radio.shift(); radioDirty = true; }
+function mmss(t){ t = Math.max(0, t); const m = Math.floor(t/60), s = Math.floor(t%60); return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; }
+function bump(n){ n.ver++; }
+
+function inputPayload(sec, text){
+  if (sec.id === 'eng') return {ticket: text || `PROJ-${ticketSeq++}`, source:'jira'};
+  if (sec.id === 'inc') return {alert: text || 'ALT-55102', service:'orders-api', signal:'5xx rate'};
+  return {tag: text || 'v4.18.0', service:'orders-api'};
+}
+function makePayload(n, p){
+  const base = {};
+  for (const k of ['ticket','alert','service','tag']) if (p[k]) base[k] = p[k];
+  switch (n.contract){
+    case 'triage.v1': return {...base, type: Math.random() < .7 ? 'bug' : 'question', severity: pick(['low','medium','high']), area: pick(['orders-api','orders-gateway','storefront-ui'])};
+    case 'plan.v2': return {...base, type:'bug', steps: rint(3,6), files:['orders/api.py','orders/tests/test_api.py'], risk: pick(['low','medium'])};
+    case 'change.v1': return {...base, branch: p.ticket, diff:`+${rint(18,64)} −${rint(2,14)}`, tests_added: rint(1,4)};
+    case 'reply.v1': return {...base, type:'question', answer_chars: rint(400,1200), links: rint(1,3)};
+    case 'signals.v1': return {...base, window:'30m', error_rate:'14.2%', baseline:'0.4%', deploys_in_window:['v4.17.3']};
+    case 'findings.v1': return {...base, suspected_cause:'connection pool exhaustion after v4.17.3', confidence:0.72, evidence:3};
+    case 'action.v1': return {...base, action:'rollback', target:'v4.17.2', blast_radius:'orders-api only'};
+    case 'rollout.v1': return {...base, strategy:'canary', canary:'10%', rollback:'auto'};
+  }
+  return base;
+}
+function crateColor(n){ return n.kind === 'machine' ? ROLE[n.role] : n.kind === 'probe' ? '#8bc96b' : '#c8b48a'; }
+
+function emit(n, crate, onlyEdge){
+  const edges = onlyEdge ? [onlyEdge] : n.outs;
+  edges.forEach((e,i) => {
+    const c = i === 0 ? crate : {...crate, id: crateSeq++, payload:{...crate.payload}};
+    c.t = 0; e.crates.push(c);
+  });
+}
+function spawn(sec, text){
+  const n = sec.nodes.find(x => x.kind === 'in');
+  const crate = {id: crateSeq++, payload: inputPayload(sec, text), color:'#c8b48a'};
+  emit(n, crate); bump(n);
+  log(sec.name, 'info', `Intake: ${crate.payload.ticket || crate.payload.alert || crate.payload.tag}`);
+  return n;
+}
+function startWork(n){
+  n.cur = n.inbox.shift(); n.state = 'busy'; n.prog = 0; n.spanStart = clock; n.attempts = 1;
+  const id = n.cur.payload.ticket || n.cur.payload.alert || n.cur.payload.tag || '';
+  if (n.kind === 'machine'){
+    n.tx = [[ 'tool', `$ claude -p --role ${n.role} --json-schema ${n.contract}` ], ['ret', `◂ started on ${id}`]];
+  } else n.tx = [['tool', `$ ${n.run}`]];
+  bump(n);
+}
+function finishWork(n){
+  const sec = n.sec;
+  if (n.kind === 'machine' && n.failNext){
+    n.failNext = false; n.state = 'fire'; n.attempts = 3;
+    n.tx.push(['bad', '✕ attempt 1/3 rejected: required property "suspected_cause" missing']);
+    n.tx.push(['bad', '✕ attempt 2/3 rejected: "confidence" must be number']);
+    n.tx.push(['bad', '✕ attempt 3/3 rejected: required property "suspected_cause" missing']);
+    n.err = `findings.v1: required property "suspected_cause" missing (3/3 attempts)`;
+    spans.push({sec:sec.id, node:n.id, s:n.spanStart, e:clock, ok:false});
+    n.fireStart = clock;
+    log(sec.name, 'fail', `${n.label} is on fire: ${n.err}`);
+    bump(n); return;
+  }
+  const p = n.cur.payload;
+  if (n.kind === 'machine'){
+    n.out = makePayload(n, p);
+    n.tx.push(['good', `✓ contract ${n.contract} valid (attempt 1/3) · exit 0`]);
+    log(sec.name, 'ok', `${n.label} → ${n.contract}`);
+  } else {
+    n.out = {...p, probe:n.id, exit:0};
+    n.tx.push(['good', `✓ exit 0 in ${(n.dur*1000|0)} ms`]);
+  }
+  spans.push({sec:sec.id, node:n.id, s:n.spanStart, e:clock, ok:true});
+  if (spans.length > 400) spans.shift();
+  const crate = {...n.cur, payload:n.out, color: crateColor(n)};
+  n.cur = null; n.state = 'idle'; n.prog = 0;
+  emit(n, crate); bump(n);
+  if (!reduced && n.kind === 'probe') burst(n.x, n.y-28, '#8bc96b', 6);
+}
+function lockReady(n){
+  if (n.needs.length > 1) return n.needs.every(p => n.inbox.some(c => c.from === p));
+  return n.inbox.length > 0;
+}
+function release(n){
+  let crates;
+  if (n.needs.length > 1){ crates = n.needs.map(p => { const i = n.inbox.findIndex(c => c.from === p); return n.inbox.splice(i,1)[0]; }); }
+  else crates = [n.inbox.shift()];
+  const payload = Object.assign({}, ...crates.map(c => c.payload));
+  delete payload.probe; delete payload.exit;
+  payload.approved_by = n.keys ? (n.needs.length > 1 ? ['you','release owner'] : ['you']) : ['you'];
+  emit(n, {id: crateSeq++, payload, color:'#f0a845'});
+  log(n.sec.name, 'ok', `${n.label} released by ${payload.approved_by.join(' + ')}`);
+  n.keys = {you:false, owner:false};
+  bump(n);
+}
+
+function step(dt, fx){
+  clock += dt;
+  for (const sec of SECTORS){
+    if (sec.halted) continue;
+    // belts
+    for (const e of sec.edges){
+      for (let i=0;i<e.crates.length;i++){
+        const c = e.crates[i];
+        const limit = i === 0 ? e.len : e.crates[i-1].t - 9;
+        c.t = Math.min(limit, c.t + 30*dt);
+        if (i === 0 && c.t >= e.len){ e.crates.shift(); i--; c.from = e.from.id; e.to.inbox.push(c); bump(e.to); }
+      }
+    }
+    for (const n of sec.nodes){
+      switch (n.kind){
+        case 'in':
+          if (sec.spawnEvery){ n.timer -= dt; if (n.timer <= 0){ n.timer = sec.spawnEvery + Math.random()*4; spawn(sec); } }
+          break;
+        case 'machine': case 'probe':
+          if (n.state === 'fire') break;
+          if (n.state === 'busy'){
+            const before = n.prog; n.prog += dt / n.dur;
+            if (n.kind === 'machine'){
+              const tl = TOOLS[n.role] || [];
+              const idx = Math.floor(n.prog * (tl.length + 1)) - 1, prevIdx = Math.floor(before * (tl.length + 1)) - 1;
+              if (idx !== prevIdx && tl[idx]){ n.tx.push(['tool', tl[idx][0]]); n.tx.push(['ret', tl[idx][1]]); bump(n); }
+            }
+            if (fx && !reduced && n.kind === 'machine' && Math.random() < dt*6) smoke(n.x+12, n.y-40);
+            if (n.prog >= 1) finishWork(n);
+          } else if (n.inbox.length) startWork(n);
+          break;
+        case 'split':
+          while (n.inbox.length){
+            const c = n.inbox.shift(); const target = n.routes[c.payload[n.by]] || Object.values(n.routes)[0];
+            const e = n.outs.find(x => x.to.id === target); emit(n, c, e);
+            log(sec.name, 'info', `route: ${n.by} = ${c.payload[n.by]} → ${sec.byId[target].label}`);
+          }
+          break;
+        case 'lock': {
+          const ready = lockReady(n);
+          if (ready && n.approved > 0){ n.approved--; release(n); }
+          const st = lockReady(n) ? 'holding' : 'idle';
+          if (st !== n.state){ n.state = st; bump(n); if (st === 'holding') log(sec.name, 'warn', `${n.label} is waiting on ${n.approvers}`); }
+          break; }
+        case 'out':
+          while (n.inbox.length){
+            const c = n.inbox.shift(); sec.shipped++; n.out = c.payload; bump(n);
+            log(sec.name, 'ok', `Shipped: ${n.label} · ${c.payload.ticket || c.payload.alert || c.payload.tag || ''}`);
+            if (fx && !reduced) burst(n.x, n.y-10, '#f0a845', 12);
+          }
+          break;
+      }
+    }
+  }
+  // fire particles
+  if (fx && !reduced) for (const sec of SECTORS) for (const n of sec.nodes) if (n.state === 'fire' && Math.random() < dt*40) flame(n.x + rint(-16,16), n.y - rint(20,30));
+  for (let i=particles.length-1;i>=0;i--){ const p = particles[i]; p.life -= dt; p.x += p.vx*dt; p.y += p.vy*dt; if (p.life <= 0) particles.splice(i,1); }
+}
+function smoke(x,y){ particles.push({x, y, vx: (Math.random()-.5)*4, vy:-8-Math.random()*6, life:1.6, max:1.6, kind:'smoke'}); }
+function flame(x,y){ particles.push({x, y, vx:(Math.random()-.5)*6, vy:-14-Math.random()*14, life:.9, max:.9, kind:'fire'}); }
+function burst(x,y,c,k){ for (let i=0;i<k;i++){ const a = Math.random()*Math.PI*2; particles.push({x, y, vx:Math.cos(a)*24, vy:Math.sin(a)*24-10, life:.6, max:.6, kind:'spark', c}); } }
+
+// seed: warm the factory up so the first frame is a working floor
+SECTORS[0].nodes[0].timer = 0.2;
+SECTORS[1].byId.investigate.failNext = true;
+spawn(SECTORS[1]); spawn(SECTORS[2]);
+for (let i=0;i<620;i++) step(0.1, false);
+SECTORS[0].byId.review.approved = 1; // one review already granted earlier
+for (let i=0;i<40;i++) step(0.1, false);
+
+/* ---------- actions (UI and commands share these) ---------- */
+function findNode(q){
+  if (!q) return null; q = q.toLowerCase().replace(/^@/,'');
+  if (nodesById[q]) return nodesById[q];
+  const all = Object.values(nodesById);
+  return all.find(n => n.id === q) || all.find(n => n.label.toLowerCase() === q) || all.find(n => n.label.toLowerCase().includes(q) || n.id.includes(q)) || null;
+}
+function findSector(q){
+  if (!q) return null; q = q.toLowerCase().replace(/^@/,'');
+  return SECTORS.find(s => s.id === q || s.slug === q || s.name.toLowerCase() === q) || SECTORS.find(s => s.slug.includes(q) || s.name.toLowerCase().includes(q)) || null;
+}
+function approve(n, who){
+  if (!n || n.kind !== 'lock') return 'That is not a lock.';
+  if (n.keys && n.needs.length > 1){
+    n.keys[who || 'you'] = true; bump(n);
+    if (!(n.keys.you && n.keys.owner)) { log(n.sec.name, 'warn', `${n.label}: ${who === 'owner' ? 'release owner' : 'your'} key turned. One key left.`); return 'Key turned. One key left.'; }
+  }
+  if (!lockReady(n)) return `${n.label} has nothing waiting.`;
+  n.approved++; return `Approved ${n.label}.`;
+}
+function retry(n, hint){
+  if (!n || n.state !== 'fire') return `${n ? n.label : 'That step'} is not on fire.`;
+  n.state = 'busy'; n.prog = 0; n.spanStart = clock; n.err = null; n.attempts = 1;
+  n.tx.push(['tool', `↻ retry${hint ? ' with hint: "' + hint + '"' : ''}`]); bump(n);
+  log(n.sec.name, 'info', `${n.label} retrying${hint ? ' with your hint' : ''}`);
+  return `Retrying ${n.label}.`;
+}
+function halt(sec, on){ sec.halted = on; log(sec.name, on ? 'warn' : 'info', on ? 'Line halted' : 'Line resumed'); SECTORS.forEach(s => s.nodes.forEach(bump)); return `${sec.name} ${on ? 'halted' : 'resumed'}.`; }
+
+function statusOf(sec){
+  const fires = sec.nodes.filter(n => n.state === 'fire');
+  const holds = sec.nodes.filter(n => n.kind === 'lock' && n.state === 'holding');
+  const busy = sec.nodes.filter(n => n.state === 'busy');
+  const wip = sec.edges.reduce((s,e) => s + e.crates.length, 0) + sec.nodes.reduce((s,n) => s + n.inbox.length + (n.cur ? 1 : 0), 0);
+  return {fires, holds, busy, wip};
+}
+function foreman(sec, node, q){
+  if (node){
+    if (node.state === 'fire') return `${node.label} ran out of attempts on ${node.contract}. Last error: ${node.err}. It did query New Relic and saw pool wait p95 at 2.8s, so the cause is likely there but missing from the output. Try: /retry ${node.id} "include suspected_cause from the pool metrics"`;
+    if (node.kind === 'lock') return node.state === 'holding' ? `${node.label} holds ${node.inbox.length} crate(s) for ${node.approvers}. /approve ${node.id} releases it.` : `${node.label} is open; nothing waiting.`;
+    return `${node.label} is ${node.state}${node.state === 'busy' ? ` (${Math.round(node.prog*100)}%)` : ''}. ${node.out ? 'Last output: ' + JSON.stringify(node.out) : 'No output yet.'}`;
+  }
+  const s = statusOf(sec);
+  const parts = [`${sec.name}: ${s.wip} crate(s) in flight, ${sec.shipped} shipped.`];
+  if (sec.halted) parts.push('The line is halted.');
+  if (s.fires.length) parts.push(`On fire: ${s.fires.map(n => n.label).join(', ')}.`);
+  if (s.holds.length) parts.push(`Waiting on you: ${s.holds.map(n => n.label).join(', ')}.`);
+  if (s.busy.length) parts.push(`Working: ${s.busy.map(n => n.label).join(', ')}.`);
+  if (/why|burn|fire/.test(q) && s.fires[0]) parts.push(foreman(sec, s.fires[0], q));
+  return parts.join(' ');
+}
+
+const COMMANDS = [
+  {c:'/run', d:'start a run on a line', arg:'line'},
+  {c:'/approve', d:'release a lock waiting on you', arg:'lock'},
+  {c:'/retry', d:'put out a fire and rerun the step', arg:'fire'},
+  {c:'/halt', d:'stop a line where it stands', arg:'line'},
+  {c:'/resume', d:'restart a halted line', arg:'line'},
+  {c:'/focus', d:'fly the camera to a line or step', arg:'any'},
+  {c:'/help', d:'list commands'},
+];
+function runCommand(text){
+  text = text.trim(); if (!text) return;
+  log('you', 'you', text);
+  const say = m => log('foreman', 'foreman', m);
+  if (text.startsWith('/')){
+    const m = text.match(/^\/(\w+)\s*(\S+)?\s*(.*)$/); const [, verb, a, rest] = m || [];
+    const hint = (rest || '').replace(/^"|"$/g,'').trim();
+    switch (verb){
+      case 'approve': return say(approve(findNode(a)));
+      case 'retry': return say(retry(findNode(a), hint));
+      case 'halt': case 'resume': { const s = findSector(a); return say(s ? halt(s, verb === 'halt') : 'Which line? Try /halt incident.'); }
+      case 'run': { const s = findSector(a); if (!s) return say('Which line? Try /run ticket-to-pr PROJ-900.'); const n = spawn(s, hint || undefined); focusOn(n); return say(`Dispatched to ${s.name}.`); }
+      case 'focus': { const n = findNode(a), s = findSector(a); if (s) focusSector(s); else if (n) { focusOn(n); select(n); } return say(n || s ? 'On it.' : 'Nothing by that name.'); }
+      case 'help': return say(COMMANDS.map(x => x.c).join('  ') + '  ·  @line or @line.step to ask');
+      default: return say(`Unknown command /${verb}. Type / to see the list.`);
+    }
+  }
+  const at = text.match(/@([\w.-]+)/);
+  if (at){
+    const [sq, nq] = at[1].split('.');
+    const sec = findSector(sq); const node = nq ? findNode((sec ? sec.id + '.' : '') + nq) : (sec ? null : findNode(at[1]));
+    if (sec || node){ say(foreman(sec || node.sec, node, text.toLowerCase())); if (node) select(node); return; }
+  }
+  say('Address a line with @, e.g. "@incident status", or type / for commands.');
+}
+
+/* ---------- canvas rendering ---------- */
+const cv = $('#world'), ctx = cv.getContext('2d');
+const ZOOMS = [0.5, 0.75, 1, 1.5, 2, 3, 4];
+let zi = 2, cam = {x:0, y:0}, camT = null, dpr = 1, vw = 0, vh = 0;
+let selected = null, hover = null, mode = null;
+
+function R(g,x,y,w,h,c){ g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); }
+function hash(x,y){ let h = x*374761393 + y*668265263; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967295; }
+
+const ground = document.createElement('canvas');
+function paintGround(){
+  ground.width = worldW; ground.height = worldH; const g = ground.getContext('2d');
+  R(g,0,0,worldW,worldH,'#26301d');
+  for (let y=0;y<worldH;y+=4) for (let x=0;x<worldW;x+=4){
+    const h = hash(x,y);
+    if (h < .07) R(g,x,y,1,2,'#33422a'); else if (h < .1) R(g,x,y,2,1,'#1e2617'); else if (h > .995) R(g,x,y,1,1,'#c9b26b');
+  }
+  // dirt paths between sectors
+  for (const s of SECTORS){
+    const py = s.y + s.h + 6;
+    if (py + 18 < worldH){ R(g,0,py,worldW,16,'#3a3122'); for (let x=0;x<worldW;x+=3) if (hash(x,py) < .25) R(g,x,py+rintH(x,py,14),2,1,'#4c4130'); }
+  }
+  for (const s of SECTORS){
+    // stone floor
+    R(g, s.x-2, s.y-2, s.w+4, s.h+4, '#14110c');
+    R(g, s.x, s.y, s.w, s.h, '#3a352c');
+    for (let ty=0; ty<s.h; ty+=T) for (let tx=0; tx<s.w; tx+=T){
+      const h = hash(tx+s.x, ty+s.y);
+      R(g, s.x+tx, s.y+ty, T, T, h < .3 ? '#363128' : h > .85 ? '#403a30' : '#3a352c');
+      R(g, s.x+tx, s.y+ty, T, 1, '#2d2922'); R(g, s.x+tx, s.y+ty, 1, T, '#2d2922');
+      if (h > .93) R(g, s.x+tx+5, s.y+ty+7, 3, 1, '#2a261f');
+    }
+    // fence (top) and curb (bottom)
+    R(g, s.x, s.y+3, s.w, 2, '#7d5733'); R(g, s.x, s.y+8, s.w, 1, '#6a4a2b');
+    for (let x=s.x; x<s.x+s.w; x+=12){ R(g, x, s.y-3, 3, 13, '#5c3f25'); R(g, x, s.y-3, 3, 1, '#8a6239'); }
+    R(g, s.x, s.y+s.h-3, s.w, 3, '#4a443a'); R(g, s.x, s.y+s.h-3, s.w, 1, '#5b5447');
+    // sign board
+    R(g, s.x+10, s.y+14, 3, 26, '#5c3f25');
+    R(g, s.x+4, s.y+14, 58, 15, '#14110c'); R(g, s.x+5, s.y+15, 56, 13, '#8a5d34'); R(g, s.x+5, s.y+15, 56, 1, '#a8774a'); R(g, s.x+5, s.y+27, 56, 1, '#6a4526');
+    // direction arrows painted on floor
+    for (let x = s.x + SIGN_W; x < s.x + s.w - 10; x += 40){ const yy = s.y + s.h - 12; arrow(g, x, yy, s.dir, '#4a4438'); }
+  }
+}
+function rintH(x,y,m){ return Math.floor(hash(y,x)*m); }
+function arrow(g,x,y,dir,c){ for (let i=0;i<4;i++){ R(g, x + dir*i, y - i, 1, 1+2*i? 1:1, c); R(g, x+dir*i, y+i, 1,1,c); } R(g, x-dir*5, y, 6, 1, c); }
+
+function drawBelt(g, e, t){
+  const halted = e.sec.halted;
+  for (let i=1;i<e.pts.length;i++){
+    const [x0,y0] = e.pts[i-1], [x1,y1] = e.pts[i];
+    if (y0 === y1){
+      const x = Math.min(x0,x1), w = Math.abs(x1-x0) + 1, dir = Math.sign(x1-x0) || 1;
+      R(g, x, y0-4, w, 8, '#2b2624'); R(g, x, y0-4, w, 1, '#5d544c'); R(g, x, y0+3, w, 1, '#141110');
+      const off = halted ? 0 : Math.floor((t*30) % 6);
+      for (let k = -6; k < w; k += 6){ const xx = dir > 0 ? x + k + off : x + w - k - off; if (xx >= x && xx < x + w - 1) R(g, xx, y0-2, 1, 4, '#4a423b'); }
+    } else {
+      const y = Math.min(y0,y1), h = Math.abs(y1-y0) + 1, dir = Math.sign(y1-y0) || 1;
+      R(g, x0-4, y, 8, h, '#2b2624'); R(g, x0-4, y, 1, h, '#5d544c'); R(g, x0+3, y, 1, h, '#141110');
+      const off = halted ? 0 : Math.floor((t*30) % 6);
+      for (let k = -6; k < h; k += 6){ const yy = dir > 0 ? y + k + off : y + h - k - off; if (yy >= y && yy < y + h - 1) R(g, x0-2, yy, 4, 1, '#4a423b'); }
+    }
+  }
+}
+function drawCrate(g, x, y, c){
+  x = Math.round(x) - 3; y = Math.round(y) - 6;
+  R(g, x-1, y-1, 8, 8, '#14110c'); R(g, x, y, 6, 2, shade(c, 1.25)); R(g, x, y+2, 6, 4, c); R(g, x+2, y+3, 2, 1, shade(c, .7));
+}
+function shade(hex, f){ const n = parseInt(hex.slice(1),16); const r = Math.min(255, ((n>>16)&255)*f|0), gg = Math.min(255, ((n>>8)&255)*f|0), b = Math.min(255, (n&255)*f|0); return `rgb(${r},${gg},${b})`; }
+
+function drawMachine(g, n, t){
+  const {x, y} = n, col = ROLE[n.role] || '#888', busy = n.state === 'busy', fire = n.state === 'fire';
+  R(g, x-22, y+3, 44, 4, 'rgba(0,0,0,.35)');
+  // chimney
+  R(g, x+8, y-42, 7, 12, '#14110c'); R(g, x+9, y-41, 5, 11, '#6a645a'); R(g, x+9, y-41, 5, 1, '#857e72');
+  // roof top face + front lip
+  R(g, x-21, y-33, 42, 14, '#14110c'); R(g, x-20, y-32, 40, 11, shade(col, fire ? .6 : .85));
+  for (let i=0;i<40;i+=5) R(g, x-20+i, y-32, 1, 11, shade(col, .65));
+  R(g, x-20, y-32, 40, 1, shade(col, 1.2)); R(g, x-20, y-22, 40, 2, shade(col, .5));
+  // front wall (planks)
+  R(g, x-21, y-20, 42, 25, '#14110c'); R(g, x-20, y-20, 40, 24, fire ? '#5a3a22' : '#7a4f2d');
+  for (let i=0;i<24;i+=4) R(g, x-20, y-20+i, 40, 1, '#68421f');
+  // door
+  R(g, x-5, y-9, 10, 13, '#14110c'); R(g, x-4, y-8, 8, 12, '#3d2816'); R(g, x+2, y-3, 1, 1, '#c9a43b');
+  // windows
+  const glow = busy ? (Math.sin(t*7 + n.x) > -.6 ? '#f6c25b' : '#e0a040') : fire ? '#ff7a3d' : '#2a2420';
+  for (const wx of [x-16, x+9]){ R(g, wx-1, y-16, 9, 8, '#14110c'); R(g, wx, y-15, 7, 6, glow); R(g, wx+3, y-15, 1, 6, '#14110c'); }
+  // role banner + status lamp
+  R(g, x-17, y-40, 2, 10, '#5c3f25'); R(g, x-15, y-40, 8, 5, col); R(g, x-15, y-36, 4, 2, col);
+  const lamp = fire ? (Math.floor(t*4)%2 ? '#e5583f' : '#7a2618') : busy ? '#8bc96b' : n.inbox.length ? '#e9c46a' : '#5e574b';
+  R(g, x+16, y-27, 4, 4, '#14110c'); R(g, x+17, y-26, 2, 2, lamp);
+  // worker
+  const bob = busy ? Math.round(Math.sin(t*10 + n.x)) : 0;
+  const wx = x + (n.sec.dir > 0 ? -27 : 23), wy = y - 8 + bob;
+  R(g, wx-1, wy+9, 7, 2, 'rgba(0,0,0,.35)');
+  R(g, wx, wy+5, 5, 5, shade(col, .8)); R(g, wx+1, wy+1, 4, 4, '#e8c49a'); R(g, wx, wy, 6, 2, col); R(g, wx+2, wy+3, 1, 1, '#14110c');
+  if (busy){ R(g, x-18, y+6, 36, 3, '#14110c'); R(g, x-17, y+7, Math.max(1, Math.round(34*n.prog)), 1, '#f0a845'); }
+}
+function drawProbe(g, n, t){
+  const {x,y} = n, checking = n.state === 'busy';
+  R(g, x-9, y+2, 18, 3, 'rgba(0,0,0,.3)');
+  R(g, x-1, y-28, 3, 26, '#14110c'); R(g, x, y-27, 1, 25, '#8d877b');
+  R(g, x-7, y-38, 15, 12, '#14110c'); R(g, x-6, y-37, 13, 10, '#6a645a'); R(g, x-6, y-37, 13, 1, '#958d80');
+  const lamp = checking ? (Math.floor(t*8)%2 ? '#e9c46a' : '#8a7432') : n.out ? '#8bc96b' : '#4a443a';
+  R(g, x-3, y-34, 7, 5, '#14110c'); R(g, x-2, y-33, 5, 3, lamp);
+  if (checking && !reduced){ const r = Math.floor((t*20)%10); g.strokeStyle = 'rgba(233,196,106,.6)'; g.lineWidth = 1; g.strokeRect(x-6-r, y-38-r, 13+2*r, 10+2*r); }
+}
+function drawLock(g, n, t){
+  const {x,y} = n, hold = n.state === 'holding';
+  for (const px of [x-11, x+6]){ R(g, px-1, y-23, 7, 28, '#14110c'); R(g, px, y-22, 5, 26, '#6d675c'); R(g, px, y-22, 5, 2, '#8d877b'); }
+  const barY = hold ? y-8 : y-20; const bc = hold ? '#c9473a' : '#6aa84f';
+  R(g, x-6, barY-1, 12, 4, '#14110c'); R(g, x-6, barY, 12, 2, bc); R(g, x-6, barY+5 > y ? barY : barY+5, 12, 2, hold ? bc : 'transparent');
+  // padlock
+  const ly = y - 34;
+  R(g, x-3, ly-4, 6, 1, '#d8c27a'); R(g, x-3, ly-4, 1, 4, '#d8c27a'); R(g, x+2, ly-4, 1, hold ? 4 : 2, '#d8c27a');
+  R(g, x-4, ly, 9, 7, '#14110c'); R(g, x-3, ly+1, 7, 5, hold ? '#e9c46a' : '#8bc96b'); R(g, x, ly+3, 1, 2, '#14110c');
+  if (n.needs.length > 1){ for (const [i,k] of [['you',0],['owner',1]]){ R(g, x-8 + k*12, y+8, 5, 3, '#14110c'); R(g, x-7 + k*12, y+9, 3, 1, n.keys[i] ? '#f0a845' : '#4a443a'); } }
+  if (hold){
+    const b = reduced ? 0 : Math.round(Math.sin(t*5)*2);
+    const bx = x + 10, by = y - 50 + b;
+    R(g, bx-1, by-1, 11, 12, '#14110c'); R(g, bx, by, 9, 10, '#efe3c2'); R(g, bx+2, by+10, 3, 2, '#efe3c2');
+    R(g, bx+4, by+2, 2, 4, '#c9473a'); R(g, bx+4, by+7, 2, 1, '#c9473a');
+    if (n.inbox.length > 1){ g.font = '7px "Pixelify Sans", monospace'; g.fillStyle = '#efe3c2'; g.fillText('×' + n.inbox.length, bx + 11, by + 8); }
+  }
+}
+function drawSplit(g, n){ const {x,y} = n; R(g, x-7, y-7, 14, 14, '#14110c'); R(g, x-6, y-6, 12, 12, '#5f5a50'); R(g, x-6, y-6, 12, 1, '#857e72'); R(g, x-1, y-4, 2, 8, '#efe3c2'); R(g, x-3, y-4, 6, 1, '#efe3c2'); }
+function drawIn(g, n){
+  const {x,y} = n;
+  R(g, x-15, y-16, 26, 22, '#14110c'); R(g, x-14, y-15, 24, 20, '#6e4a2a'); for (let i=0;i<20;i+=4) R(g, x-14, y-15+i, 24, 1, '#5c3d22');
+  R(g, x-12, y-26, 8, 8, '#14110c'); R(g, x-11, y-25, 6, 2, '#d8c49a'); R(g, x-11, y-23, 6, 4, '#c8b48a');
+  R(g, x-3, y-24, 8, 7, '#14110c'); R(g, x-2, y-23, 6, 2, '#d8c49a'); R(g, x-2, y-21, 6, 4, '#c8b48a');
+  R(g, x+4, y-36, 2, 18, '#5c3f25'); R(g, x+1, y-40, 9, 6, '#14110c'); R(g, x+2, y-39, 7, 4, n.sec.id === 'inc' ? '#e5583f' : n.sec.id === 'dep' ? '#79c2b6' : '#5b8fd3');
+}
+function drawOut(g, n, t){
+  const {x,y} = n;
+  R(g, x-13, y+4, 28, 3, 'rgba(0,0,0,.3)');
+  R(g, x-13, y-16, 28, 16, '#14110c'); R(g, x-12, y-15, 26, 14, '#8a5d34'); R(g, x-12, y-15, 26, 2, '#a8774a');
+  for (let i=0;i<26;i+=6) R(g, x-12+i, y-13, 1, 12, '#6a4526');
+  for (const wx of [x-9, x+7]){ R(g, wx-1, y-3, 7, 7, '#14110c'); R(g, wx, y-2, 5, 5, '#4a443a'); R(g, wx+2, y, 1, 1, '#c9a43b'); }
+  const k = Math.min(4, n.sec.shipped); for (let i=0;i<k;i++) drawCrate(g, x-6 + (i%2)*8, y-15 - Math.floor(i/2)*6, '#c8b48a');
+}
+function drawLantern(g, x, y, t){
+  R(g, x, y-18, 2, 20, '#3b2a18'); R(g, x-2, y-24, 6, 7, '#14110c'); R(g, x-1, y-23, 4, 5, '#f6c25b');
+  const f = reduced ? 1 : .85 + Math.sin(t*9 + x)*.08 + Math.random()*.05;
+  const gr = g.createRadialGradient(x+1, y-20, 1, x+1, y-20, 46*f);
+  gr.addColorStop(0, 'rgba(246,194,91,.32)'); gr.addColorStop(1, 'rgba(246,194,91,0)');
+  g.globalCompositeOperation = 'lighter'; g.fillStyle = gr; g.fillRect(x-46, y-66, 94, 94); g.globalCompositeOperation = 'source-over';
+}
+function drawNode(g, n, t){
+  ({machine:drawMachine, probe:drawProbe, lock:drawLock, split:drawSplit, in:drawIn, out:drawOut})[n.kind](g, n, t);
+}
+
+function resize(){
+  const r = cv.getBoundingClientRect(); dpr = Math.max(1, window.devicePixelRatio || 1);
+  vw = r.width; vh = r.height; cv.width = Math.round(vw*dpr); cv.height = Math.round(vh*dpr);
+}
+function fit(){
+  resize();
+  let best = 0; for (let i=0;i<ZOOMS.length;i++) if (worldW*ZOOMS[i] <= vw*1.04 && worldH*ZOOMS[i] <= vh*1.35) best = i;
+  zi = best; const z = ZOOMS[zi];
+  cam.x = (worldW - vw/z)/2; cam.y = (worldH - vh/z)/2;
+  if (worldW*z > vw) cam.x = 0;
+  if (worldH*z > vh) cam.y = 0;
+  camT = null;
+}
+function setZoom(ni, sx, sy){
+  ni = Math.max(0, Math.min(ZOOMS.length-1, ni)); if (ni === zi) return;
+  const z0 = ZOOMS[zi], z1 = ZOOMS[ni]; sx = sx ?? vw/2; sy = sy ?? vh/2;
+  const wx = cam.x + sx/z0, wy = cam.y + sy/z0; zi = ni; cam.x = wx - sx/z1; cam.y = wy - sy/z1; camT = null;
+}
+function focusOn(n){ const z = ZOOMS[zi]; camT = {x: n.x - vw/z/2, y: n.y - 10 - vh/z/2}; if (reduced){ cam = {...camT}; camT = null; } }
+function focusSector(s){ const z = ZOOMS[zi]; camT = {x: s.x + s.w/2 - vw/z/2, y: s.y + s.h/2 - vh/z/2}; if (reduced){ cam = {...camT}; camT = null; } }
+
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(0.05, (now - last)/1000); last = now;
+  step(dt, true);
+  if (camT){ cam.x += (camT.x - cam.x)*Math.min(1, dt*6); cam.y += (camT.y - cam.y)*Math.min(1, dt*6); if (Math.abs(camT.x-cam.x) < .5 && Math.abs(camT.y-cam.y) < .5) camT = null; }
+  if (!$('#view-floor').hidden) render(clock);
+  uiTick(now);
+  requestAnimationFrame(frame);
+}
+function render(t){
+  const z = ZOOMS[zi], k = z*dpr;
+  ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle = '#1b2014'; ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.imageSmoothingEnabled = false;
+  ctx.setTransform(k, 0, 0, k, Math.round(-cam.x*k), Math.round(-cam.y*k));
+  ctx.drawImage(ground, 0, 0);
+  for (const s of SECTORS){
+    ctx.font = '600 8px "Pixelify Sans", monospace'; ctx.fillStyle = '#2a1a0a'; ctx.fillText(s.name.length > 13 ? s.name.slice(0,13) : s.name, s.x+8, s.y+25);
+    ctx.font = '7px "Pixelify Sans", monospace'; ctx.fillStyle = '#d9c9a0'; ctx.fillText((s.dir > 0 ? '→ ' : '← ') + s.trigger, s.x+SIGN_W, s.y+20);
+    if (s.halted){ ctx.fillStyle = '#e9c46a'; ctx.fillText('HALTED', s.x+s.w-40, s.y+20); }
+    for (const e of s.edges) drawBelt(ctx, e, t);
+  }
+  const all = SECTORS.flatMap(s => s.nodes).sort((a,b) => a.y - b.y);
+  for (const n of all){
+    drawNode(ctx, n, t);
+    ctx.font = '7px "Pixelify Sans", monospace'; ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(10,9,7,.75)'; const lw = ctx.measureText(n.label).width; ctx.fillRect(Math.round(n.x - lw/2 - 2), n.y + 10, Math.ceil(lw) + 4, 9);
+    ctx.fillStyle = n.state === 'fire' ? '#ff9b82' : '#efe3c2'; ctx.fillText(n.label, n.x, n.y + 17);
+    if (n.contract){ ctx.fillStyle = '#79c2b6'; ctx.font = '6px "Pixelify Sans", monospace'; ctx.fillText(n.contract, n.x, n.y + 25); }
+    ctx.textAlign = 'left';
+  }
+  for (const s of SECTORS) for (const e of s.edges) for (const c of e.crates){ const [x,y] = pointAt(e, c.t); drawCrate(ctx, x, y, c.color); }
+  for (const p of particles){
+    const a = p.life/p.max;
+    if (p.kind === 'smoke'){ ctx.fillStyle = `rgba(150,140,125,${a*.55})`; const s = 2 + Math.round((1-a)*3); ctx.fillRect(Math.round(p.x), Math.round(p.y), s, s); }
+    else if (p.kind === 'fire'){ ctx.fillStyle = a > .7 ? '#ffe28a' : a > .4 ? '#ff9a3c' : a > .2 ? '#e5583f' : 'rgba(80,70,60,.6)'; const s = a > .5 ? 3 : 2; ctx.fillRect(Math.round(p.x), Math.round(p.y), s, s); }
+    else { ctx.fillStyle = p.c; ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1); }
+  }
+  for (const s of SECTORS){ drawLantern(ctx, s.x + 2, s.y + 2, t); drawLantern(ctx, s.x + s.w - 4, s.y + 2, t); }
+  if (mode === 'fire'){
+    for (const s of SECTORS) if (!s.nodes.some(n => n.state === 'fire')){ ctx.fillStyle = 'rgba(8,6,4,.6)'; ctx.fillRect(s.x-4, s.y-30, s.w+8, s.h+34); }
+  }
+  for (const n of [hover, selected]) if (n){
+    const c = n === selected ? '#f0a845' : 'rgba(239,227,194,.7)'; const x0 = n.x - n.hw - 6, y0 = n.y - 46, x1 = n.x + n.hw + 6, y1 = n.y + 28;
+    for (const [cx,cy,dx,dy] of [[x0,y0,1,1],[x1,y0,-1,1],[x0,y1,1,-1],[x1,y1,-1,-1]]){ R(ctx, cx, cy, 5*dx || 1, 1, c); R(ctx, dx > 0 ? cx : cx-4, cy, 5, 1, c); R(ctx, cx, dy > 0 ? cy : cy-4, 1, 5, c); }
+  }
+}
+
+/* ---------- pointer ---------- */
+function toWorld(ev){ const r = cv.getBoundingClientRect(), z = ZOOMS[zi]; return [cam.x + (ev.clientX - r.left)/z, cam.y + (ev.clientY - r.top)/z]; }
+function hitNode(wx, wy){ for (const s of SECTORS) for (const n of s.nodes) if (wx > n.x - n.hw - 6 && wx < n.x + n.hw + 6 && wy > n.y - 44 && wy < n.y + 26) return n; return null; }
+function hitCrate(wx, wy){ for (const s of SECTORS) for (const e of s.edges) for (const c of e.crates){ const [x,y] = pointAt(e, c.t); if (Math.abs(wx-x) < 5 && Math.abs(wy-(y-3)) < 5) return {c, e}; } return null; }
+let drag = null;
+cv.addEventListener('pointerdown', ev => { drag = {x:ev.clientX, y:ev.clientY, cx:cam.x, cy:cam.y, moved:false}; cv.setPointerCapture(ev.pointerId); });
+cv.addEventListener('pointermove', ev => {
+  if (drag){ const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y; if (Math.abs(dx)+Math.abs(dy) > 4) drag.moved = true;
+    if (drag.moved){ const z = ZOOMS[zi]; cam.x = drag.cx - dx/z; cam.y = drag.cy - dy/z; camT = null; cv.classList.add('pan'); } return; }
+  const [wx,wy] = toWorld(ev); hover = hitNode(wx,wy); cv.classList.toggle('hot', !!(hover || hitCrate(wx,wy)));
+});
+cv.addEventListener('pointerup', ev => {
+  cv.classList.remove('pan');
+  if (drag && !drag.moved){ const [wx,wy] = toWorld(ev); const hc = hitCrate(wx,wy); if (hc) selectCrate(hc); else select(hitNode(wx,wy)); }
+  drag = null;
+});
+cv.addEventListener('pointerleave', () => { hover = null; });
+cv.addEventListener('wheel', ev => { ev.preventDefault(); const r = cv.getBoundingClientRect(); setZoom(zi + (ev.deltaY < 0 ? 1 : -1), ev.clientX - r.left, ev.clientY - r.top); }, {passive:false});
+$('#z-in').onclick = () => setZoom(zi+1); $('#z-out').onclick = () => setZoom(zi-1); $('#z-fit').onclick = fit;
+$('#lg-btn').onclick = () => { const l = $('#legend'); l.hidden = !l.hidden; };
+addEventListener('resize', () => { resize(); });
+
+/* ---------- inspector ---------- */
+const insp = $('#inspector');
+let inspVer = -1, inspCrate = null;
+function select(n){ selected = n; inspCrate = null; inspVer = -1; insp.hidden = !n; if (n) renderInspector(); }
+function selectCrate({c, e}){ selected = null; inspCrate = {c, e}; insp.hidden = false; renderCrateInspector(); }
+function stateChip(n){
+  const map = {busy:['#8bc96b','Working'], idle:['#6d6556','Idle'], fire:['#e5583f','On fire'], holding:['#e9c46a','Waiting on you']};
+  let [c,l] = map[n.state] || map.idle; if (n.sec.halted) [c,l] = ['#3a3428','Line halted'];
+  if (n.kind === 'probe' && n.state === 'idle' && n.out) [c,l] = ['#8bc96b','Passing'];
+  return `<span class="state"><i style="background:${c}"></i>${l}</span>`;
+}
+function miniSprite(n){
+  const c = document.createElement('canvas'); c.width = 64; c.height = 56; const g = c.getContext('2d');
+  g.imageSmoothingEnabled = false; g.setTransform(1,0,0,1,0,0);
+  const fake = {...n, x:32, y:46, inbox:n.inbox, keys:n.keys, needs:n.needs, sec:n.sec};
+  drawNode(g, fake, clock); return c;
+}
+function renderInspector(){
+  const n = selected; if (!n) return; inspVer = n.ver;
+  const kindName = {machine:'Machine', probe:'Probe', lock:'Lock', split:'Splitter', in:'Intake', out:'Shipping dock'}[n.kind];
+  const rows = [];
+  rows.push(['State', stateChip(n)]);
+  if (n.role){ rows.push(['Role', `<span class="path">.promptory/roles/${n.role}.md</span>`]); rows.push(['Contract', `<span class="path">.promptory/contracts/${n.contract}.json</span>`]); rows.push(['Runs as', `<code>claude -p</code> headless · ends on exit`]); if (n.mcp) rows.push(['Tools', n.mcp.map(m => `<code>${m}</code>`).join(' ')]); rows.push(['Attempts', `${n.attempts || 0} / 3`]); }
+  if (n.kind === 'probe') rows.push(['Runs', `<code>${esc(n.run)}</code>`], ['Passes on', 'exit 0']);
+  if (n.kind === 'lock') rows.push(['Opens for', esc(n.approvers)], ['Holding', `${n.inbox.length} crate(s)`]);
+  if (n.kind === 'split') rows.push(['Routes on', `<code>${n.by}</code>`], ['Routes', Object.entries(n.routes).map(([k,v]) => `${k} → ${n.sec.byId[v].label}`).join('<br>')]);
+  if (n.kind === 'in') rows.push(['Trigger', esc(n.sec.trigger)]);
+  if (n.kind === 'out') rows.push(['Shipped', String(n.sec.shipped)]);
+  rows.push(['Defined in', `<span class="path">.promptory/workflows/${n.sec.file}</span>`]);
+  const acts = [];
+  if (n.state === 'fire'){ acts.push(`<button class="btn primary" data-act="retry">Retry</button>`, `<button class="btn" data-act="hint">Retry with a hint…</button>`, `<button class="btn danger" data-act="halt">Halt line</button>`); }
+  else if (n.kind === 'lock' && n.state === 'holding'){ acts.push(n.needs.length > 1 ? `<button class="btn primary" data-act="ship">Open the launch keys</button>` : `<button class="btn primary" data-act="approve">Approve</button>`); }
+  if (n.kind === 'in') acts.push(`<button class="btn" data-act="run">Dispatch a run</button>`);
+  if (n.kind === 'machine' && n.state !== 'fire') acts.push(`<button class="btn" data-act="ask">Ask this step…</button>`);
+  if (n.state !== 'fire') acts.push(`<button class="btn" data-act="${n.sec.halted ? 'resume' : 'halt'}">${n.sec.halted ? 'Resume line' : 'Halt line'}</button>`);
+  const tx = n.tx.length ? `<div><p class="sec-title">Transcript</p><pre class="tx">${n.tx.slice(-12).map(([k,l]) => `<span class="${k === 'tool' ? 'tool' : k === 'ret' ? 'ret' : k === 'bad' ? 'bad' : 'good'}">${esc(l)}</span>`).join('\n')}</pre></div>` : '';
+  const out = n.out ? `<div><p class="sec-title">Last output</p><pre class="json">${esc(JSON.stringify(n.out, null, 2))}</pre></div>` : '';
+  insp.innerHTML = `<div class="insp-head"><span id="spr"></span><div><h2>${esc(n.label)}</h2><p>${kindName} · ${esc(n.sec.name)}</p></div><button class="iconbtn x" data-act="close" aria-label="Close inspector">×</button></div>
+    <div class="insp-body"><dl class="kv">${rows.map(([a,b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>
+    ${n.err ? `<div><p class="sec-title">Why it stopped</p><pre class="tx"><span class="bad">${esc(n.err)}</span></pre></div>` : ''}
+    <div class="actions">${acts.join('')}</div>${tx}${out}</div>`;
+  insp.querySelector('#spr').replaceWith(miniSprite(n));
+}
+function renderCrateInspector(){
+  const {c, e} = inspCrate;
+  insp.innerHTML = `<div class="insp-head"><div><h2>Crate #${c.id}</h2><p>On the belt ${esc(e.from.label)} → ${esc(e.to.label)}</p></div><button class="iconbtn x" data-act="close" aria-label="Close inspector">×</button></div>
+    <div class="insp-body"><dl class="kv"><dt>Line</dt><dd>${esc(e.sec.name)}</dd><dt>Made by</dt><dd>${esc(e.from.label)}${e.from.contract ? ` · <span class="path">${e.from.contract}</span>` : ''}</dd><dt>Status</dt><dd>Schema-valid</dd></dl>
+    <div><p class="sec-title">Payload</p><pre class="json">${esc(JSON.stringify(c.payload, null, 2))}</pre></div></div>`;
+}
+insp.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-act]'); if (!b) return; const n = selected; const act = b.dataset.act;
+  if (act === 'close'){ select(null); return; }
+  if (!n) return;
+  if (act === 'retry') runCommand(`/retry ${n.sec.id}.${n.id}`);
+  if (act === 'hint'){ const i = $('#cmd'); i.value = `/retry ${n.sec.id}.${n.id} "`; i.focus(); }
+  if (act === 'ask'){ const i = $('#cmd'); i.value = `@${n.sec.id}.${n.id} `; i.focus(); }
+  if (act === 'approve') runCommand(`/approve ${n.sec.id}.${n.id}`);
+  if (act === 'ship') openMode('ship');
+  if (act === 'run') openMode('start', n.sec.id);
+  if (act === 'halt' || act === 'resume') runCommand(`/${act} ${n.sec.id}`);
+  renderInspector();
+});
+
+/* ---------- radio ---------- */
+function renderRadio(){
+  radioDirty = false; const ol = $('#radio-list');
+  const near = ol.scrollHeight - ol.scrollTop - ol.clientHeight < 30;
+  ol.innerHTML = radio.slice(-40).map(r => `<li class="ev ${r.level}"><time>${mmss(r.t)}</time><b>${esc(r.who)}</b><span>${esc(r.text)}</span></li>`).join('');
+  if (near) ol.scrollTop = ol.scrollHeight;
+}
+$('#radio-toggle').onclick = () => { const r = $('#radio'); const c = r.classList.toggle('collapsed'); $('#radio-toggle').textContent = c ? '+' : '–'; $('#radio-toggle').setAttribute('aria-expanded', String(!c)); };
+
+/* ---------- modes (situations) ---------- */
+const card = $('#modecard');
+function openMode(m, arg){
+  mode = mode === m && !arg ? null : m;
+  document.querySelectorAll('.mode').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
+  $('#view-floor').classList.toggle('alarm', mode === 'fire');
+  if (mode) switchView('floor');
+  renderMode(arg);
+  if (mode === 'fire'){ const f = SECTORS.flatMap(s => s.nodes).find(n => n.state === 'fire'); if (f){ focusOn(f); select(f); } }
+  if (mode === 'ship'){ const l = nodesById['dep.launch']; focusOn(l); select(l); }
+}
+let modeSig = '';
+function renderMode(arg){
+  if (!mode){ card.hidden = true; card.innerHTML = ''; modeSig = ''; return; }
+  card.hidden = false;
+  if (mode === 'start'){
+    const sel = arg || 'eng';
+    card.innerHTML = `<h3>Start a run</h3><p>Pick a line and give it its input. The crate leaves the intake dock and the line takes it from there.</p>
+      <form class="row" id="start-form"><div class="field"><label for="run-line">Line</label><select id="run-line">${SECTORS.map(s => `<option value="${s.id}" ${s.id === sel ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>
+      <div class="field" style="flex:1;min-width:160px"><label for="run-input">Input</label><input id="run-input" placeholder="PROJ-900, ALT-55110 or v4.18.1"></div>
+      <button class="btn primary" type="submit">Dispatch</button></form>`;
+    card.querySelector('#start-form').onsubmit = ev => { ev.preventDefault(); const s = $('#run-line').value; const v = $('#run-input').value.trim(); runCommand(`/run ${s}${v ? ' ' + v : ''}`); openMode('start'); };
+  }
+  if (mode === 'fire'){
+    const fires = SECTORS.flatMap(s => s.nodes).filter(n => n.state === 'fire');
+    modeSig = 'fire:' + fires.map(f => f.id).join(',');
+    card.innerHTML = `<h3>Firefight</h3><p>Lines without fires are dimmed. Each card shows the step that stopped, the contract error and what the agent saw last.</p>` +
+      (fires.length ? `<div class="firecards">${fires.map(n => `<div class="firecard"><strong>${esc(n.label)} · ${esc(n.sec.name)}</strong><span class="err">${esc(n.err)}</span>
+        <pre class="tx">${n.tx.filter(x => x[0] !== 'bad').slice(-4).map(([k,l]) => `<span class="${k === 'tool' ? 'tool' : 'ret'}">${esc(l)}</span>`).join('\n')}</pre>
+        <div class="field"><label for="hint-${n.sec.id}-${n.id}">Hint for the retry</label><input id="hint-${n.sec.id}-${n.id}" value="include suspected_cause from the pool metrics"></div>
+        <div class="actions"><button class="btn primary" data-retry="${n.sec.id}.${n.id}">Retry with hint</button><button class="btn danger" data-halt="${n.sec.id}">Halt line</button></div></div>`).join('')}</div>`
+      : `<p>No fires. Every line is running.</p>`);
+    card.querySelectorAll('[data-retry]').forEach(b => b.onclick = () => { const id = b.dataset.retry; const h = card.querySelector(`#hint-${id.replace('.','-')}`).value; runCommand(`/retry ${id} "${h}"`); renderMode(); });
+    card.querySelectorAll('[data-halt]').forEach(b => b.onclick = () => runCommand(`/halt ${b.dataset.halt}`));
+  }
+  if (mode === 'ship'){
+    const l = nodesById['dep.launch'], ci = nodesById['dep.ci'], np = nodesById['dep.nonprod'];
+    const ok = n => n.out && n.state !== 'busy';
+    const holding = l.state === 'holding';
+    modeSig = `ship:${ok(ci)}${ok(np)}${l.keys.you}${l.keys.owner}${holding}`;
+    const li = (c, t) => `<li><i style="background:${c ? 'var(--ok)' : 'var(--muted)'}"></i>${t}</li>`;
+    card.innerHTML = `<h3>Ship to prod</h3><p>Production opens with two keys after both probes pass. Turning a key is logged with your name and stored in the run.</p>
+      <ul class="checklist">${li(ok(ci), 'Probe: CI green')}${li(ok(np), 'Probe: non-prod applied')}
+      <li><label class="key"><input type="checkbox" id="key-you" ${l.keys.you ? 'checked' : ''}> Your key</label></li>
+      <li><label class="key"><input type="checkbox" id="key-owner" ${l.keys.owner ? 'checked' : ''}> Release owner key</label></li></ul>
+      <div class="actions"><button class="btn primary" id="launch" ${l.keys.you && l.keys.owner && holding ? '' : 'disabled'}>Launch v4.18.0</button><span style="color:var(--muted);font-size:13px;align-self:center">${holding ? 'Crates are waiting at the launch gate.' : 'Nothing at the gate yet.'}</span></div>`;
+    card.querySelector('#key-you').onchange = ev => { l.keys.you = ev.target.checked; bump(l); if (l.keys.you) log(l.sec.name, 'warn', 'Your key turned'); renderMode(); };
+    card.querySelector('#key-owner').onchange = ev => { l.keys.owner = ev.target.checked; bump(l); if (l.keys.owner) log(l.sec.name, 'warn', 'Release owner key turned'); renderMode(); };
+    card.querySelector('#launch').onclick = () => { l.approved++; log('you', 'you', 'Launch'); openMode('ship'); };
+  }
+}
+document.querySelectorAll('.mode').forEach(b => b.onclick = () => openMode(b.dataset.mode));
+$('#p-fire').onclick = () => openMode('fire');
+$('#p-wait').onclick = () => { const w = SECTORS.flatMap(s => s.nodes).find(n => n.kind === 'lock' && n.state === 'holding'); if (w){ switchView('floor'); focusOn(w); select(w); } };
+
+/* ---------- command bar with suggestions ---------- */
+const input = $('#cmd'), sug = $('#suggest'); let sugItems = [], sugI = 0;
+function targets(kind){
+  const nodes = SECTORS.flatMap(s => s.nodes);
+  if (kind === 'line') return SECTORS.map(s => ({v:s.id, d:s.name + (s.halted ? ' · halted' : '')}));
+  if (kind === 'lock') return nodes.filter(n => n.kind === 'lock').map(n => ({v:`${n.sec.id}.${n.id}`, d:`${n.label} · ${n.state === 'holding' ? 'waiting on you' : 'open'}`}));
+  if (kind === 'fire') return nodes.filter(n => n.state === 'fire').map(n => ({v:`${n.sec.id}.${n.id}`, d:`${n.label} · on fire`}));
+  return [...SECTORS.map(s => ({v:s.id, d:s.name})), ...nodes.map(n => ({v:`${n.sec.id}.${n.id}`, d:`${n.label} · ${n.sec.name}`}))];
+}
+function updateSuggest(){
+  const v = input.value; let items = [];
+  const m = v.match(/^\/(\w*)$/);
+  if (m) items = COMMANDS.filter(c => c.c.startsWith('/' + m[1])).map(c => ({ins:c.c + ' ', code:c.c, d:c.d}));
+  else {
+    const m2 = v.match(/^\/(\w+)\s+([\w.-]*)$/);
+    const at = v.match(/(^|\s)@([\w.-]*)$/);
+    if (m2){ const c = COMMANDS.find(x => x.c === '/' + m2[1]); if (c && c.arg) items = targets(c.arg).filter(t => t.v.includes(m2[2])).map(t => ({ins:`/${m2[1]} ${t.v} `, code:t.v, d:t.d})); }
+    else if (at){ items = targets('any').filter(t => t.v.includes(at[2])).slice(0, 12).map(t => ({ins: v.slice(0, v.length - at[2].length) + t.v + ' ', code:'@' + t.v, d:t.d})); }
+  }
+  sugItems = items; sugI = 0;
+  sug.hidden = !items.length;
+  sug.innerHTML = items.map((it,i) => `<li role="option" aria-selected="${i === sugI}" data-i="${i}"><code>${esc(it.code)}</code><span>${esc(it.d)}</span></li>`).join('');
+}
+function acceptSuggest(i){ const it = sugItems[i]; if (!it) return; input.value = it.ins; input.focus(); updateSuggest(); }
+input.addEventListener('input', updateSuggest);
+input.addEventListener('focus', updateSuggest);
+input.addEventListener('blur', () => setTimeout(() => { sug.hidden = true; }, 150));
+input.addEventListener('keydown', ev => {
+  if (sug.hidden) return;
+  if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp'){ ev.preventDefault(); sugI = (sugI + (ev.key === 'ArrowDown' ? 1 : -1) + sugItems.length) % sugItems.length; sug.querySelectorAll('li').forEach((li,i) => li.setAttribute('aria-selected', String(i === sugI))); }
+  else if (ev.key === 'Tab'){ ev.preventDefault(); acceptSuggest(sugI); }
+  else if (ev.key === 'Escape'){ sug.hidden = true; }
+});
+sug.addEventListener('mousedown', ev => { const li = ev.target.closest('li'); if (li){ ev.preventDefault(); acceptSuggest(+li.dataset.i); } });
+$('#cmd-form').addEventListener('submit', ev => { ev.preventDefault(); runCommand(input.value); input.value = ''; sug.hidden = true; if (selected) renderInspector(); });
+addEventListener('keydown', ev => { if (ev.key === '/' && document.activeElement !== input && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)){ ev.preventDefault(); input.focus(); input.value = '/'; updateSuggest(); } });
+
+/* ---------- views ---------- */
+function switchView(v){
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.view === v)));
+  for (const id of ['floor','andon','ledger','blueprint']) $('#view-' + id).hidden = id !== v;
+  if (v === 'floor') resize();
+  if (v === 'blueprint') renderBlueprint();
+  lastSlow = 0;
+}
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchView(t.dataset.view));
+
+function renderAndon(){
+  $('#andon').innerHTML = SECTORS.map(s => {
+    const st = statusOf(s);
+    return `<article class="acard"><h3>${esc(s.name)} <small>${esc(s.trigger)}</small></h3>
+      <div class="stations">${s.nodes.filter(n => n.kind !== 'split').map(n => { const c = s.halted ? 'halt' : n.state === 'fire' ? 'fire' : n.state === 'holding' ? 'hold' : n.state === 'busy' ? 'busy' : 'idle'; return `<button class="st ${c}" data-node="${s.id}.${n.id}">${esc(n.label)}</button>`; }).join('')}</div>
+      <div class="nums"><div><b>${st.wip}</b><span>In flight</span></div><div><b>${s.shipped}</b><span>Shipped</span></div><div><b>${st.holds.length}</b><span>On you</span></div><div><b>${st.fires.length}</b><span>Fires</span></div></div></article>`;
+  }).join('');
+}
+$('#andon').addEventListener('click', ev => { const b = ev.target.closest('[data-node]'); if (!b) return; const n = nodesById[b.dataset.node]; switchView('floor'); focusOn(n); select(n); });
+
+function renderLedger(){
+  const W = 180, t0 = clock - W;
+  let h = '';
+  for (const s of SECTORS){
+    h += `<div class="lh">${esc(s.name)}</div>`;
+    for (const n of s.nodes.filter(n => n.kind === 'machine' || n.kind === 'probe')){
+      const bars = spans.filter(sp => sp.sec === s.id && sp.node === n.id && sp.e > t0).map(sp => ({s:sp.s, e:sp.e, k: sp.ok ? 'ok' : 'bad'}));
+      if (n.state === 'busy') bars.push({s:n.spanStart, e:clock, k:'run'});
+      if (n.state === 'fire') bars.push({s:n.fireStart ?? clock, e:clock, k:'bad'});
+      h += `<div class="ln">${esc(n.label)}</div><div class="lane">${bars.map(b => { const l = Math.max(0, (b.s - t0)/W*100), r = Math.min(100, (b.e - t0)/W*100); return `<i class="${b.k}" style="left:${l}%;width:${Math.max(.4, r-l)}%" title="${mmss(b.s)}–${mmss(b.e)}"></i>`; }).join('')}</div>`;
+    }
+  }
+  h += `<div></div><div class="axis"><span>${mmss(t0)}</span><span>${mmss(t0 + W/2)}</span><span>${mmss(clock)} now</span></div>`;
+  $('#ledger').innerHTML = h;
+}
+
+let bpSec = 'inc';
+function yamlFor(s){
+  const L = [`# .promptory/workflows/${s.file}`, `name: ${s.slug}`, `direction: ${s.dir > 0 ? 'right' : 'left'}   # the line grows this way on the floor`, `trigger: ${s.triggerYaml}`, `steps:`];
+  for (const n of s.nodes){
+    if (n.kind === 'in') continue;
+    L.push(`  - id: ${n.id}`);
+    if (n.needs.length && !(n.needs.length === 1 && s.byId[n.needs[0]].kind === 'in')) L.push(`    needs: [${n.needs.join(', ')}]`);
+    if (n.kind === 'machine'){ L.push(`    role: ${n.role}            # .promptory/roles/${n.role}.md`, `    contract: ${n.contract}   # JSON Schema, 3 attempts, then fire`, `    agent: claude-headless`); if (n.mcp) L.push(`    tools: [${n.mcp.join(', ')}]`); L.push(`    timeout: ${Math.ceil(n.dur*60)}s`); }
+    if (n.kind === 'probe') L.push(`    probe: { run: "${n.run}", pass: exit 0 }`);
+    if (n.kind === 'lock') L.push(n.keys ? `    lock: { keys: [you, release-owner] }` : `    lock: { approvers: [you] }`);
+    if (n.kind === 'split') L.push(`    split: { on: ${n.by}, routes: { ${Object.entries(n.routes).map(([k,v]) => `${k}: ${v}`).join(', ')} } }`);
+    if (n.kind === 'out') L.push(`    ship: ${n.label.toLowerCase().replace(/[^a-z]+/g,'-')}`);
+  }
+  return L.join('\n');
+}
+function hl(src){ return esc(src).split('\n').map(line => {
+  const [code, ...c] = line.split('#'); const cm = c.length ? `<span class="c">#${c.join('#')}</span>` : '';
+  return code.replace(/^(\s*-?\s*)([a-z_]+):/, '$1<span class="k">$2</span>:').replace(/(&quot;[^&]*&quot;)/g, '<span class="s">$1</span>') + cm;
+}).join('\n'); }
+function renderBlueprint(){
+  $('#bp-tabs').innerHTML = SECTORS.map(s => `<button class="tab" aria-selected="${s.id === bpSec}" data-bp="${s.id}">${esc(s.file)}</button>`).join('');
+  $('#yaml').innerHTML = hl(yamlFor(SECTORS.find(s => s.id === bpSec)));
+  const roles = [...new Set(SECTORS.flatMap(s => s.nodes).filter(n => n.role).map(n => n.role))];
+  const contracts = [...new Set(SECTORS.flatMap(s => s.nodes).filter(n => n.contract).map(n => n.contract))];
+  $('#tree').innerHTML = `<span class="d">.promptory/</span>
+  <span class="d">workflows/</span>
+${SECTORS.map(s => `    <span class="f">${s.file}</span>`).join('\n')}
+  <span class="d">roles/</span>
+${roles.map(r => `    <span class="f">${r}.md</span>`).join('\n')}
+  <span class="d">contracts/</span>
+${contracts.map(c => `    <span class="f">${c}.json</span>`).join('\n')}
+  <span class="d">probes/</span>
+    <span class="f">error-rate.sh</span>
+    <span class="f">env-applied.sh</span>
+    <span class="f">canary.sh</span>
+  <span class="m">runs/            # gitignored JSONL</span>`;
+}
+$('#bp-tabs').addEventListener('click', ev => { const b = ev.target.closest('[data-bp]'); if (b){ bpSec = b.dataset.bp; renderBlueprint(); } });
+
+/* ---------- periodic UI ---------- */
+let lastSlow = 0;
+function uiTick(now){
+  if (radioDirty) renderRadio();
+  if (selected && selected.ver !== inspVer && !insp.contains(document.activeElement)) renderInspector();
+  if (now - lastSlow < 400) return; lastSlow = now;
+  const nodes = SECTORS.flatMap(s => s.nodes);
+  const fires = nodes.filter(n => n.state === 'fire').length, waits = nodes.filter(n => n.kind === 'lock' && n.state === 'holding').length;
+  $('#p-fire span').textContent = `${fires} fire${fires === 1 ? '' : 's'}`;
+  $('#p-wait span').textContent = `${waits} waiting on you`;
+  $('#p-ship').textContent = `${SECTORS.reduce((s,x) => s + x.shipped, 0)} shipped`;
+  $('#b-fire').hidden = !fires; $('#b-fire').textContent = fires;
+  $('#b-ship').hidden = nodesById['dep.launch'].state !== 'holding';
+  if (mode === 'fire'){ const sig = 'fire:' + nodes.filter(n => n.state === 'fire').map(f => f.id).join(','); if (sig !== modeSig && !card.contains(document.activeElement)) renderMode(); }
+  if (mode === 'ship'){ const l = nodesById['dep.launch'], ci = nodesById['dep.ci'], np = nodesById['dep.nonprod']; const ok = n => n.out && n.state !== 'busy'; const sig = `ship:${ok(ci)}${ok(np)}${l.keys.you}${l.keys.owner}${l.state === 'holding'}`; if (sig !== modeSig) renderMode(); }
+  if (!$('#view-andon').hidden) renderAndon();
+  if (!$('#view-ledger').hidden) renderLedger();
+}
+
+/* ---------- legend sprites ---------- */
+document.querySelectorAll('[data-sprite]').forEach(c => {
+  const g = c.getContext('2d'); g.imageSmoothingEnabled = false; const kind = c.dataset.sprite;
+  const sec = SECTORS[1];
+  if (kind === 'crate'){ g.setTransform(3,0,0,3,0,0); drawCrate(g, 9, 9, ROLE.investigator); drawCrate(g, 4, 11, ROLE.correlator); return; }
+  const base = {sec, x:28, y:36, hw:10, inbox:[], keys:{you:true, owner:false}, needs:['a'], tx:[], prog:.5, out:{}};
+  g.setTransform(.8,0,0,.8,6,4);
+  if (kind === 'machine') drawMachine(g, {...base, kind, role:'deployer', state:'busy'}, 1);
+  if (kind === 'probe') drawProbe(g, {...base, kind, state:'idle'}, 1);
+  if (kind === 'lock') drawLock(g, {...base, kind, state:'holding', inbox:[{}]}, 0.3);
+  if (kind === 'split'){ g.setTransform(2,0,0,2,0,0); drawSplit(g, {...base, x:14, y:11}); }
+  if (kind === 'fire'){ drawMachine(g, {...base, kind:'machine', role:'investigator', state:'fire'}, 1); for (let i=0;i<14;i++){ g.fillStyle = i%3 ? '#ff9a3c' : '#ffe28a'; g.fillRect(14 + (i*7)%28, 6 + (i*5)%10, 3, 3); } }
+});
+
+/* ---------- boot ---------- */
+paintGround();
+fit();
+renderRadio();
+select(nodesById['inc.investigate']);
+requestAnimationFrame(frame);
+document.fonts && document.fonts.ready.then(() => { inspVer = -1; });
+})();
+</script>

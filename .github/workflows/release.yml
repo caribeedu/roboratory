@@ -1,0 +1,73 @@
+# Release: tag vX.Y.Z -> test -> build the app on macOS, Windows and Linux -> GitHub Release with the archives
+name: release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Check that the tag matches the package version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [[ "${{ github.ref_type }}" == "tag" && "${GITHUB_REF_NAME#v}" != "$VERSION" ]]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match the package version $VERSION"
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run make
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: promptory-${{ matrix.os }}
+          path: out/make/**/*.zip
+          if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Extract the release notes from the changelog
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v v="## v$VERSION" 'index($0, v) == 1 { on = 1; next } on && /^## v/ { exit } on' CHANGELOG.md > release_notes.md
+          if [ ! -s release_notes.md ]; then echo "Release v$VERSION." > release_notes.md; fi
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          body_path: release_notes.md
+          prerelease: ${{ startsWith(github.ref_name, 'v0.') }}

@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360" role="img" aria-label="Promptory: a factory for AI agents, with deterministic production lines in pixel art">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#141412"/>
+      <stop offset="1" stop-color="#2a2825"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#e0a43a" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#e0a43a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="360" fill="url(#bg)"/>
+  <circle cx="900" cy="230" r="260" fill="url(#glow)"/>
+
+  <!-- floor tiles -->
+  <g stroke="#2f2d2a" stroke-width="2" shape-rendering="crispEdges">
+    <path d="M600 300 H1200 M600 332 H1200 M600 268 H1200"/>
+    <path d="M640 268 V360 M720 268 V360 M800 268 V360 M880 268 V360 M960 268 V360 M1040 268 V360 M1120 268 V360"/>
+  </g>
+
+  <g shape-rendering="crispEdges">
+    <!-- belt -->
+    <rect x="610" y="236" width="560" height="20" fill="#3a3733"/>
+    <rect x="610" y="236" width="560" height="4" fill="#4a4641"/>
+    <g fill="#2a2825">
+      <rect x="630" y="246" width="12" height="4"/><rect x="670" y="246" width="12" height="4"/><rect x="710" y="246" width="12" height="4"/>
+      <rect x="750" y="246" width="12" height="4"/><rect x="790" y="246" width="12" height="4"/><rect x="830" y="246" width="12" height="4"/>
+      <rect x="870" y="246" width="12" height="4"/><rect x="910" y="246" width="12" height="4"/><rect x="950" y="246" width="12" height="4"/>
+      <rect x="990" y="246" width="12" height="4"/><rect x="1030" y="246" width="12" height="4"/><rect x="1070" y="246" width="12" height="4"/>
+      <rect x="1110" y="246" width="12" height="4"/><rect x="1150" y="246" width="12" height="4"/>
+    </g>
+
+    <!-- intake cart -->
+    <rect x="626" y="196" width="48" height="32" fill="#8a5a2b"/>
+    <rect x="626" y="196" width="48" height="6" fill="#a86b00"/>
+    <rect x="636" y="180" width="28" height="16" fill="#ecebe8"/>
+    <rect x="640" y="184" width="20" height="3" fill="#9c9891"/>
+    <rect x="632" y="228" width="8" height="8" fill="#141412"/><rect x="660" y="228" width="8" height="8" fill="#141412"/>
+
+    <!-- machine 1 -->
+    <rect x="720" y="168" width="64" height="68" fill="#5a3a22"/>
+    <rect x="712" y="156" width="80" height="16" fill="#3d8a4f"/>
+    <rect x="712" y="156" width="80" height="4" fill="#6cc08e"/>
+    <rect x="732" y="184" width="16" height="16" fill="#e0a43a"/><rect x="756" y="184" width="16" height="16" fill="#e0a43a"/>
+    <rect x="740" y="208" width="24" height="28" fill="#2a2825"/>
+    <rect x="780" y="148" width="8" height="16" fill="#9c9891"/>
+
+    <!-- machine 2 -->
+    <rect x="830" y="168" width="64" height="68" fill="#5a3a22"/>
+    <rect x="822" y="156" width="80" height="16" fill="#3d8a4f"/>
+    <rect x="822" y="156" width="80" height="4" fill="#6cc08e"/>
+    <rect x="842" y="184" width="16" height="16" fill="#e0a43a"/><rect x="866" y="184" width="16" height="16" fill="#e0a43a"/>
+    <rect x="850" y="208" width="24" height="28" fill="#2a2825"/>
+    <rect x="890" y="148" width="8" height="16" fill="#9c9891"/>
+
+    <!-- signal -->
+    <rect x="944" y="196" width="6" height="40" fill="#9c9891"/>
+    <rect x="932" y="176" width="30" height="22" fill="#2a2825"/>
+    <rect x="936" y="180" width="22" height="14" fill="#6cc08e"/>
+
+    <!-- gate -->
+    <rect x="1000" y="188" width="10" height="48" fill="#9c9891"/><rect x="1040" y="188" width="10" height="48" fill="#9c9891"/>
+    <rect x="1000" y="188" width="50" height="8" fill="#b3261e"/>
+    <rect x="1008" y="188" width="8" height="8" fill="#ecebe8"/><rect x="1024" y="188" width="8" height="8" fill="#ecebe8"/><rect x="1040" y="188" width="8" height="8" fill="#ecebe8"/>
+    <rect x="1018" y="160" width="14" height="22" fill="#e0a43a"/><rect x="1023" y="164" width="4" height="9" fill="#141412"/><rect x="1023" y="176" width="4" height="4" fill="#141412"/>
+
+    <!-- pallet with boxes -->
+    <rect x="1096" y="226" width="64" height="10" fill="#8a5a2b"/>
+    <rect x="1100" y="204" width="24" height="22" fill="#c07a2c"/><rect x="1128" y="204" width="24" height="22" fill="#c07a2c"/>
+    <rect x="1112" y="182" width="24" height="22" fill="#e0a43a"/>
+    <rect x="1100" y="204" width="24" height="4" fill="#e0a43a"/><rect x="1128" y="204" width="24" height="4" fill="#e0a43a"/>
+
+    <!-- boxes on the belt -->
+    <rect x="696" y="222" width="14" height="14" fill="#e0a43a"/><rect x="696" y="222" width="14" height="4" fill="#f0c36a"/>
+    <rect x="806" y="222" width="14" height="14" fill="#e0a43a"/><rect x="806" y="222" width="14" height="4" fill="#f0c36a"/>
+    <rect x="974" y="222" width="14" height="14" fill="#e0a43a"/><rect x="974" y="222" width="14" height="4" fill="#f0c36a"/>
+  </g>
+
+  <!-- text -->
+  <text x="70" y="168" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="78" font-weight="700" fill="#ecebe8">Prompt<tspan fill="#e0a43a">ory</tspan></text>
+  <text x="74" y="214" font-family="'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="24" fill="#e0a43a">A factory for AI agents</text>
+  <text x="74" y="258" font-family="'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="18" fill="#9c9891">Production lines in files, checked at every step,</text>
+  <text x="74" y="284" font-family="'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="18" fill="#9c9891">with the whole floor in pixel art.</text>
+</svg>
