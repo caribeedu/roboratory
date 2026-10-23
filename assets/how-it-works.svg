@@ -75,7 +75,7 @@
 
   <!-- managers and you -->
   <text x="40" y="76" class="lane">Who decides</text>
-  <rect x="40" y="90" width="190" height="62" rx="12" class="intake"/>
+  <rect x="40" y="90" width="250" height="62" rx="12" class="intake"/>
   <text x="58" y="116" class="title">Sector Manager</text>
   <text x="58" y="136" class="sub">Read-only: answers and proposes</text>
 
@@ -83,8 +83,8 @@
   <text x="488" y="116" class="title">You</text>
   <text x="488" y="136" class="sub">Accept, release, retry</text>
 
-  <path class="propose" d="M230 121 H468"/>
-  <text x="290" y="112" class="note" style="fill:#9c9891">proposals, never actions</text>
+  <path class="propose" d="M290 121 H468"/>
+  <text x="306" y="112" class="note" style="fill:#9c9891">proposals, never actions</text>
   <path class="propose" d="M620 121 H688 V178"/>
 
   <!-- the factory repository -->

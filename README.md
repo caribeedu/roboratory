@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/assets/banner.svg" alt="Roboratory: a factory for AI agents, with deterministic production lines in pixel art" width="100%">
+  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/assets/banner.svg?v=2" alt="Roboratory: a factory for AI agents, with deterministic production lines in pixel art" width="100%">
 </p>
 
 <p align="center">
@@ -15,7 +15,7 @@
 
 Roboratory is for work that has to be repeatable and auditable: turning tickets into pull requests, answering incidents, shipping to production. Each line is a deterministic workflow defined in files and versioned in git. The agents only produce what goes inside each step, and every step's output has to pass a contract before it moves on.
 
-![The Releases sector on the Floor, with a release line at work](https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/floor.png)
+![The Releases sector on the Floor, with a release line at work](https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/floor.png?v=2)
 
 ## Why
 
@@ -44,7 +44,7 @@ You can write these as plain YAML in the factory repository, or build them with 
 ## How it works
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/assets/how-it-works.svg" alt="How Roboratory works: an intake starts a run; machines, signals and gates carry validated boxes to a pallet; return belts send work back; managers propose and you decide; everything is files in a git repository" width="100%">
+  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/assets/how-it-works.svg?v=2" alt="How Roboratory works: an intake starts a run; machines, signals and gates carry validated boxes to a pallet; return belts send work back; managers propose and you decide; everything is files in a git repository" width="100%">
 </p>
 
 A run starts at an **intake** with a work order. Each **machine** runs a headless agent (Claude Code or Codex) with a fresh context, and the step ends when the process exits. The output is a **box** that must match the machine's contract. **Signals** (scripts) and **gates** (you, or a rule) check the box before it moves on, **return belts** send work back for rework within a lap limit, and the last box lands on the **pallet**: the deliverable.
@@ -53,39 +53,39 @@ A run starts at an **intake** with a work order. Each **machine** runs a headles
 
 | Piece | What it is |
 |---|---|
-| **Factory** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/factory.png" height="56" alt=""> | One git repository. Holds every sector, line model and policy. |
-| **Sector** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/sector.png" height="56" alt=""> | A group of production lines with its own Sector Manager. You work in one sector at a time; the minimap shows all of them and tells you which one needs you. |
-| **Production line** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/production-line.png" height="56" alt=""> | A running copy of a line model. A sector can hold many copies of the same model. |
-| **Machine** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/machine.png" height="56" alt=""> | One step. An agent runs headless with a role and a contract, and the step ends when the process exits. |
-| **Belt** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/belt.png" height="56" alt=""> | Carries boxes from one piece to the next. A splitter belt routes on a box field. |
-| **Box** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/box.png" height="56" alt=""> | The contract-validated output of a machine: a piece of progress travelling on the belts. |
-| **Pallet** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/pallet.png" height="56" alt=""> | Where finished boxes are stacked at the end of a line. What is on the pallet is the deliverable. |
-| **Signal** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/signal.png" height="56" alt=""> | A deterministic check: a script whose exit code passes the box or stops the line. |
-| **Gate** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/gate.png" height="56" alt=""> | Holds boxes until you release it, or until a rule over the box holds. |
-| **Sector Manager** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/sector-manager.png" height="56" alt=""> | Answers questions about its sector and proposes actions and changes to its sector. |
-| **General Manager** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/general-manager.png" height="56" alt=""> | Answers factory-wide questions and proposes whole new sectors. |
+| **Factory** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/factory.png?v=2" height="56" alt=""> | One git repository. Holds every sector, line model and policy. |
+| **Sector** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/sector.png?v=2" height="56" alt=""> | A group of production lines with its own Sector Manager. You work in one sector at a time; the minimap shows all of them and tells you which one needs you. |
+| **Production line** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/production-line.png?v=2" height="56" alt=""> | A running copy of a line model. A sector can hold many copies of the same model. |
+| **Machine** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/machine.png?v=2" height="56" alt=""> | One step. An agent runs headless with a role and a contract, and the step ends when the process exits. |
+| **Belt** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/belt.png?v=2" height="56" alt=""> | Carries boxes from one piece to the next. A splitter belt routes on a box field. |
+| **Box** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/box.png?v=2" height="56" alt=""> | The contract-validated output of a machine: a piece of progress travelling on the belts. |
+| **Pallet** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/pallet.png?v=2" height="56" alt=""> | Where finished boxes are stacked at the end of a line. What is on the pallet is the deliverable. |
+| **Signal** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/signal.png?v=2" height="56" alt=""> | A deterministic check: a script whose exit code passes the box or stops the line. |
+| **Gate** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/gate.png?v=2" height="56" alt=""> | Holds boxes until you release it, or until a rule over the box holds. |
+| **Sector Manager** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/sector-manager.png?v=2" height="56" alt=""> | Answers questions about its sector and proposes actions and changes to its sector. |
+| **General Manager** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/general-manager.png?v=2" height="56" alt=""> | Answers factory-wide questions and proposes whole new sectors. |
 
 ## What you can do today
 
 - **Run lines** with simulated, Claude Code or Codex agents, on target repositories with one git worktree per machine.
 
-  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/line.png" alt="A line at work: an intake, machines, a signal, a gate and a pallet" width="900">
+  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/line.png?v=2" alt="A line at work: an intake, machines, a signal, a gate and a pallet" width="900">
 
 - **Watch and trace everything:** the Floor, an attention queue and minimap, a live log at three levels, and a Ledger of every run with its steps, boxes, attempts, transcripts and gate releases.
 
-  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/ledger.png" alt="The Ledger, with every run and its steps" width="900">
+  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/ledger.png?v=2" alt="The Ledger, with every run and its steps" width="900">
 
 - **Ask the managers** through the megaphone: answers come with evidence and proposals as buttons; changes show a diff and are written only when you accept.
 
-  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/manager-proposal.png" alt="A Sector Manager proposing a change, shown as a diff" width="900">
+  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/manager-proposal.png?v=2" alt="A Sector Manager proposing a change, shown as a diff" width="900">
 
 - **Stay in control:** when a machine burns or a gate waits for you, the Floor says so and opens the piece's panel: the error and the agent's last steps with a hint field for the retry, or the signals before the gate and its confirmations.
 
-  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/fire-panel.png" alt="A machine on fire, with its fire panel" width="440"> <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/gate.png" alt="A two-confirmation gate" width="440">
+  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/fire-panel.png?v=2" alt="A machine on fire, with its fire panel" width="440"> <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/gate.png?v=2" alt="A two-confirmation gate" width="440">
 
 - **Build the factory on the Floor:** create sectors and lines, insert machines, signals and gates with "+" slots, connect return belts, edit roles and contracts, and save only after the checks pass. YAML is edited in place, so your diffs stay small.
 
-  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/build-mode.png" alt="Build mode on the Floor, with a plus slot on every belt" width="900">
+  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/build-mode.png?v=2" alt="Build mode on the Floor, with a plus slot on every belt" width="900">
 
 ## Getting started
 
