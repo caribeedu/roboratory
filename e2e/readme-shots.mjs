@@ -23,8 +23,8 @@ await win.getByRole('button', { name: /Releases/ }).first().click();
 await wait(800);
 await win.evaluate(() => window.roboratory.run('releases/orders-api', { tag: 'v4.18.0' }));
 await wait(3300);
-await win.screenshot({ path: path.join(out, 'floor.png') });
-console.log('wrote floor.png');
+await win.screenshot({ path: path.join(out, 'floor-releases.png') });
+console.log('wrote floor-releases.png');
 
 // a line at work: an engineering ticket, a few seconds in
 await win.getByRole('button', { name: /Engineering/ }).first().click();

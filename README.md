@@ -15,7 +15,7 @@
 
 Roboratory is for work that has to be repeatable and auditable: turning tickets into pull requests, answering incidents, shipping to production. Each line is a deterministic workflow defined in files and versioned in git. The agents only produce what goes inside each step, and every step's output has to pass a contract before it moves on.
 
-![The Releases sector on the Floor, with a release line at work](https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/floor.png?v=2)
+![The Releases sector on the Floor, with a release line at work](https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/floor-releases.png)
 
 ## Why
 
@@ -51,19 +51,19 @@ A run starts at an **intake** with a work order. Each **machine** runs a headles
 
 ### The pieces
 
-| Piece | What it is |
-|---|---|
-| **Factory** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/factory.png?v=2" height="56" alt=""> | One git repository. Holds every sector, line model and policy. |
-| **Sector** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/sector.png?v=2" height="56" alt=""> | A group of production lines with its own Sector Manager. You work in one sector at a time; the minimap shows all of them and tells you which one needs you. |
-| **Production line** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/production-line.png?v=2" height="56" alt=""> | A running copy of a line model. A sector can hold many copies of the same model. |
-| **Machine** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/machine.png?v=2" height="56" alt=""> | One step. An agent runs headless with a role and a contract, and the step ends when the process exits. |
-| **Belt** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/belt.png?v=2" height="56" alt=""> | Carries boxes from one piece to the next. A splitter belt routes on a box field. |
-| **Box** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/box.png?v=2" height="56" alt=""> | The contract-validated output of a machine: a piece of progress travelling on the belts. |
-| **Pallet** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/pallet.png?v=2" height="56" alt=""> | Where finished boxes are stacked at the end of a line. What is on the pallet is the deliverable. |
-| **Signal** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/signal.png?v=2" height="56" alt=""> | A deterministic check: a script whose exit code passes the box or stops the line. |
-| **Gate** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/gate.png?v=2" height="56" alt=""> | Holds boxes until you release it, or until a rule over the box holds. |
-| **Sector Manager** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/sector-manager.png?v=2" height="56" alt=""> | Answers questions about its sector and proposes actions and changes to its sector. |
-| **General Manager** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/general-manager.png?v=2" height="56" alt=""> | Answers factory-wide questions and proposes whole new sectors. |
+| Piece | Concept | What it is |
+|---|---|---|
+| **Machine** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/machine.png?v=2" height="56" alt=""> | One agent | One step. An agent runs headless with a role and a contract, and the step ends when the process exits. |
+| **Box** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/box.png?v=2" height="56" alt=""> | Outcome | The contract-validated output of a machine: a piece of progress travelling on the belts. |
+| **Belt** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/belt.png?v=2" height="56" alt=""> | Routing | Carries boxes from one piece to the next. A splitter belt routes on a box field. |
+| **Signal** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/signal.png?v=2" height="56" alt=""> | Eval | A deterministic check: a script whose exit code passes the box or stops the line. |
+| **Gate** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/gate.png?v=2" height="56" alt=""> | Human in the loop | Holds boxes until you release it, or until a rule over the box holds. |
+| **Pallet** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/pallet.png?v=2" height="56" alt=""> | End of the flow | Where finished boxes are stacked at the end of a line. What is on the pallet is the deliverable. |
+| **Production line** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/production-line.png?v=2" height="56" alt=""> | A multi-agent workflow | A running copy of a line model. A sector can hold many copies of the same model. |
+| **Sector** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/sector.png?v=2" height="56" alt=""> | A group of production lines | A group of production lines with its own Sector Manager. You work in one sector at a time; the minimap shows all of them and tells you which one needs you. |
+| **Sector Manager** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/sector-manager.png?v=2" height="56" alt=""> | Supervisor of the line | Answers questions about its sector and proposes actions and changes to its sector. |
+| **Factory** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/factory.png?v=2" height="56" alt=""> | A group of sectors | One git repository. Holds every sector, line model and policy. |
+| **General Manager** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/general-manager.png?v=2" height="56" alt=""> | Supervisor of the factory | Answers factory-wide questions and proposes whole new sectors. |
 
 ## What you can do today
 
