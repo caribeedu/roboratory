@@ -28,6 +28,19 @@ Running several AI agents on real work today means either free-form chat between
 - **Git is the source of truth.** The factory is a repository. Changing it means a reviewed diff, never improvisation at runtime.
 - **Local.** No telemetry, open file formats, and your own agent CLIs and subscriptions.
 
+## Build any flow you want
+
+Roboratory does not come with one fixed pipeline: **you design the flow**, and it runs exactly as designed. A line is a set of pieces you can connect however your process needs:
+
+- **A sequence** of machines, with signals and gates wherever a check or a decision belongs.
+- **Branches:** a splitter belt routes each box on a field of its contract (`type: bug` one way, `type: question` the other), and never asks a model to decide.
+- **Joins:** a piece can wait for several belts to arrive before it runs.
+- **Loops with a limit:** a return belt sends work back for rework (a failing test, a reviewer's findings), with a lap limit so a line cannot spin forever.
+- **Many lines from one model:** one incident line per service, one release line per repository, all kept in sync.
+- **Your own sectors:** group lines by team or purpose, each with its own manager and policy.
+
+You can write these as plain YAML in the factory repository, or build them with clicks on the Floor in build mode, which checks the line before saving.
+
 ## How it works
 
 <p align="center">
@@ -40,33 +53,44 @@ A run starts at an **intake** with a work order. Each **machine** runs a headles
 
 | Piece | What it is |
 |---|---|
-| **Factory** | One git repository. Holds every sector, line model and policy. |
-| **Sector** | A group of production lines with its own Sector Manager. You work in one sector at a time; the Andon shows the whole factory. |
-| **Production line** | A running copy of a line model. A sector can hold many copies of the same model. |
-| **Machine** | One step. An agent runs headless with a role and a contract, and the step ends when the process exits. |
-| **Belt** | Carries boxes from one piece to the next. A splitter belt routes on a box field. |
-| **Box** | The contract-validated output of a machine: a piece of progress travelling on the belts. |
-| **Pallet** | Where finished boxes are stacked at the end of a line. What is on the pallet is the deliverable. |
-| **Signal** | A deterministic check: a script whose exit code passes the box or stops the line. |
-| **Gate** | Holds boxes until you release it, or until a rule over the box holds. |
-| **Sector Manager** | Answers questions about its sector and proposes actions and changes to its sector. |
-| **General Manager** | Answers factory-wide questions and proposes whole new sectors. |
+| **Factory** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/factory.png" height="56" alt=""> | One git repository. Holds every sector, line model and policy. |
+| **Sector** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/sector.png" height="56" alt=""> | A group of production lines with its own Sector Manager. You work in one sector at a time; the Andon shows the whole factory. |
+| **Production line** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/production-line.png" height="56" alt=""> | A running copy of a line model. A sector can hold many copies of the same model. |
+| **Machine** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/machine.png" height="56" alt=""> | One step. An agent runs headless with a role and a contract, and the step ends when the process exits. |
+| **Belt** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/belt.png" height="56" alt=""> | Carries boxes from one piece to the next. A splitter belt routes on a box field. |
+| **Box** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/box.png" height="56" alt=""> | The contract-validated output of a machine: a piece of progress travelling on the belts. |
+| **Pallet** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/pallet.png" height="56" alt=""> | Where finished boxes are stacked at the end of a line. What is on the pallet is the deliverable. |
+| **Signal** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/signal.png" height="56" alt=""> | A deterministic check: a script whose exit code passes the box or stops the line. |
+| **Gate** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/gate.png" height="56" alt=""> | Holds boxes until you release it, or until a rule over the box holds. |
+| **Sector Manager** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/sector-manager.png" height="56" alt=""> | Answers questions about its sector and proposes actions and changes to its sector. |
+| **General Manager** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/general-manager.png" height="56" alt=""> | Answers factory-wide questions and proposes whole new sectors. |
 
 ## What you can do today
 
 - **Run lines** with simulated, Claude Code or Codex agents, on target repositories with one git worktree per machine.
+
+  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/line.png" alt="A line at work: an intake, machines, a signal, a gate and a pallet" width="900">
+
 - **Watch and trace everything:** the Floor, an attention queue and minimap, a live log at three levels, and a Ledger of every run with its steps, boxes, attempts, transcripts and gate releases.
+
+  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/ledger.png" alt="The Ledger, with every run and its steps" width="900">
+
 - **Ask the managers** through the megaphone: answers come with evidence and proposals as buttons; changes show a diff and are written only when you accept.
+
+  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/manager-proposal.png" alt="A Sector Manager proposing a change, shown as a diff" width="900">
+
 - **Build the factory on the Floor:** create sectors and lines, insert machines, signals and gates with "+" slots, connect return belts, edit roles and contracts, and save only after the checks pass. YAML is edited in place, so your diffs stay small.
+
+  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/build-mode.png" alt="Build mode on the Floor, with a plus slot on every belt" width="900">
+
+### Stay in control
+
+When something burns, or a gate waits for you, the Floor tells you and opens the piece's panel: the error and the agent's last steps with a hint field for the retry, or the signals before the gate with its confirmations.
 
 <table>
   <tr>
     <td><img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/fire-panel.png" alt="A machine on fire, with its fire panel"></td>
     <td><img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/gate.png" alt="A two-confirmation gate"></td>
-  </tr>
-  <tr>
-    <td><img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/manager-proposal.png" alt="A Sector Manager proposing a change"></td>
-    <td><img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/ledger.png" alt="The Ledger"></td>
   </tr>
 </table>
 

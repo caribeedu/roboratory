@@ -25,6 +25,7 @@ npm start
 | `node e2e/shoot.mjs <dir>` | Drives the packaged app with Playwright and saves screenshots |
 | `node e2e/build-mode.mjs <dir>` | Checks build mode through the UI: build a line from scratch, edit a real one, the locks |
 | `node e2e/gesture-check.mjs`, `e2e/factory-shots.mjs` | Gesture and screenshot checks on the packaged app |
+| `node e2e/readme-shots.mjs`, `e2e/piece-images.mjs`, `e2e/render-svg.mjs` | Regenerate the README's images: a line at work and build mode, one picture per piece drawn with the app's own sprites, and an SVG rendered to PNG |
 | `node e2e/scenario.mjs`, `e2e/real-agent-check.mjs` | A staged demo day, and a paid run with the real Claude agent |
 
 The e2e scripts launch the packaged app: they find it in `out/` for your platform (`ROBORATORY_OUT_DIR` changes the folder, `ROBORATORY_EXE` points at a specific executable).
