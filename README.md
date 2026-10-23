@@ -21,8 +21,8 @@ Roboratory is for work that has to be repeatable and auditable: turning tickets 
 
 Running several AI agents on real work today means either free-form chat between agents, which is hard to predict, or workflow engines that hide the agents behind logs. Roboratory treats agent work like a factory floor:
 
-- **Deterministic lines.** The order of steps, the routing, the checks and the gates are defined in files. Agents fill in each step's content and never decide the flow.
-- **Contracts at every step.** A machine's output is validated against a JSON Schema. If it does not match, the step runs again; when attempts run out, the machine catches fire and the line stops behind it.
+- **Deterministic lines.** Routing, checks and gates are defined in files, so the same input takes the same path every time.
+- **Contracts at every step.** An output that does not match its JSON Schema runs the step again; when attempts run out, the machine catches fire and the line stops behind it.
 - **Humans hold the gates that matter.** Releasing a gate or applying a change is never automatic. Managers answer questions and propose, and you decide.
 - **Everything visible.** If something is running, waiting or burning, it shows on the floor, on the minimap and in the log.
 - **Git is the source of truth.** The factory is a repository. Changing it means a reviewed diff, never improvisation at runtime.
@@ -33,21 +33,21 @@ Running several AI agents on real work today means either free-form chat between
 Roboratory does not come with one fixed pipeline: **you design the flow**, and it runs exactly as designed. A line is a set of pieces you can connect however your process needs:
 
 - **A sequence** of machines, with signals and gates wherever a check or a decision belongs.
-- **Branches:** a splitter belt routes each box on a field of its contract (`type: bug` one way, `type: question` the other), and never asks a model to decide.
+- **Branches:** route each box on a field of its contract (`type: bug` one way, `type: question` the other).
 - **Joins:** a piece can wait for several belts to arrive before it runs.
-- **Loops with a limit:** a return belt sends work back for rework (a failing test, a reviewer's findings), with a lap limit so a line cannot spin forever.
+- **Loops with a limit:** send work back for rework (a failing test, a reviewer's findings), with a lap limit so a line cannot spin forever.
 - **Many lines from one model:** one incident line per service, one release line per repository, all kept in sync.
 - **Your own sectors:** group lines by team or purpose, each with its own manager and policy.
 
 You can write these as plain YAML in the factory repository, or build them with clicks on the Floor in build mode, which checks the line before saving.
 
-## How it works
+## One run, start to finish
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/assets/how-it-works.svg?v=2" alt="How Roboratory works: an intake starts a run; machines, signals and gates carry validated boxes to a pallet; return belts send work back; managers propose and you decide; everything is files in a git repository" width="100%">
 </p>
 
-A run starts at an **intake** with a work order. Each **machine** runs a headless agent (Claude Code or Codex) with a fresh context, and the step ends when the process exits. The output is a **box** that must match the machine's contract. **Signals** (scripts) and **gates** (you, or a rule) check the box before it moves on, **return belts** send work back for rework within a lap limit, and the last box lands on the **pallet**: the deliverable.
+A run starts when a work order enters at an **intake**, and every run follows the same path: each step produces a box, the box is checked before it moves on, and the last box lands on the pallet. No agent decides that path, each machine starts with a fresh context, and every hop is recorded in the run's logs, which the Ledger shows.
 
 ### The pieces
 
