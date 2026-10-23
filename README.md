@@ -114,8 +114,6 @@ Choose **Open the demo factory** on the welcome screen. It creates a factory in 
 | [Development](docs/DEVELOPMENT.md) | Setup, code layout, conventions and lessons about the agent CLIs |
 | [Changelog](CHANGELOG.md) | What is built |
 
-The first interactive concept is [docs/prototype/factory-floor.html](docs/prototype/factory-floor.html); open it in a browser.
-
 ## Status
 
 Roboratory is an early release (v0.7): the factory, the Floor, headless machines, managers and build mode are built; a headless engine, permission requests and automatic intakes are planned ([docs/ROADMAP.md](docs/ROADMAP.md)).
