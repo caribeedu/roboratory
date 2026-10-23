@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/assets/banner.svg?v=2" alt="Roboratory: a factory for AI agents, with deterministic production lines in pixel art" width="100%">
+  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/assets/banner.svg?v=3" alt="Roboratory: a factory for AI agents, with deterministic production lines in pixel art" width="100%">
 </p>
 
 <p align="center">

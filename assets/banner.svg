@@ -98,6 +98,6 @@
   <!-- text -->
   <text x="70" y="168" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="78" font-weight="700" fill="#ecebe8">Robo<tspan fill="#e0a43a">ratory</tspan></text>
   <text x="74" y="214" font-family="'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="24" fill="#e0a43a">A factory for AI agents</text>
-  <text x="74" y="258" font-family="'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="18" fill="#9c9891">Design any flow you want in files, check every step,</text>
-  <text x="74" y="284" font-family="'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="18" fill="#9c9891">and watch the whole floor in pixel art.</text>
+  <text x="74" y="258" font-family="'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="18" fill="#9c9891">Deterministic production lines of agents, routing,</text>
+  <text x="74" y="284" font-family="'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="18" fill="#9c9891">evals and HIT, run headless and drawn in pixel art.</text>
 </svg>
