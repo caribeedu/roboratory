@@ -54,7 +54,7 @@ A run starts at an **intake** with a work order. Each **machine** runs a headles
 | Piece | What it is |
 |---|---|
 | **Factory** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/factory.png" height="56" alt=""> | One git repository. Holds every sector, line model and policy. |
-| **Sector** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/sector.png" height="56" alt=""> | A group of production lines with its own Sector Manager. You work in one sector at a time; the Andon shows the whole factory. |
+| **Sector** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/sector.png" height="56" alt=""> | A group of production lines with its own Sector Manager. You work in one sector at a time; the minimap shows all of them and tells you which one needs you. |
 | **Production line** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/production-line.png" height="56" alt=""> | A running copy of a line model. A sector can hold many copies of the same model. |
 | **Machine** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/machine.png" height="56" alt=""> | One step. An agent runs headless with a role and a contract, and the step ends when the process exits. |
 | **Belt** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/belt.png" height="56" alt=""> | Carries boxes from one piece to the next. A splitter belt routes on a box field. |
