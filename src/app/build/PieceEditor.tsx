@@ -208,7 +208,7 @@ function SignalForm({ view, line, piece, op }: { view: BuildView; line: Line; pi
   const newScript = () => {
     const name = `${piece.id}.sh`;
     void op({ op: 'batch', ops: [
-      { op: 'writeFile', path: `${modelDir(line)}/signals/${name}`, content: '#!/bin/sh\n# Exit 0 to pass the box on; anything else fails: a return belt can send the box back.\n# The incoming box is in "$PROMPTORY_BOX" (JSON).\nexit 0\n', executable: true },
+      { op: 'writeFile', path: `${modelDir(line)}/signals/${name}`, content: '#!/bin/sh\n# Exit 0 to pass the box on; anything else fails: a return belt can send the box back.\n# The incoming box is in "$ROBORATORY_BOX" (JSON).\nexit 0\n', executable: true },
       { op: 'setPiece', lineId: line.id, pieceId: piece.id, run: `signals/${name}` },
     ] });
   };

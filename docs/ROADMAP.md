@@ -1,4 +1,4 @@
-# Promptory — Roadmap
+# Roboratory — Roadmap
 
 Everything that is planned, open or accepted as a limit, checked against the code. Decisions are in [DECISIONS.md](DECISIONS.md) and what is built is in [CHANGELOG.md](../CHANGELOG.md).
 
@@ -10,11 +10,11 @@ From the assessment of the first real ticket run ([ASSESSMENT.md](ASSESSMENT.md)
 
 The engine moves out of the Electron app into its own process; the app becomes a window onto it. The other items depend on where the engine lives: permission requests and the manager's investigations need a process that waits for you.
 
-- **One engine per factory, started on demand** by the app or the CLI (`promptory serve`). It keeps running when the app quits and ends with `promptory stop`, or by itself when no run is open and no client is connected. A lock file in the factory allows one engine per factory. State stays in the factory's files.
+- **One engine per factory, started on demand** by the app or the CLI (`roboratory serve`). It keeps running when the app quits and ends with `roboratory stop`, or by itself when no run is open and no client is connected. A lock file in the factory allows one engine per factory. State stays in the factory's files.
 - **A Unix socket** at `.runs/engine.sock`, open to your user only, with one JSON message per line: the methods of `src/shared/api.ts` as calls, and state updates pushed on the same channel. The Electron main process relays between the interface and the socket; the interface does not change. No network port is opened.
 - **Everything in `FactoryService` moves to the engine:** runs, build-mode sessions and their locks (D41), managers and their proposals, and reloading the factory. A draft lives as long as the engine.
 - **A CLI for the verbs:** `serve`, `stop`, `status`, `run <line> --input k=v`, `release`, `answer`, `retry`, `halt`, `resume` and `watch` (live events). Each is audited like the app's, as `you` with the source `cli`. Build mode stays in the app.
-- **Runtime:** the packaged app's own binary in Node mode (`ELECTRON_RUN_AS_NODE=1`) runs `engine.cjs`, the engine and CLI in one bundle. The app's menu installs the `promptory` command in `~/.local/bin` when you ask. In development, `npm run cli`.
+- **Runtime:** the packaged app's own binary in Node mode (`ELECTRON_RUN_AS_NODE=1`) runs `engine.cjs`, the engine and CLI in one bundle. The app's menu installs the `roboratory` command in `~/.local/bin` when you ask. In development, `npm run cli`.
 - **New versions:** when the app finds an older engine, it offers "Restart when idle". The engine stops dispatching new work and restarts when no machine or signal is running; gates, questions and fires survive the restart.
 - **The engine's log** is `.runs/engine.log`. When the engine stops unexpectedly, the app says so and offers to start it.
 - **Tests** drive a real engine on a temporary factory through the same client as the CLI. Flow tests and `e2e/factory-sim-check.mjs` move to it; the engine's unit tests stay; Playwright tests cover the interface only.
@@ -24,7 +24,7 @@ Exit criteria, all with the simulated agent:
 2. The CLI drives a simulated run to its pallet (`run`, `release`, `answer`, `retry`, `halt`, `resume`, `status`, `watch`) with no app.
 3. Rebuilding and reopening the app during a run shows the current state, and the run goes on.
 4. An older engine with an open run restarts by itself when idle, and no step catches fire because of it.
-5. Build-mode locks apply to the CLI: `promptory run` on a line the open draft changes is refused.
+5. Build-mode locks apply to the CLI: `roboratory run` on a line the open draft changes is refused.
 6. Flow tests and the factory dry run go through the real engine over the socket; the existing tests still pass.
 7. Only your user can connect to the socket, and no network port is open.
 
@@ -64,7 +64,7 @@ Each step ends with `npm test` and `npm run typecheck` green before the next one
    - `src/main.ts` replaces `FactoryService` with the client and relays the handlers; dialogs, the recent list and revealing files stay in the main process.
    - Opening a factory connects to its engine, starting it when needed. Quitting the app closes the connection only.
    - A banner "Engine stopped" with Start, and a banner "Engine is older than the app" with "Restart when idle".
-   - A menu item "Install command-line tool" that writes `~/.local/bin/promptory` after you confirm.
+   - A menu item "Install command-line tool" that writes `~/.local/bin/roboratory` after you confirm.
 7. **Tests through the real engine.**
    - A helper starts a server on a temporary factory and connects with the client. Flow tests move to it; the `Engine` unit tests stay as they are.
    - `e2e/factory-sim-check.mjs` drives the engine through the client.
@@ -86,8 +86,8 @@ Each step ends with `npm test` and `npm run typecheck` green before the next one
 
 ### v0.10 — Metrics and a cheap rehearsal
 
-1. **Metrics per machine** from `run.jsonl` (`promptory stats`): cost, duration, attempts, laps, denied commands, questions, blocks, and checker passes later proved wrong (a pass followed by a question or rework further down the line). Costs say whether they are estimates.
-2. **A cheap rehearsal with real permissions** (`promptory rehearse`): the real roles, signals and permissions, a cheap model, and every outward action denied, to find role and permission defects for cents. It finds defects of roles and permissions, not of quality. `e2e/factory-sim-check.mjs` keeps checking the flow for free.
+1. **Metrics per machine** from `run.jsonl` (`roboratory stats`): cost, duration, attempts, laps, denied commands, questions, blocks, and checker passes later proved wrong (a pass followed by a question or rework further down the line). Costs say whether they are estimates.
+2. **A cheap rehearsal with real permissions** (`roboratory rehearse`): the real roles, signals and permissions, a cheap model, and every outward action denied, to find role and permission defects for cents. It finds defects of roles and permissions, not of quality. `e2e/factory-sim-check.mjs` keeps checking the flow for free.
 
 ### v0.11 — Checkers prove their work
 
@@ -116,7 +116,7 @@ None of these exist in the code yet.
 4. **Webhook and chat intakes** (D14). The loader accepts these kinds and they have sprites, but nothing starts a run from them (`src/core/factory.ts`). Timer intakes are in §2.
 5. **First-factory tutorial** (D38).
 6. **Replaying a run on the Floor** (D40).
-7. **A git identity per machine** (D9, D10). Today every machine commits as "Promptory" (`src/core/git.ts`).
+7. **A git identity per machine** (D9, D10). Today every machine commits as "Roboratory" (`src/core/git.ts`).
 8. **Container isolation for machines** (D32).
 9. **Remote or shared factories.**
 10. **A command-line interface for the verbs** (D30). Planned in v0.8 (§1).
@@ -170,9 +170,9 @@ Besides the real ticket run (US$ 8.03), the only other real run is a two-machine
 
 ## 9. Ideas from Harness²
 
-[Harness²](https://github.com/google-research/harness2) ([paper](https://arxiv.org/abs/2610.14224)) improves the harness of one agent per task: it runs the task with the current harness, then with an invariant and a domain-specific candidate, and an LLM composer merges what the execution contrasts support. Each task starts again from the base harness; what carries over is an advisory library of adopted harnesses with an `EXPERIENCE.md` each. Ideas that fit Promptory without breaking D29:
+[Harness²](https://github.com/google-research/harness2) ([paper](https://arxiv.org/abs/2610.14224)) improves the harness of one agent per task: it runs the task with the current harness, then with an invariant and a domain-specific candidate, and an LLM composer merges what the execution contrasts support. Each task starts again from the base harness; what carries over is an advisory library of adopted harnesses with an `EXPERIENCE.md` each. Ideas that fit Roboratory without breaking D29:
 
 1. **Selection criteria in checker roles.** The validator and code reviewer judge, in order: the deliverable exists, it has the requested shape, it is faithful to its sources, it is consistent with itself; length and polish are not merits. Text only; it complements v0.11 (§1).
 2. **A lessons library per sector.** After a run, the Sector Manager proposes a lesson with its evidence (the situation, what changed and the execution contrast that supports it), as a diff to `role.md` or `culture.md`, or as an entry under `sectors/<sector>/lessons/`. You accept or reject it. Machines read the entries as examples and check them against the current run. In Harness², removing the library cost about 2 to 3 points.
 3. **Rehearse role variants on recorded boxes,** for checkers only. Run two versions of a checker's role on the box of a past run with a cheap model, and keep the one that finds what the real run later showed (for example, the plan that would have broken authentication). Never for machines with outward actions. It extends the rehearsal in v0.10 (§1).
-4. **The eight harness components as a checklist** for what a machine can configure: system prompt, guardrails, memory, skills, tool guidance, scripts, subagents and plugins. Promptory has no memory across runs and no plugins, and denies subagents on purpose (D9).
+4. **The eight harness components as a checklist** for what a machine can configure: system prompt, guardrails, memory, skills, tool guidance, scripts, subagents and plugins. Roboratory has no memory across runs and no plugins, and denies subagents on purpose (D9).

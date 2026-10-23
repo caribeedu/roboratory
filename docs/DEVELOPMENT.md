@@ -1,10 +1,10 @@
-# Promptory — Development
+# Roboratory — Development
 
-How to work on Promptory: set it up, find your way around the code, and the lessons about the agent CLIs that cost time to learn. The product's behavior is in [PRODUCT.md](PRODUCT.md), how it is built in [ARCHITECTURE.md](ARCHITECTURE.md), and the reasoning in [DECISIONS.md](DECISIONS.md).
+How to work on Roboratory: set it up, find your way around the code, and the lessons about the agent CLIs that cost time to learn. The product's behavior is in [PRODUCT.md](PRODUCT.md), how it is built in [ARCHITECTURE.md](ARCHITECTURE.md), and the reasoning in [DECISIONS.md](DECISIONS.md).
 
 ## Setup
 
-You need Node 22.12 or later (`.nvmrc` pins 24), npm and git. Promptory runs on macOS, Windows and Linux.
+You need Node 22.12 or later (`.nvmrc` pins 24), npm and git. Roboratory runs on macOS, Windows and Linux.
 
 ```bash
 npm ci
@@ -27,7 +27,7 @@ npm start
 | `node e2e/gesture-check.mjs`, `e2e/factory-shots.mjs` | Gesture and screenshot checks on the packaged app |
 | `node e2e/scenario.mjs`, `e2e/real-agent-check.mjs` | A staged demo day, and a paid run with the real Claude agent |
 
-The e2e scripts launch the packaged app: they find it in `out/` for your platform (`PROMPTORY_OUT_DIR` changes the folder, `PROMPTORY_EXE` points at a specific executable).
+The e2e scripts launch the packaged app: they find it in `out/` for your platform (`ROBORATORY_OUT_DIR` changes the folder, `ROBORATORY_EXE` points at a specific executable).
 
 ## Layout
 
@@ -62,6 +62,6 @@ Tests, the demo and dry runs use `agent: sim`. Do not run a line with `agent: cl
 ## Platform notes
 
 - **Signals run through `sh`.** On Windows, install Git for Windows (or use WSL) and keep `sh` on `PATH`.
-- **Agent CLIs must be native executables on Windows** (for example `claude.exe`). A `.cmd` shim cannot receive multi-line arguments, so the adapters refuse it with a message. `PROMPTORY_CLAUDE_BIN` and `PROMPTORY_CODEX_BIN` point at a specific executable.
+- **Agent CLIs must be native executables on Windows** (for example `claude.exe`). A `.cmd` shim cannot receive multi-line arguments, so the adapters refuse it with a message. `ROBORATORY_CLAUDE_BIN` and `ROBORATORY_CODEX_BIN` point at a specific executable.
 - **There is no executable bit on Windows.** Scripts written by build mode are marked executable on macOS and Linux only.
-- **A rebuilt app only takes effect after you quit the running one** (⌘Q on macOS): launching it again can bring the old process back. When the app is open it locks `out/`; build a copy with `PROMPTORY_OUT_DIR=<dir>`.
+- **A rebuilt app only takes effect after you quit the running one** (⌘Q on macOS): launching it again can bring the old process back. When the app is open it locks `out/`; build a copy with `ROBORATORY_OUT_DIR=<dir>`.

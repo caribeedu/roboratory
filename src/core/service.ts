@@ -28,7 +28,7 @@ export class FactoryService {
 
   open(root: string) {
     this.close();
-    if (!fs.existsSync(path.join(root, 'factory.yaml')) && !fs.existsSync(path.join(root, 'sectors'))) throw new Error(`${root} is not a Promptory factory (no factory.yaml or sectors/ folder).`);
+    if (!fs.existsSync(path.join(root, 'factory.yaml')) && !fs.existsSync(path.join(root, 'sectors'))) throw new Error(`${root} is not a Roboratory factory (no factory.yaml or sectors/ folder).`);
     this.factory = loadFactory(root);
     const engine = new Engine(this.factory);
     this.engine = engine;

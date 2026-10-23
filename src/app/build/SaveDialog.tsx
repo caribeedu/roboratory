@@ -55,7 +55,7 @@ export function SaveDialog({ view, reason, onSave, onDiscard, onClose }: {
             : <><span className="confirm-q small">Discard {view.changes.length} change{view.changes.length === 1 ? '' : 's'}?</span><button className="btn ghost" onClick={onDiscard}>Yes, discard</button></>}
           <button className="btn ghost" onClick={onClose}>Keep editing</button>
         </div>
-        <p className="muted small">Promptory only writes files. Commit them with git when you are ready.</p>
+        <p className="muted small">Roboratory only writes files. Commit them with git when you are ready.</p>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<title>Promptory Factory</title>
+<title>Roboratory Factory</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -180,7 +180,7 @@ pre.tx .tool{color:var(--lantern)} pre.tx .ret{color:var(--muted)} pre.tx .bad{c
 
 <div id="app">
   <header class="bar frame">
-    <div class="brand">promptory <small>factory · ops-floor</small></div>
+    <div class="brand">roboratory <small>factory · ops-floor</small></div>
     <nav class="tabs" role="tablist" aria-label="Views">
       <button class="tab" role="tab" data-view="floor" aria-selected="true">Floor</button>
       <button class="tab" role="tab" data-view="andon" aria-selected="false">Andon</button>
@@ -252,7 +252,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':
 const pick = a => a[Math.floor(Math.random()*a.length)];
 const rint = (a,b) => a + Math.floor(Math.random()*(b-a+1));
 
-/* ---------- world definition (what lives in .promptory/workflows/*.yaml) ---------- */
+/* ---------- world definition (what lives in .roboratory/workflows/*.yaml) ---------- */
 const ROLE = {
   triager:'#5b8fd3', planner:'#9a70d3', implementer:'#d47b48', responder:'#45b1a0',
   correlator:'#c9a43b', investigator:'#d4566b', mitigator:'#6aa84f', deployer:'#e07b39'
@@ -886,13 +886,13 @@ function renderInspector(){
   const kindName = {machine:'Machine', probe:'Probe', lock:'Lock', split:'Splitter', in:'Intake', out:'Shipping dock'}[n.kind];
   const rows = [];
   rows.push(['State', stateChip(n)]);
-  if (n.role){ rows.push(['Role', `<span class="path">.promptory/roles/${n.role}.md</span>`]); rows.push(['Contract', `<span class="path">.promptory/contracts/${n.contract}.json</span>`]); rows.push(['Runs as', `<code>claude -p</code> headless · ends on exit`]); if (n.mcp) rows.push(['Tools', n.mcp.map(m => `<code>${m}</code>`).join(' ')]); rows.push(['Attempts', `${n.attempts || 0} / 3`]); }
+  if (n.role){ rows.push(['Role', `<span class="path">.roboratory/roles/${n.role}.md</span>`]); rows.push(['Contract', `<span class="path">.roboratory/contracts/${n.contract}.json</span>`]); rows.push(['Runs as', `<code>claude -p</code> headless · ends on exit`]); if (n.mcp) rows.push(['Tools', n.mcp.map(m => `<code>${m}</code>`).join(' ')]); rows.push(['Attempts', `${n.attempts || 0} / 3`]); }
   if (n.kind === 'probe') rows.push(['Runs', `<code>${esc(n.run)}</code>`], ['Passes on', 'exit 0']);
   if (n.kind === 'lock') rows.push(['Opens for', esc(n.approvers)], ['Holding', `${n.inbox.length} crate(s)`]);
   if (n.kind === 'split') rows.push(['Routes on', `<code>${n.by}</code>`], ['Routes', Object.entries(n.routes).map(([k,v]) => `${k} → ${n.sec.byId[v].label}`).join('<br>')]);
   if (n.kind === 'in') rows.push(['Trigger', esc(n.sec.trigger)]);
   if (n.kind === 'out') rows.push(['Shipped', String(n.sec.shipped)]);
-  rows.push(['Defined in', `<span class="path">.promptory/workflows/${n.sec.file}</span>`]);
+  rows.push(['Defined in', `<span class="path">.roboratory/workflows/${n.sec.file}</span>`]);
   const acts = [];
   if (n.state === 'fire'){ acts.push(`<button class="btn primary" data-act="retry">Retry</button>`, `<button class="btn" data-act="hint">Retry with a hint…</button>`, `<button class="btn danger" data-act="halt">Halt line</button>`); }
   else if (n.kind === 'lock' && n.state === 'holding'){ acts.push(n.needs.length > 1 ? `<button class="btn primary" data-act="ship">Open the launch keys</button>` : `<button class="btn primary" data-act="approve">Approve</button>`); }
@@ -1066,12 +1066,12 @@ function renderLedger(){
 
 let bpSec = 'inc';
 function yamlFor(s){
-  const L = [`# .promptory/workflows/${s.file}`, `name: ${s.slug}`, `direction: ${s.dir > 0 ? 'right' : 'left'}   # the line grows this way on the floor`, `trigger: ${s.triggerYaml}`, `steps:`];
+  const L = [`# .roboratory/workflows/${s.file}`, `name: ${s.slug}`, `direction: ${s.dir > 0 ? 'right' : 'left'}   # the line grows this way on the floor`, `trigger: ${s.triggerYaml}`, `steps:`];
   for (const n of s.nodes){
     if (n.kind === 'in') continue;
     L.push(`  - id: ${n.id}`);
     if (n.needs.length && !(n.needs.length === 1 && s.byId[n.needs[0]].kind === 'in')) L.push(`    needs: [${n.needs.join(', ')}]`);
-    if (n.kind === 'machine'){ L.push(`    role: ${n.role}            # .promptory/roles/${n.role}.md`, `    contract: ${n.contract}   # JSON Schema, 3 attempts, then fire`, `    agent: claude-headless`); if (n.mcp) L.push(`    tools: [${n.mcp.join(', ')}]`); L.push(`    timeout: ${Math.ceil(n.dur*60)}s`); }
+    if (n.kind === 'machine'){ L.push(`    role: ${n.role}            # .roboratory/roles/${n.role}.md`, `    contract: ${n.contract}   # JSON Schema, 3 attempts, then fire`, `    agent: claude-headless`); if (n.mcp) L.push(`    tools: [${n.mcp.join(', ')}]`); L.push(`    timeout: ${Math.ceil(n.dur*60)}s`); }
     if (n.kind === 'probe') L.push(`    probe: { run: "${n.run}", pass: exit 0 }`);
     if (n.kind === 'lock') L.push(n.keys ? `    lock: { keys: [you, release-owner] }` : `    lock: { approvers: [you] }`);
     if (n.kind === 'split') L.push(`    split: { on: ${n.by}, routes: { ${Object.entries(n.routes).map(([k,v]) => `${k}: ${v}`).join(', ')} } }`);
@@ -1088,7 +1088,7 @@ function renderBlueprint(){
   $('#yaml').innerHTML = hl(yamlFor(SECTORS.find(s => s.id === bpSec)));
   const roles = [...new Set(SECTORS.flatMap(s => s.nodes).filter(n => n.role).map(n => n.role))];
   const contracts = [...new Set(SECTORS.flatMap(s => s.nodes).filter(n => n.contract).map(n => n.contract))];
-  $('#tree').innerHTML = `<span class="d">.promptory/</span>
+  $('#tree').innerHTML = `<span class="d">.roboratory/</span>
   <span class="d">workflows/</span>
 ${SECTORS.map(s => `    <span class="f">${s.file}</span>`).join('\n')}
   <span class="d">roles/</span>

@@ -7,17 +7,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const base = path.join(os.homedir(), 'Promptory', 'Scenario');
+const base = path.join(os.homedir(), 'Roboratory', 'Scenario');
 fs.rmSync(base, { recursive: true, force: true });
 fs.mkdirSync(base, { recursive: true });
 const exe = appExecutable();
-const app = await electron.launch({ executablePath: exe, env: { ...process.env, PROMPTORY_USER_DATA: path.join(base, '.app-data'), PROMPTORY_DEMO_DIR: path.join(base, 'Demo Factory') } });
+const app = await electron.launch({ executablePath: exe, env: { ...process.env, ROBORATORY_USER_DATA: path.join(base, '.app-data'), ROBORATORY_DEMO_DIR: path.join(base, 'Demo Factory') } });
 const win = await app.firstWindow();
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 await wait(1200);
 await win.getByText('Open the demo factory').click();
 await wait(1500);
-const run = (line, input) => win.evaluate(([l, i]) => window.promptory.run(l, i), [line, input]).catch(() => {});
+const run = (line, input) => win.evaluate(([l, i]) => window.roboratory.run(l, i), [line, input]).catch(() => {});
 // a busy morning, staggered so belts are full
 await run('incidents/orders-api', { alert: 'ALT-55102' });
 await run('releases/orders-api', { tag: 'v4.18.0' });

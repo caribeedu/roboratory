@@ -13,13 +13,13 @@ import { LiveLog } from './panels/LiveLog';
 import { Megaphone } from './panels/Megaphone';
 import { Ledger } from './panels/Ledger';
 import { Welcome } from './panels/Welcome';
-import { api, chirp, errText, usePromptory } from './store';
+import { api, chirp, errText, useRoboratory } from './store';
 import logo from '../../assets/logo-64.png';
 
 export type View = 'floor' | 'ledger';
 
 export function App() {
-  const { snapshot, logs, recent, demoPath, msgTick, refreshRecent } = usePromptory();
+  const { snapshot, logs, recent, demoPath, msgTick, refreshRecent } = useRoboratory();
   const factory = snapshot?.factory ?? null;
   const [view, setView] = useState<View>('floor');
   const [sectorId, setSectorId] = useState<string | null>(null);
@@ -165,7 +165,7 @@ export function App() {
   return (
     <div className={`app${firePanel ? ' alarm' : ''}`}>
       <header className="topbar">
-        <div className="brand"><img className="logo" src={logo} alt="" width={26} height={26} />Promptory</div>
+        <div className="brand"><img className="logo" src={logo} alt="" width={26} height={26} />Roboratory</div>
         <div className="factory-name" title={factory.root}>{factory.name}</div>
         {view === 'floor' && liveSector && (
           !build
@@ -276,7 +276,7 @@ export function App() {
         <main className="stage empty-state">
           <div className="frame empty-card">
             <h2>This factory has no sectors yet</h2>
-            <p>Create a folder under <code>sectors/</code> with a <code>sector.yaml</code> and a <code>lines.yaml</code>. Promptory picks it up as soon as you save.</p>
+            <p>Create a folder under <code>sectors/</code> with a <code>sector.yaml</code> and a <code>lines.yaml</code>. Roboratory picks it up as soon as you save.</p>
           </div>
         </main>
       )}

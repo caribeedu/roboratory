@@ -35,7 +35,7 @@ export function Welcome({ recent, demoPath, onOpened, notify, toast }: { recent:
     <div className="welcome">
       <div className="welcome-card frame">
         <canvas ref={art} width={320} height={120} className="welcome-art" aria-hidden />
-        <h1><img src={logo} alt="" width={48} height={48} className="welcome-logo" />Promptory</h1>
+        <h1><img src={logo} alt="" width={48} height={48} className="welcome-logo" />Roboratory</h1>
         <p className="tagline">A factory for AI agents. Build deterministic production lines, watch every machine work, and keep every rule in git.</p>
         <div className="welcome-actions">
           <button className="btn primary big" onClick={() => go(() => api().createDemo())}>Open the demo factory</button>

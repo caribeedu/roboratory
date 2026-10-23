@@ -1,6 +1,6 @@
-# Promptory — Assessment
+# Roboratory — Assessment
 
-An assessment of Promptory as a development tool, measured against its goal: a tool that is visual, deterministic, easy to control and versionable. It is based on the first real run of a ticket line (a dependency-update ticket, US$ 8.03 in 88 minutes) and on the work that led to it. It lists only what is still open; what was fixed after the run is in [CHANGELOG.md](../CHANGELOG.md) (D37, D27, and the ticket line's signals and QA). What to do about it is in [ROADMAP.md](ROADMAP.md) §1.
+An assessment of Roboratory as a development tool, measured against its goal: a tool that is visual, deterministic, easy to control and versionable. It is based on the first real run of a ticket line (a dependency-update ticket, US$ 8.03 in 88 minutes) and on the work that led to it. It lists only what is still open; what was fixed after the run is in [CHANGELOG.md](../CHANGELOG.md) (D37, D27, and the ticket line's signals and QA). What to do about it is in [ROADMAP.md](ROADMAP.md) §1.
 
 **In short:** the architecture fits the goal. The next step to maturity is not more features. It is trust in the machines that check work, and in the tool permissions.
 

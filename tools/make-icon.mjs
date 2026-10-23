@@ -1,4 +1,4 @@
-// Draws the Promptory logo as 32×32 pixel art and writes the app icons:
+// Draws the Roboratory logo as 32×32 pixel art and writes the app icons:
 // assets/icon.png (1024), assets/logo-32.png, assets/icon.icns (macOS), assets/icon.ico (Windows).
 // The logo: a little factory whose glowing window is a prompt "›_", with smoke from the chimney.
 import fs from 'node:fs';

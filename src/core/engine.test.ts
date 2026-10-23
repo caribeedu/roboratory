@@ -6,7 +6,7 @@ import { createTargetRepo } from './demo';
 import { Engine, humanActions, linePlace } from './engine';
 import { loadFactory } from './factory';
 
-process.env.PROMPTORY_SIM_SPEED = '200';
+process.env.ROBORATORY_SIM_SPEED = '200';
 
 function writeFiles(root: string, files: Record<string, string>) {
   for (const [rel, c] of Object.entries(files)) {
@@ -25,7 +25,7 @@ const pre = (dir: string, f: Record<string, string>) => Object.fromEntries(Objec
 
 /** A one-sector factory whose line is described by `lineYaml`. */
 function factory(lineYaml: string, machines: Record<string, Record<string, string>>, files: Record<string, string> = {}, withRepo = true) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'promptory-engine-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'roboratory-engine-'));
   const root = path.join(dir, 'factory');
   if (withRepo) createTargetRepo(path.join(dir, 'repo'), 'repo');
   const ms = Object.entries(machines).reduce((acc, [n, f]) => ({ ...acc, ...pre(`sectors/s/models/m/machines/${n}`, f) }), {});
@@ -78,11 +78,11 @@ pieces:
     // b's worktree started from a's branch, and b's leftover file was committed for it
     const bDir = path.join(f.root, '.runs/s/l', runId, 'machines/b');
     expect(fs.readFileSync(path.join(bDir, 'A.md'), 'utf8')).toBe('from a T-1');
-    const log = execFileSync('git', ['log', '--format=%s', `promptory/${runId}/b`], { cwd: path.join(dir, 'repo') }).toString();
+    const log = execFileSync('git', ['log', '--format=%s', `roboratory/${runId}/b`], { cwd: path.join(dir, 'repo') }).toString();
     expect(log.split('\n')[0]).toMatch(/B: work left uncommitted/);
     expect(log).toContain('a\n');
     // the broker's box file never lands in the target repository
-    const files = execFileSync('git', ['ls-tree', '-r', '--name-only', `promptory/${runId}/b`], { cwd: path.join(dir, 'repo') }).toString();
+    const files = execFileSync('git', ['ls-tree', '-r', '--name-only', `roboratory/${runId}/b`], { cwd: path.join(dir, 'repo') }).toString();
     expect(files).not.toContain('box.json');
     const types = e.runEvents(runId).map((x) => x.type);
     expect(types[0]).toBe('run.start');
@@ -315,14 +315,14 @@ pallet: { needs: [{ from: qa, when: "verdict == 'pass'" }] }
     const bin = path.join(dir, 'claude');
     fs.writeFileSync(bin, `#!/usr/bin/env node\nrequire('fs').writeFileSync(${JSON.stringify(argsFile)}, JSON.stringify(process.argv.slice(2)));\nconsole.log(JSON.stringify({ type: 'result', subtype: 'success', result: '', structured_output: { ok: true } }));\n`);
     fs.chmodSync(bin, 0o755);
-    process.env.PROMPTORY_CLAUDE_BIN = bin;
+    process.env.ROBORATORY_CLAUDE_BIN = bin;
     const { f } = factory('intake: { kind: manual }\npieces:\n  - { id: a, machine: a }\n', {
       a: { ...machine('{ ok: true }'), 'role.md': 'I am the role.', 'machine.yaml': 'agent: claude\n' },
     }, { 'culture.md': 'Factory rule: be honest.', 'sectors/s/culture.md': 'Sector rule: Slack first.' }, false);
     const e = make(f);
     await e.run('s/l', {});
     await until(() => e.runSummaries()[0].status === 'done');
-    delete process.env.PROMPTORY_CLAUDE_BIN;
+    delete process.env.ROBORATORY_CLAUDE_BIN;
     const args: string[] = JSON.parse(fs.readFileSync(argsFile, 'utf8'));
     const role = args[args.indexOf('--append-system-prompt') + 1];
     expect(role.indexOf('I am the role.')).toBeLessThan(role.indexOf('Factory rule: be honest.'));
@@ -456,7 +456,7 @@ pallet: { needs: [next] }
     const bin = path.join(dir, 'claude');
     fs.writeFileSync(bin, `#!/usr/bin/env node\nrequire('fs').writeFileSync(${JSON.stringify(argsFile)}, JSON.stringify(process.argv.slice(2)));\nconsole.log(JSON.stringify({ type: 'result', subtype: 'success', result: '', structured_output: { result: { ok: true } } }));\n`);
     fs.chmodSync(bin, 0o755);
-    process.env.PROMPTORY_CLAUDE_BIN = bin;
+    process.env.ROBORATORY_CLAUDE_BIN = bin;
     const promptFor = async (machineYaml: string, factoryYaml = 'name: T\n') => {
       const { f } = factory('intake: { kind: manual }\npieces:\n  - { id: a, label: Draft, goal: Write the first draft., machine: a }\n  - { id: b, label: Check, goal: Find what the draft gets wrong., machine: b }\n', {
         a: { ...machine('{ ok: true }'), 'machine.yaml': machineYaml },
@@ -475,7 +475,7 @@ pallet: { needs: [next] }
     expect(on).toContain('Your goal: Write the first draft.');
     expect(on).toContain('- Check (machine): Find what the draft gets wrong.');
     expect(await promptFor('agent: claude\n', 'name: T\nline_context: false\n')).not.toContain('Your place in the line');
-    delete process.env.PROMPTORY_CLAUDE_BIN;
+    delete process.env.ROBORATORY_CLAUDE_BIN;
   });
 
   it('uses a machine\'s default goal where the line gives none', () => {
@@ -494,12 +494,12 @@ pallet: { needs: [next] }
     const bin = path.join(dir, 'claude');
     fs.writeFileSync(bin, `#!/usr/bin/env node\nrequire('fs').writeFileSync(${JSON.stringify(argsFile)}, JSON.stringify(process.argv.slice(2)));\nconsole.log(JSON.stringify({ type: 'result', subtype: 'success', result: '', structured_output: { result: { ok: true } } }));\n`);
     fs.chmodSync(bin, 0o755);
-    process.env.PROMPTORY_CLAUDE_BIN = bin;
+    process.env.ROBORATORY_CLAUDE_BIN = bin;
     const { f } = factory('intake: { kind: manual }\npieces:\n  - { id: a, machine: a }\n', { a: { ...machine('{ ok: true }'), 'machine.yaml': 'agent: claude\n' } }, {}, false);
     const e = make(f);
     await e.run('s/l', {});
     await until(() => e.runSummaries()[0].status === 'done');
-    delete process.env.PROMPTORY_CLAUDE_BIN;
+    delete process.env.ROBORATORY_CLAUDE_BIN;
     const args: string[] = JSON.parse(fs.readFileSync(argsFile, 'utf8'));
     const schema = JSON.parse(args[args.indexOf('--json-schema') + 1]);
     expect(schema.type).toBe('object');
@@ -526,13 +526,13 @@ pieces:
     expect(e.lineView('s/l').pieces.sig.error).toBe('timed out after 300ms');
   });
 
-  it('delivers a failed signal\'s box that was on its return belt when Promptory closed', async () => {
+  it('delivers a failed signal\'s box that was on its return belt when Roboratory closed', async () => {
     const dev = { ...machine('{ ok: true }'), 'contract.json': '{"type":"object"}', 'machine.yaml': 'agent: sim\nsim:\n  seconds: 1\n  output: { built: true, saw: "{{box.feedback.signal_output}}" }\n' };
     const { f, root } = factory(`intake: { kind: manual }
 pieces:
   - { id: dev, machine: dev, needs: ["@intake", { from: checks, when: "signal == 'fail'", back: true }] }
   - { id: checks, signal: { run: "signals/once.sh" } }
-`, { dev }, { 'sectors/s/models/m/signals/once.sh': '#!/bin/sh\ntest -f "$PROMPTORY_RUN_DIR/once" && exit 0\ntouch "$PROMPTORY_RUN_DIR/once"; echo "lint broke"; exit 1\n' }, false);
+`, { dev }, { 'sectors/s/models/m/signals/once.sh': '#!/bin/sh\ntest -f "$ROBORATORY_RUN_DIR/once" && exit 0\ntouch "$ROBORATORY_RUN_DIR/once"; echo "lint broke"; exit 1\n' }, false);
     const e1 = new Engine(f, { beltMs: 400 }); engines.push(e1);
     const id = await e1.run('s/l', {});
     await until(() => e1.lineView('s/l').boxes.some((b) => b.id.endsWith('<')));
@@ -545,7 +545,7 @@ pieces:
   });
 
   it('reports a signal timeout that is not a duration', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'promptory-engine-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'roboratory-engine-'));
     writeFiles(dir, {
       'factory.yaml': 'name: T\n', 'sectors/s/sector.yaml': 'name: S\n', 'sectors/s/lines.yaml': 'lines:\n  - { id: l, model: m }\n',
       'sectors/s/models/m/line.yaml': 'intake: { kind: manual }\npieces:\n  - { id: sig, signal: { run: "true", timeout: soon } }\n',
@@ -559,7 +559,7 @@ pieces:
 pieces:
   - { id: dev, machine: dev, needs: ["@intake", { from: checks, when: "signal == 'fail'", back: true, laps: 2 }] }
   - { id: checks, signal: { run: "signals/once.sh" } }
-`, { dev }, { 'sectors/s/models/m/signals/once.sh': '#!/bin/sh\ntest -f "$PROMPTORY_RUN_DIR/once" && exit 0\ntouch "$PROMPTORY_RUN_DIR/once"; echo "lint broke"; exit 1\n' }, false);
+`, { dev }, { 'sectors/s/models/m/signals/once.sh': '#!/bin/sh\ntest -f "$ROBORATORY_RUN_DIR/once" && exit 0\ntouch "$ROBORATORY_RUN_DIR/once"; echo "lint broke"; exit 1\n' }, false);
     const e = make(f);
     const id = await e.run('s/l', {});
     await until(() => e.runSummaries()[0].status === 'done');

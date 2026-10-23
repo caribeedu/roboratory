@@ -8,9 +8,9 @@ import path from 'node:path';
 
 const out = process.argv[2] || fs.mkdtempSync(path.join(os.tmpdir(), 'shots-'));
 fs.mkdirSync(out, { recursive: true });
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'promptory-e2e-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'roboratory-e2e-'));
 const exe = appExecutable();
-const app = await electron.launch({ executablePath: exe, env: { ...process.env, PROMPTORY_USER_DATA: path.join(tmp, 'ud'), PROMPTORY_DEMO_DIR: path.join(tmp, 'Demo Factory'), PROMPTORY_SIM_SPEED: process.env.PROMPTORY_SIM_SPEED || '2' } });
+const app = await electron.launch({ executablePath: exe, env: { ...process.env, ROBORATORY_USER_DATA: path.join(tmp, 'ud'), ROBORATORY_DEMO_DIR: path.join(tmp, 'Demo Factory'), ROBORATORY_SIM_SPEED: process.env.ROBORATORY_SIM_SPEED || '2' } });
 const win = await app.firstWindow();
 await win.setViewportSize({ width: 1440, height: 900 }).catch(() => {});
 const errors = [];
@@ -25,10 +25,10 @@ await wait(2500);
 await shot('02-floor-engineering');
 const steps = (process.argv[3] || 'all').split(',');
 if (steps.includes('all') || steps.includes('run')) {
-  await win.evaluate(() => window.promptory.run('engineering/orders-api', { ticket: 'PROJ-812' }));
-  await win.evaluate(() => window.promptory.run('engineering/storefront-ui', { ticket: 'PROJ-900' }));
-  await win.evaluate(() => window.promptory.run('incidents/orders-api', { alert: 'ALT-55102' }));
-  await win.evaluate(() => window.promptory.run('releases/orders-api', { tag: 'v4.18.0' }));
+  await win.evaluate(() => window.roboratory.run('engineering/orders-api', { ticket: 'PROJ-812' }));
+  await win.evaluate(() => window.roboratory.run('engineering/storefront-ui', { ticket: 'PROJ-900' }));
+  await win.evaluate(() => window.roboratory.run('incidents/orders-api', { alert: 'ALT-55102' }));
+  await win.evaluate(() => window.roboratory.run('releases/orders-api', { tag: 'v4.18.0' }));
   await wait(6000);
   await shot('03-floor-running');
   await wait(14000);

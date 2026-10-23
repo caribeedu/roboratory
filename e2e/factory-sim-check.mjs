@@ -28,7 +28,7 @@ for (const f of walk(root)) {
 for (const f of walk(root)) if (f.endsWith('sector.yaml') || f.endsWith('factory.yaml')) fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace(/agent: claude/g, 'agent: sim'));
 
 if (process.argv.includes('--prepare-only')) { console.log(root); process.exit(0); }
-process.env.PROMPTORY_SIM_SPEED = '200';
+process.env.ROBORATORY_SIM_SPEED = '200';
 const require = createRequire(import.meta.url);
 const { build } = require('esbuild');
 const out = path.join(tmp, 'core.cjs');

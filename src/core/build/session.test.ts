@@ -9,7 +9,7 @@ const services: FactoryService[] = [];
 afterEach(() => { services.splice(0).forEach((s) => s.close()); });
 
 function open() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'promptory-session-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'roboratory-session-'));
   const root = createDemoFactory(path.join(dir, 'f'), path.join(dir, 'repos'));
   const svc = new FactoryService({ snapshot: () => {}, logs: () => {}, messages: () => {} });
   svc.open(root);

@@ -6,7 +6,7 @@ import { Engine } from './engine';
 import { loadFactory } from './factory';
 import { autoAllowance, Managers } from './managers';
 
-process.env.PROMPTORY_SIM_SPEED = '200';
+process.env.ROBORATORY_SIM_SPEED = '200';
 
 async function until(fn: () => boolean, ms = 8000) {
   const t0 = Date.now();
@@ -14,7 +14,7 @@ async function until(fn: () => boolean, ms = 8000) {
 }
 
 function setup() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'promptory-mgr-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'roboratory-mgr-'));
   const root = createDemoFactory(path.join(dir, 'factory'), path.join(dir, 'repos'));
   let f = loadFactory(root);
   const e = new Engine(f, { beltMs: 5 });
@@ -46,7 +46,7 @@ describe('managers', () => {
   });
 
   it('runs an allowed verb on its own, within the policy limit', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'promptory-mgr-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'roboratory-mgr-'));
     const root = createDemoFactory(path.join(dir, 'factory'), path.join(dir, 'repos'));
     fs.appendFileSync(path.join(root, 'shared/machines/triager/machine.yaml'), '  fail_first_run: true\n  bad_output: { ticket: 1 }\n');
     const f = loadFactory(root);
@@ -93,7 +93,7 @@ describe('managers', () => {
 
 describe('manager regressions', () => {
   it('enforces policy limits for verbs without a run, and reports a failed run proposal', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'promptory-mgr-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'roboratory-mgr-'));
     const root = createDemoFactory(path.join(dir, 'factory'), path.join(dir, 'repos'));
     fs.writeFileSync(path.join(root, 'sectors/releases/sector.yaml'), 'name: Releases\npolicy:\n  run: { auto: 1 }\nmanager:\n  agent: sim\n');
     const f = loadFactory(root);

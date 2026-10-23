@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360" role="img" aria-label="Promptory: a factory for AI agents, with deterministic production lines in pixel art">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360" role="img" aria-label="Roboratory: a factory for AI agents, with deterministic production lines in pixel art">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#141412"/>
@@ -77,7 +77,7 @@
   </g>
 
   <!-- text -->
-  <text x="70" y="168" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="78" font-weight="700" fill="#ecebe8">Prompt<tspan fill="#e0a43a">ory</tspan></text>
+  <text x="70" y="168" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="78" font-weight="700" fill="#ecebe8">Robo<tspan fill="#e0a43a">ratory</tspan></text>
   <text x="74" y="214" font-family="'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="24" fill="#e0a43a">A factory for AI agents</text>
   <text x="74" y="258" font-family="'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="18" fill="#9c9891">Production lines in files, checked at every step,</text>
   <text x="74" y="284" font-family="'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="18" fill="#9c9891">with the whole floor in pixel art.</text>

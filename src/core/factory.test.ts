@@ -4,7 +4,7 @@ import path from 'node:path';
 import { createDemoFactory } from './demo';
 import { loadFactory, usage } from './factory';
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'promptory-'));
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'roboratory-'));
 
 describe('factory loader', () => {
   it('loads the demo factory: sectors, shared model copies, machines and policy', () => {

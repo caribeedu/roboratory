@@ -1,10 +1,10 @@
 # Changelog
 
-What Promptory delivers. The reasoning behind each choice is in [docs/DECISIONS.md](docs/DECISIONS.md), and what is still open is in [docs/ROADMAP.md](docs/ROADMAP.md).
+What Roboratory delivers. The reasoning behind each choice is in [docs/DECISIONS.md](docs/DECISIONS.md), and what is still open is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## v0.7.0
 
-The first release. A factory is a git repository; Promptory draws it as a pixel-art floor, runs its lines with headless agents and lets you build and change it from the Floor itself.
+The first release. A factory is a git repository; Roboratory draws it as a pixel-art floor, runs its lines with headless agents and lets you build and change it from the Floor itself.
 
 ### The factory and the Floor
 - **The Electron app** with a PixiJS Floor: one sector room that grows to fit its lines, a three-quarter pixel-art camera, and pan and zoom (D7, D6).

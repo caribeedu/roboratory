@@ -7,8 +7,8 @@ import { extractJson, short, spawnCollect } from './process';
 import type { AgentRequest, AgentResult } from './types';
 
 export async function runCodex(req: AgentRequest): Promise<AgentResult> {
-  const bin = process.env.PROMPTORY_CODEX_BIN || 'codex';
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'promptory-codex-'));
+  const bin = process.env.ROBORATORY_CODEX_BIN || 'codex';
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'roboratory-codex-'));
   const schemaFile = path.join(tmp, 'schema.json'), outFile = path.join(tmp, 'out.txt');
   fs.writeFileSync(schemaFile, JSON.stringify(req.schema));
   const args = ['exec', `${req.role}\n\n${req.prompt}`, '--output-schema', schemaFile, '-o', outFile, '--sandbox', req.readOnly ? 'read-only' : 'workspace-write', '--skip-git-repo-check'];

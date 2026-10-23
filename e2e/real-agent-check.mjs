@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 
 const gh = process.argv.includes('--github') ? process.argv[process.argv.indexOf('--github') + 1] : null;
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'promptory-real-'));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'roboratory-real-'));
 const repo = path.join(dir, 'repo');
 if (gh) execFileSync('gh', ['repo', 'clone', gh, repo], { stdio: 'inherit' });
 else {

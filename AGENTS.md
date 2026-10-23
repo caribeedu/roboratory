@@ -1,6 +1,6 @@
 # AGENTS.md — Invariants
 
-Promptory is a desktop app that runs AI agents as machines on deterministic production lines, rendered as a pixel-art factory. Read [README.md](README.md) and [docs/DECISIONS.md](docs/DECISIONS.md) before proposing any change to behavior; the code layout, commands and conventions are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+Roboratory is a desktop app that runs AI agents as machines on deterministic production lines, rendered as a pixel-art factory. Read [README.md](README.md) and [docs/DECISIONS.md](docs/DECISIONS.md) before proposing any change to behavior; the code layout, commands and conventions are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 These hold unless a person explicitly signs off a change, recorded as a new decision in `docs/DECISIONS.md`:
 

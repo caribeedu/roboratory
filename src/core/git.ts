@@ -1,10 +1,10 @@
-// Git helpers. Promptory never writes to the factory repository's git (D5);
+// Git helpers. Roboratory never writes to the factory repository's git (D5);
 // it only reads it. Target repositories get chained per-machine worktrees (D10).
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const IDENTITY = { GIT_AUTHOR_NAME: 'Promptory', GIT_AUTHOR_EMAIL: 'machine@promptory.local', GIT_COMMITTER_NAME: 'Promptory', GIT_COMMITTER_EMAIL: 'machine@promptory.local' };
+const IDENTITY = { GIT_AUTHOR_NAME: 'Roboratory', GIT_AUTHOR_EMAIL: 'machine@roboratory.local', GIT_COMMITTER_NAME: 'Roboratory', GIT_COMMITTER_EMAIL: 'machine@roboratory.local' };
 
 export function git(cwd: string, args: string[], opts: { allowFail?: boolean } = {}): Promise<{ code: number; out: string; err: string }> {
   return new Promise((resolve, reject) => {

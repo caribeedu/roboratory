@@ -1,11 +1,11 @@
-# Promptory — Decision log
+# Roboratory — Decision log
 
 Each decision states what was chosen, the alternatives considered and why. Decisions are grouped by topic, and related ones point to each other.
 
 # Foundations
 
 ## D1. Build a new product instead of adopting one
-**Decision:** build Promptory.
+**Decision:** build Roboratory.
 
 **Requirements that drove it:**
 - Strong visibility of agent work while it runs and afterwards.
@@ -28,10 +28,10 @@ Each decision states what was chosen, the alternatives considered and why. Decis
 - A manager that lets a model rewire the team at runtime is the kind of unpredictability the product exists to remove.
 - Two modes would double what one maintainer has to keep working.
 
-## D3. What Promptory deliberately does not do
+## D3. What Roboratory deliberately does not do
 **Decision:** each of these is a choice, not a gap:
 
-| Common approach | In Promptory |
+| Common approach | In Roboratory |
 |---|---|
 | A step ends when the terminal goes quiet; output is captured from the screen | A step ends when the process exits; output is the agent's JSON (D8) |
 | Agent-agnostic code | Per-agent headless templates and output parsing (D8) |
@@ -47,9 +47,9 @@ Kept as principles: everything runs locally, there is no telemetry, and files us
 
 **Why:** changes become reviewable diffs, history is free, and nothing about how the factory behaves lives only in one person's app data.
 
-## D5. Promptory never writes to the factory repository's git
+## D5. Roboratory never writes to the factory repository's git
 **Decision:**
-- Accepting a proposal or confirming build mode only writes files. Promptory never commits, pushes or branches, and records no origin for changes.
+- Accepting a proposal or confirming build mode only writes files. Roboratory never commits, pushes or branches, and records no origin for changes.
 - Lines run from the files on disk.
 - Each run records the commit it started from and any uncommitted diff in effect.
 
@@ -159,7 +159,7 @@ Kept as principles: everything runs locally, there is no telemetry, and files us
 ## D16. Human gates confirm, they don't collect approvers
 **Decision:** a human gate is a release button that can ask "are you sure?" several times (`confirmations: 2`). There are no named approvers and no checklists.
 
-**Why:** Promptory has one user. The friction is the point, and a second person's key has no way to arrive in a local app.
+**Why:** Roboratory has one user. The friction is the point, and a second person's key has no way to arrive in a local app.
 
 ## D17. Decision gates route on your choice
 **Decision:**
@@ -295,7 +295,7 @@ Kept as principles: everything runs locally, there is no telemetry, and files us
 ## D32. Scope: machines by instruction, managers read-only by the CLI
 **Decision:**
 - **Machines:** read access is not restricted beyond their instructions.
-- **Managers:** they run read-only through the agent CLI and deliver changes as patches that Promptory writes only when you accept them (D33).
+- **Managers:** they run read-only through the agent CLI and deliver changes as patches that Roboratory writes only when you accept them (D33).
 - **Sector Manager scope:** staying inside its sector is an instruction, and your review is the guard.
 
 **Why:** restricting machines needs containers or an OS sandbox, which costs more than it buys today. Making managers read-only costs nothing, because the CLIs already support it, and it guarantees that nothing changes without you.
@@ -305,9 +305,9 @@ Kept as principles: everything runs locally, there is no telemetry, and files us
 ## D33. Manager tools: factory data plus MCP tools listed by name
 **Decision:**
 - Managers see the factory's state, runs, transcripts and files, plus MCP tools listed by tool name: in `sector.yaml` for a Sector Manager, in `factory.yaml` for the General Manager.
-- MCP servers are configured in the agent CLI, never by Promptory, and machines' `tools:` work the same way.
-- On start, Promptory checks that listed tools exist and warns about missing ones.
-- Managers run read-only through the CLI: `--tools` on Claude Code, `--sandbox read-only` on Codex. They return changes as patches inside their contract answer, and Promptory writes them only when you accept.
+- MCP servers are configured in the agent CLI, never by Roboratory, and machines' `tools:` work the same way.
+- On start, Roboratory checks that listed tools exist and warns about missing ones.
+- Managers run read-only through the CLI: `--tools` on Claude Code, `--sandbox read-only` on Codex. They return changes as patches inside their contract answer, and Roboratory writes them only when you accept.
 
 **Why:** managers can diagnose alongside you without any path to act outside verbs and review.
 
@@ -424,10 +424,10 @@ A rework drops the arrivals and skips that the last lap left downstream (D15).
 
 ## D43. The engine runs without the app (planned)
 **Decision:**
-- The engine runs in its own process, one per factory, started on demand by the app or the `promptory` command. It keeps running when the app quits, and ends with `promptory stop` or when no run is open and no client is connected. A lock file in the factory allows one engine per factory.
+- The engine runs in its own process, one per factory, started on demand by the app or the `roboratory` command. It keeps running when the app quits, and ends with `roboratory stop` or when no run is open and no client is connected. A lock file in the factory allows one engine per factory.
 - Clients talk to it over a Unix socket at `.runs/engine.sock`, open to the user only, with one JSON message per line: the methods of `src/shared/api.ts`, and state updates pushed back. No network port is opened. The Electron main process relays between the interface and the socket.
 - Everything in `FactoryService` moves into the engine: runs, build-mode sessions and their locks, managers and proposals, and reloading the factory. The app keeps only the interface.
-- The `promptory` command offers `serve`, `stop`, `status`, `run`, `release`, `answer`, `retry`, `halt`, `resume` and `watch`. Every action is a verb, audited as `you` with the source `cli`. Build mode stays in the app.
+- The `roboratory` command offers `serve`, `stop`, `status`, `run`, `release`, `answer`, `retry`, `halt`, `resume` and `watch`. Every action is a verb, audited as `you` with the source `cli`. Build mode stays in the app.
 - The packaged app's binary runs the engine in Node mode (`ELECTRON_RUN_AS_NODE`), so the app and the command share one engine bundle and need no other runtime. The command is installed in `~/.local/bin` only when you ask, from the app's menu.
 - When the app finds an older engine, it offers to restart it when idle: the engine stops dispatching new work and restarts once no machine or signal is running.
 - Tests drive a real engine through the same client as the command.

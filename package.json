@@ -1,6 +1,6 @@
 {
-  "name": "promptory",
-  "productName": "Promptory",
+  "name": "roboratory",
+  "productName": "Roboratory",
   "version": "0.7.0",
   "description": "A factory for AI agents: deterministic production lines in pixel art.",
   "keywords": [
@@ -14,13 +14,13 @@
     "codex",
     "llm"
   ],
-  "homepage": "https://github.com/caribeedu/promptory",
+  "homepage": "https://github.com/caribeedu/roboratory",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/caribeedu/promptory.git"
+    "url": "git+https://github.com/caribeedu/roboratory.git"
   },
   "bugs": {
-    "url": "https://github.com/caribeedu/promptory/issues"
+    "url": "https://github.com/caribeedu/roboratory/issues"
   },
   "author": {
     "name": "Edu Caribé"

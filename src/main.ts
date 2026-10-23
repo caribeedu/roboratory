@@ -8,7 +8,7 @@ import type { ScopeArg } from './shared/api';
 import type { BuildOp } from './shared/build';
 
 // The macOS menu bar and Dock read this name (dev builds otherwise show "Electron").
-app.setName('Promptory');
+app.setName('Roboratory');
 
 let win: BrowserWindow | null = null;
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
@@ -19,8 +19,8 @@ const remember = (root: string) => {
   fs.mkdirSync(path.dirname(settingsFile()), { recursive: true });
   fs.writeFileSync(settingsFile(), JSON.stringify(s, null, 2));
 };
-const demoPath = process.env.PROMPTORY_DEMO_DIR || path.join(os.homedir(), 'Promptory', 'Demo Factory');
-if (process.env.PROMPTORY_USER_DATA) app.setPath('userData', process.env.PROMPTORY_USER_DATA);
+const demoPath = process.env.ROBORATORY_DEMO_DIR || path.join(os.homedir(), 'Roboratory', 'Demo Factory');
+if (process.env.ROBORATORY_USER_DATA) app.setPath('userData', process.env.ROBORATORY_USER_DATA);
 
 const send = (ch: string, payload: unknown) => { if (win && !win.isDestroyed()) win.webContents.send(ch, payload); };
 const service = new FactoryService({
@@ -33,7 +33,7 @@ const service = new FactoryService({
 function open(root: string) {
   service.open(root);
   remember(root);
-  win?.setTitle(`${service.factory?.name ?? 'Promptory'} — Promptory`);
+  win?.setTitle(`${service.factory?.name ?? 'Roboratory'} — Roboratory`);
 }
 
 function iconPath() {
@@ -45,7 +45,7 @@ function createWindow() {
     width: 1480, height: 940, minWidth: 980, minHeight: 640,
     backgroundColor: '#14110d',
     icon: iconPath(),
-    title: 'Promptory',
+    title: 'Roboratory',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition: { x: 14, y: 16 },
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: false },

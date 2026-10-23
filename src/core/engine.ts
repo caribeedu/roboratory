@@ -500,7 +500,7 @@ export class Engine extends EventEmitter {
       return dir;
     }
     if (!run.line.repo) { fs.mkdirSync(dir, { recursive: true }); return dir; }
-    const branch = `promptory/${run.summary.id}/${pieceId}`;
+    const branch = `roboratory/${run.summary.id}/${pieceId}`;
     const base = ups.length ? run.branches.get(ups[0])! : await headOf(run.line.repo);
     await addWorktree(run.line.repo, dir, branch, base);
     for (const other of ups.slice(1)) {
@@ -531,7 +531,7 @@ export class Engine extends EventEmitter {
     if (!validate) { validate = ajv.compile(machine.contract); validators.set(key, validate); }
     const siblings = fs.existsSync(path.join(run.dir, 'machines')) ? fs.readdirSync(path.join(run.dir, 'machines')).filter((d) => d !== def.id).map((d) => path.join(run.dir, 'machines', d)) : [];
     const addDirs = [...siblings, ...(run.line.repo ? [path.dirname(boxFile)] : []), ...machine.dirs.filter((d) => fs.existsSync(d))];
-    const branch = run.line.repo ? `promptory/${run.summary.id}/${def.id}` : undefined;
+    const branch = run.line.repo ? `roboratory/${run.summary.id}/${def.id}` : undefined;
     const simFail = !!machine.sim?.fail_first_run && !this.simFailed.has(key) && !w.hint;
     const call = run.calls.get(def.id) ?? 0;
     run.calls.set(def.id, call + 1);
@@ -625,7 +625,7 @@ export class Engine extends EventEmitter {
     let timedOut = false;
     const code = await new Promise<number | null>((resolve) => {
       // its own process group, so a timeout stops everything the script started (D19)
-      const child = spawn('sh', ['-c', cmd], { cwd, detached: true, windowsHide: true, env: { ...process.env, PROMPTORY_BOX: boxFile, PROMPTORY_RUN: run.summary.id, PROMPTORY_RUN_DIR: run.dir } });
+      const child = spawn('sh', ['-c', cmd], { cwd, detached: true, windowsHide: true, env: { ...process.env, ROBORATORY_BOX: boxFile, ROBORATORY_RUN: run.summary.id, ROBORATORY_RUN_DIR: run.dir } });
       // on Windows there are no process groups: the whole tree is stopped with taskkill
       const group = (sig: NodeJS.Signals) => {
         if (process.platform === 'win32') { if (child.pid) spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true }).on('error', () => {}); return; }
@@ -808,7 +808,7 @@ export class Engine extends EventEmitter {
         rt.current = { runId: id, box: merged() };
         rt.state = 'fire';
         rt.since = since.get(p.id) ?? this.now();
-        rt.error = fired.get(p.id) ?? 'Interrupted when Promptory closed. Retry to run this step again.';
+        rt.error = fired.get(p.id) ?? 'Interrupted when Roboratory closed. Retry to run this step again.';
         run.summary.status = 'fire';
       } else if (holding.has(p.id)) {
         rt.current = { runId: id, box: merged() };
@@ -817,7 +817,7 @@ export class Engine extends EventEmitter {
       }
     }
     for (const p of l.def.model.pieces) if (!run.done.has(p.id)) this.checkReady(run, p.id);
-    // a box that was on a return belt when Promptory closed comes back now
+    // a box that was on a return belt when Roboratory closed comes back now
     for (const { from, to } of pendingBack.values()) {
       const fb = sent.get(from);
       if (fb) this.rework(run, to, from, { id: `${id}:${from}`, runId: id, payload: fb, color: '#c8a46a' });
@@ -918,7 +918,7 @@ export function humanActions(run: RunRt): string {
 
 function machinePrompt(run: RunRt, pieceId: string | undefined, label: string, box: Payload, contract: Record<string, unknown>, siblings: string[], lastError: string, hint: string | undefined, boxFile: string) {
   return [
-    `You are the "${label}" machine on the Promptory production line "${run.line.name}" (run ${run.summary.id}).`,
+    `You are the "${label}" machine on the Roboratory production line "${run.line.name}" (run ${run.summary.id}).`,
     pieceId ? linePlace(run.line, pieceId) : '',
     `Your working folder is the current directory. The incoming box is also saved at ${boxFile}.`,
     siblings.length ? `Other machines of this run work in these folders, which you may read:\n${siblings.map((s) => `- ${s}`).join('\n')}` : '',

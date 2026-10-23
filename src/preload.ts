@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { PromptoryApi } from './shared/api';
+import type { RoboratoryApi } from './shared/api';
 
 const call = (ch: string) => (...args: unknown[]) => ipcRenderer.invoke(ch, ...args);
 const on = (ch: string) => (cb: (p: any) => void) => {
@@ -8,39 +8,39 @@ const on = (ch: string) => (cb: (p: any) => void) => {
   return () => { ipcRenderer.removeListener(ch, h); };
 };
 
-const api: PromptoryApi = {
-  state: call('state') as PromptoryApi['state'],
-  openFactory: call('openFactory') as PromptoryApi['openFactory'],
-  openFactoryAt: call('openFactoryAt') as PromptoryApi['openFactoryAt'],
-  createDemo: call('createDemo') as PromptoryApi['createDemo'],
-  closeFactory: call('closeFactory') as PromptoryApi['closeFactory'],
-  run: call('run') as PromptoryApi['run'],
-  retry: call('retry') as PromptoryApi['retry'],
-  release: call('release') as PromptoryApi['release'],
-  answer: call('answer') as PromptoryApi['answer'],
-  halt: call('halt') as PromptoryApi['halt'],
-  resume: call('resume') as PromptoryApi['resume'],
-  runs: call('runs') as PromptoryApi['runs'],
-  runDetail: call('runDetail') as PromptoryApi['runDetail'],
-  ask: call('ask') as PromptoryApi['ask'],
-  messages: call('messages') as PromptoryApi['messages'],
-  acceptProposal: call('acceptProposal') as PromptoryApi['acceptProposal'],
-  rejectProposal: call('rejectProposal') as PromptoryApi['rejectProposal'],
-  reveal: call('reveal') as PromptoryApi['reveal'],
-  buildStart: call('buildStart') as PromptoryApi['buildStart'],
-  buildApply: call('buildApply') as PromptoryApi['buildApply'],
-  buildUndo: call('buildUndo') as PromptoryApi['buildUndo'],
-  buildRedo: call('buildRedo') as PromptoryApi['buildRedo'],
-  buildFields: call('buildFields') as PromptoryApi['buildFields'],
-  buildServers: call('buildServers') as PromptoryApi['buildServers'],
-  buildRead: call('buildRead') as PromptoryApi['buildRead'],
-  buildList: call('buildList') as PromptoryApi['buildList'],
-  buildSave: call('buildSave') as PromptoryApi['buildSave'],
-  buildDiscard: call('buildDiscard') as PromptoryApi['buildDiscard'],
+const api: RoboratoryApi = {
+  state: call('state') as RoboratoryApi['state'],
+  openFactory: call('openFactory') as RoboratoryApi['openFactory'],
+  openFactoryAt: call('openFactoryAt') as RoboratoryApi['openFactoryAt'],
+  createDemo: call('createDemo') as RoboratoryApi['createDemo'],
+  closeFactory: call('closeFactory') as RoboratoryApi['closeFactory'],
+  run: call('run') as RoboratoryApi['run'],
+  retry: call('retry') as RoboratoryApi['retry'],
+  release: call('release') as RoboratoryApi['release'],
+  answer: call('answer') as RoboratoryApi['answer'],
+  halt: call('halt') as RoboratoryApi['halt'],
+  resume: call('resume') as RoboratoryApi['resume'],
+  runs: call('runs') as RoboratoryApi['runs'],
+  runDetail: call('runDetail') as RoboratoryApi['runDetail'],
+  ask: call('ask') as RoboratoryApi['ask'],
+  messages: call('messages') as RoboratoryApi['messages'],
+  acceptProposal: call('acceptProposal') as RoboratoryApi['acceptProposal'],
+  rejectProposal: call('rejectProposal') as RoboratoryApi['rejectProposal'],
+  reveal: call('reveal') as RoboratoryApi['reveal'],
+  buildStart: call('buildStart') as RoboratoryApi['buildStart'],
+  buildApply: call('buildApply') as RoboratoryApi['buildApply'],
+  buildUndo: call('buildUndo') as RoboratoryApi['buildUndo'],
+  buildRedo: call('buildRedo') as RoboratoryApi['buildRedo'],
+  buildFields: call('buildFields') as RoboratoryApi['buildFields'],
+  buildServers: call('buildServers') as RoboratoryApi['buildServers'],
+  buildRead: call('buildRead') as RoboratoryApi['buildRead'],
+  buildList: call('buildList') as RoboratoryApi['buildList'],
+  buildSave: call('buildSave') as RoboratoryApi['buildSave'],
+  buildDiscard: call('buildDiscard') as RoboratoryApi['buildDiscard'],
   onBuild: on('build'),
   onSnapshot: on('snapshot'),
   onLogs: on('logs'),
   onMessages: on('messages'),
 };
 
-contextBridge.exposeInMainWorld('promptory', api);
+contextBridge.exposeInMainWorld('roboratory', api);

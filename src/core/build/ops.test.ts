@@ -13,7 +13,7 @@ const machine = (props = '{"verdict":{"type":"string","enum":["pass","fail"]}}')
 });
 
 function factory(lineYaml: string, machines: Record<string, ReturnType<typeof machine>>) {
-  const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'promptory-build-')), 'f');
+  const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'roboratory-build-')), 'f');
   const files: Record<string, string> = {
     'factory.yaml': 'name: T\n',
     'sectors/s/sector.yaml': 'name: S\n',
@@ -43,7 +43,7 @@ const issues = (d: Draft) => checkFactory(d.load()).map((i) => i.message);
 describe('build-mode edits', () => {
   it('starts clean on a valid factory and on the demo', () => {
     expect(issues(new Draft(factory(LINE, { build: machine(), check: machine() })))).toEqual([]);
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'promptory-build-demo-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'roboratory-build-demo-'));
     expect(issues(new Draft(createDemoFactory(path.join(dir, 'f'), path.join(dir, 'repos'))))).toEqual([]);
   });
 

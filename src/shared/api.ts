@@ -6,7 +6,7 @@ export type ScopeArg = { kind: 'sector'; sectorId: string } | { kind: 'factory' 
 
 export interface RunDetail { summary: RunSummary; events: Record<string, any>[]; diff?: string; dir: string }
 
-export interface PromptoryApi {
+export interface RoboratoryApi {
   state(): Promise<{ snapshot: Snapshot; logs: LogEntry[]; recent: string[]; demoPath: string }>;
   openFactory(): Promise<boolean>;
   openFactoryAt(root: string): Promise<void>;
@@ -42,5 +42,5 @@ export interface PromptoryApi {
 }
 
 declare global {
-  interface Window { promptory: PromptoryApi }
+  interface Window { roboratory: RoboratoryApi }
 }

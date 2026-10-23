@@ -1,8 +1,8 @@
-# Promptory — Competitors
+# Roboratory — Competitors
 
 Tools that orchestrate coding agents, checked against their own READMEs and docs in October 2026. Star counts and releases are from GitHub on 2026-10-19 (2026-10-22 for Orchestrator.inc, OpenAgents and nodeterm). Each section has the same parts: what the tool is and its link; six profile lines (maturity, versionability, similarity, tracing, custom flows and free commercial use); **Inspirations** (ideas to take), **Overlaps** (what it does the same or almost the same) and **Contradictions** (what it does or decided differently).
 
-Similarity is Low, Medium or High against Promptory's model: deterministic lines in files, human gates before outward actions, and a fresh headless step per machine. Reddit could not be searched: it refused every automated access, so the sources are GitHub, Hacker News and web search.
+Similarity is Low, Medium or High against Roboratory's model: deterministic lines in files, human gates before outward actions, and a fresh headless step per machine. Reddit could not be searched: it refused every automated access, so the sources are GitHub, Hacker News and web search.
 
 ## Archon
 A "factory builder": YAML workflows in `.archon/workflows/` run AI agents, scripts and human decisions as a graph. Its `sdlc` pack takes an issue to a merged PR. Link: https://github.com/coleam00/Archon
@@ -54,7 +54,7 @@ A local control plane (the `rig` CLI and a daemon) that runs persistent teams ("
 - Specs are files in git; each seat has its own working directory and worktree; a model per seat.
 
 ### Contradictions
-- Agents are long-lived tmux sessions that keep their context, with `fork`, `snapshot` and context watchdogs. Promptory starts each step with a fresh, headless context.
+- Agents are long-lived tmux sessions that keep their context, with `fork`, `snapshot` and context watchdogs. Roboratory starts each step with a fresh, headless context.
 - A lead agent coordinates the others through queues and messages.
 - State is in a daemon with SQLite under `~/.openrig`, and launching it writes hooks and settings into the workspace and skills into `~/.claude/skills`.
 - No JSON Schema contract per step.
@@ -445,7 +445,7 @@ A tmux system that runs up to 10 coding CLIs in a "Shogun → Karo → Ashigaru"
 - Sessions survive app restarts in tmux, and the macOS app "ships its own tmux".
 - An uninstall script with `--dry-run` that "reverts the status-hook/skill entries it merged into your agent CLIs' config", with a documented list of everything it writes.
 - Dictation types the text into the prompt and "you press Enter (nothing auto-submits)".
-- One core behind a platform seam, with Electron as only one shell; the same renderer runs in a browser. Close to Promptory's `src/core` rule.
+- One core behind a platform seam, with Electron as only one shell; the same renderer runs in a browser. Close to Roboratory's `src/core` rule.
 
 ### Overlaps
 - An Electron app with core logic kept free of Electron, a canvas of agents and a kanban view of the same sessions.

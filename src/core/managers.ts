@@ -88,7 +88,7 @@ export class Managers {
         role: [def.role || (sector ? `You are the Sector Manager of "${sector.name}".` : 'You are the General Manager of this factory.'), f.culture, sector?.culture].filter((x) => x && x.trim()).join('\n\n'),
         prompt: managerPrompt(scope, sector, brief, question, this.messages(scope).slice(-8, -2)), onEvent: () => {},
       });
-    if (def.agent === 'sim') await new Promise((r) => setTimeout(r, 1200 / Number(process.env.PROMPTORY_SIM_SPEED || 1)));
+    if (def.agent === 'sim') await new Promise((r) => setTimeout(r, 1200 / Number(process.env.ROBORATORY_SIM_SPEED || 1)));
     reply.pending = false;
     if ('error' in res && res.error) reply.error = res.error;
     else if (!validate(res.output)) reply.error = `The answer did not match the manager contract: ${JSON.stringify(validate.errors?.[0]?.message)}`;

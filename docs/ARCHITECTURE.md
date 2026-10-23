@@ -1,6 +1,6 @@
-# Promptory — Architecture
+# Roboratory — Architecture
 
-How Promptory is built. Product behavior is in [PRODUCT.md](PRODUCT.md); the reasoning behind each choice is in [DECISIONS.md](DECISIONS.md).
+How Roboratory is built. Product behavior is in [PRODUCT.md](PRODUCT.md); the reasoning behind each choice is in [DECISIONS.md](DECISIONS.md).
 
 ## 1. Stack
 
@@ -119,7 +119,7 @@ tools: [mcp__claude_ai_Atlassian, mcp__newrelic]   # a whole server, or mcp__<se
 allow: ["Bash(gh:*)"]             # extra permission rules for the agent
 ```
 
-Promptory does not configure MCP servers. On start, it reads `claude mcp list` and warns about any server named by a listed tool that is missing.
+Roboratory does not configure MCP servers. On start, it reads `claude mcp list` and warns about any server named by a listed tool that is missing.
 
 Headless templates live in the app, one adapter per supported agent CLI in `src/core/agents/`, and machines reference them by name. The engine gives every adapter the contract and its alternatives, a question (D21) or blocked (D22); the adapter decides how to ask its CLI for them:
 
@@ -173,18 +173,18 @@ Delivery follows the same rule as everything else: the agent publishes (for exam
 
 ### 3.4 Scope
 - **Machines** are told which folders belong to their run. Nothing stops an agent from reading elsewhere. Containers or an OS sandbox remain an option if this ever matters.
-- **Managers** run read-only through the agent CLI: Claude Code with `--tools "Read,Grep,Glob"`, `--permission-mode dontAsk` and only the sector's listed MCP tools allowed; Codex with `--sandbox read-only`. They deliver changes as patches inside their contract answer, and Promptory writes them only when you accept. A Sector Manager is told to stay inside `sectors/<its-sector>/`; your review is the guard for that.
+- **Managers** run read-only through the agent CLI: Claude Code with `--tools "Read,Grep,Glob"`, `--permission-mode dontAsk` and only the sector's listed MCP tools allowed; Codex with `--sandbox read-only`. They deliver changes as patches inside their contract answer, and Roboratory writes them only when you accept. A Sector Manager is told to stay inside `sectors/<its-sector>/`; your review is the guard for that.
 - Gemini CLI and OpenCode have no verified read-only mode, so they are not supported as managers until one is confirmed.
 
 ### 3.5 Git in the factory repository
-Promptory reads the factory repository's git state and never writes to it. (Target repositories are different: see §3.3.)
+Roboratory reads the factory repository's git state and never writes to it. (Target repositories are different: see §3.3.)
 - It shows the pending diff against the last commit and the commit history.
 - It does not commit, push or branch. Accepting a proposal or confirming build mode only writes files.
 - Lines run from the files on disk. Each run records in its `run.jsonl` the commit it started from and, when the working tree has uncommitted changes, the exact diff in effect.
 
 ### 3.6 Verbs
 All actions go through one engine API: `run`, `retry`, `release`, `halt` and `resume`, plus accepting a manager's change.
-- UI buttons and manager proposals call it today. A command-line interface (`promptory`) is planned (D43).
+- UI buttons and manager proposals call it today. A command-line interface (`roboratory`) is planned (D43).
 - Every call is appended with the actor and the time: to each affected run's `run.jsonl`, and for halts, resumes and accepted changes also to `.runs/<sector>/audit.jsonl`.
 - A halted line stays halted across restarts (`.runs/<sector>/<line>/HALTED`).
 
@@ -206,7 +206,7 @@ Build mode edits the factory through a draft in the main process; the renderer s
 - **Locks.** While a session is open, dispatching a line the draft changes is refused for every caller (you, a manager's proposal, a policy auto-run), and accepting a manager's change is refused. A manager's change to a line with a run in progress waits too.
 
 ### 3.10 The engine process (planned, D43)
-Today the engine runs in the Electron main process, so runs stop when the app quits. It is planned to move to its own process per factory, reached over a Unix socket at `.runs/engine.sock` by the app and the `promptory` command; the roadmap and exit criteria are in [ROADMAP.md](ROADMAP.md) §1.
+Today the engine runs in the Electron main process, so runs stop when the app quits. It is planned to move to its own process per factory, reached over a Unix socket at `.runs/engine.sock` by the app and the `roboratory` command; the roadmap and exit criteria are in [ROADMAP.md](ROADMAP.md) §1.
 
 ## 4. Visual system
 - Three-quarter top-down camera and nearest-neighbor pixel art.

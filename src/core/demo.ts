@@ -25,12 +25,12 @@ function prefix(dir: string, files: Files): Files {
 }
 
 function git(cwd: string, ...args: string[]) {
-  execFileSync('git', args, { cwd, stdio: 'ignore', env: { ...process.env, GIT_AUTHOR_NAME: 'Promptory', GIT_AUTHOR_EMAIL: 'demo@promptory.local', GIT_COMMITTER_NAME: 'Promptory', GIT_COMMITTER_EMAIL: 'demo@promptory.local' } });
+  execFileSync('git', args, { cwd, stdio: 'ignore', env: { ...process.env, GIT_AUTHOR_NAME: 'Roboratory', GIT_AUTHOR_EMAIL: 'demo@roboratory.local', GIT_COMMITTER_NAME: 'Roboratory', GIT_COMMITTER_EMAIL: 'demo@roboratory.local' } });
 }
 
 export function createTargetRepo(dir: string, name: string) {
   write(dir, {
-    'README.md': `# ${name}\n\nA demo target repository for Promptory.\n`,
+    'README.md': `# ${name}\n\nA demo target repository for Roboratory.\n`,
     'src/orders.py': 'def create_order(items):\n    return {"items": items}\n',
     'test.sh': '#!/bin/sh\n# Demo test suite: passes once a fix has been written.\necho "collected 48 items"\ntest -f FIX.md && echo "48 passed" && exit 0\necho "FAILED: no fix found"; exit 1\n',
   });
@@ -40,7 +40,7 @@ export function createTargetRepo(dir: string, name: string) {
   git(dir, 'commit', '-q', '-m', 'Initial commit');
 }
 
-export function createDemoFactory(root: string, reposDir = path.join(root, '..', 'promptory-demo-repos')) {
+export function createDemoFactory(root: string, reposDir = path.join(root, '..', 'roboratory-demo-repos')) {
   if (fs.existsSync(path.join(root, 'factory.yaml'))) throw new Error(`${root} already holds a factory`);
   fs.mkdirSync(root, { recursive: true });
   for (const repo of ['orders-api', 'storefront-ui']) {
@@ -220,7 +220,7 @@ sim:
 
   write(root, {
     '.gitignore': '.runs/\n',
-    'README.md': '# Demo Factory\n\nA Promptory factory. Open this folder in Promptory.\n',
+    'README.md': '# Demo Factory\n\nA Roboratory factory. Open this folder in Roboratory.\n',
     'factory.yaml': `name: Demo Factory
 # What any sector may let its manager do alone. Releasing gates and applying
 # changes can never be automatic.

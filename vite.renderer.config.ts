@@ -9,7 +9,7 @@ import react from '@vitejs/plugin-react';
  */
 function stripCrossOrigin(): Plugin {
   return {
-    name: 'promptory-strip-crossorigin',
+    name: 'roboratory-strip-crossorigin',
     enforce: 'post',
     transformIndexHtml(html) {
       return html.replace(/(\s)crossorigin(="[^"]*")?/g, '');

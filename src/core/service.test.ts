@@ -4,15 +4,15 @@ import path from 'node:path';
 import { createDemoFactory } from './demo';
 import { FactoryService } from './service';
 
-process.env.PROMPTORY_SIM_SPEED = '200';
+process.env.ROBORATORY_SIM_SPEED = '200';
 
 describe('factory service', () => {
   it('opens a factory, snapshots it, and picks up a manager change after it is accepted', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'promptory-svc-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'roboratory-svc-'));
     const root = createDemoFactory(path.join(dir, 'factory'), path.join(dir, 'repos'));
     const snaps: number[] = [];
     const svc = new FactoryService({ snapshot: () => snaps.push(1), logs: () => {}, messages: () => {} });
-    expect(() => svc.open(dir)).toThrow(/not a Promptory factory/);
+    expect(() => svc.open(dir)).toThrow(/not a Roboratory factory/);
     svc.open(root);
     const s = svc.snapshot();
     expect(s.factory!.sectors.map((x) => x.name)).toEqual(['Engineering', 'Incidents', 'Releases']);

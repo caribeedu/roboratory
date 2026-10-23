@@ -4,7 +4,7 @@
 //  2. Edit a real line (insert, connect, rule, remove leaving a red belt, undo) and save a minimal
 //     diff that keeps the YAML comments.
 //  3. Saving is blocked while the line runs, and a file changed on disk shows as a conflict.
-// Usage: node e2e/build-mode.mjs [out-dir]   (honours PROMPTORY_OUT_DIR)
+// Usage: node e2e/build-mode.mjs [out-dir]   (honours ROBORATORY_OUT_DIR)
 import { appExecutable } from './exe.mjs';
 import { _electron as electron } from 'playwright';
 import { execFileSync } from 'node:child_process';
@@ -14,10 +14,10 @@ import path from 'node:path';
 
 const out = process.argv[2] || fs.mkdtempSync(path.join(os.tmpdir(), 'build-shots-'));
 fs.mkdirSync(out, { recursive: true });
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'promptory-build-e2e-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'roboratory-build-e2e-'));
 const root = path.join(tmp, 'Demo Factory');
 const exe = appExecutable();
-const app = await electron.launch({ executablePath: exe, env: { ...process.env, PROMPTORY_USER_DATA: path.join(tmp, 'ud'), PROMPTORY_DEMO_DIR: root, PROMPTORY_SIM_SPEED: '1' } });
+const app = await electron.launch({ executablePath: exe, env: { ...process.env, ROBORATORY_USER_DATA: path.join(tmp, 'ud'), ROBORATORY_DEMO_DIR: root, ROBORATORY_SIM_SPEED: '1' } });
 const win = await app.firstWindow();
 await win.setViewportSize({ width: 1440, height: 900 }).catch(() => {});
 const errors = [];
@@ -136,13 +136,13 @@ check(saved.startsWith('# Alert to mitigation') && saved.includes('  # the fix i
 check(lost.length === 0 && added.length === 3 && added.every((l) => /id: signal|label: Smoke test|signal: \{ run: "true" \}/.test(l)), `the diff only adds the new signal (${added.length} lines added: ${added.map((l) => l.trim()).join(' | ')}; ${lost.length} lost)`);
 
 // ---------- criterion 3: locks, from the UI ----------
-await win.evaluate(() => window.promptory.run('incidents/orders-api', { alert: 'ALT-1' }));
+await win.evaluate(() => window.roboratory.run('incidents/orders-api', { alert: 'ALT-1' }));
 await wait(500);
 await win.getByRole('button', { name: 'Build', exact: true }).click();
 await wait(500);
 await insertOn('mitigate', 'signal', 'Gate');
 const role = path.join(root, 'sectors/incidents/models/triage-to-mitigation/machines/mitigator/role.md');
-await win.evaluate((p) => window.promptory.buildApply({ op: 'writeFile', path: p, content: 'Draft role.\n' }), 'sectors/incidents/models/triage-to-mitigation/machines/mitigator/role.md');
+await win.evaluate((p) => window.roboratory.buildApply({ op: 'writeFile', path: p, content: 'Draft role.\n' }), 'sectors/incidents/models/triage-to-mitigation/machines/mitigator/role.md');
 fs.writeFileSync(role, 'Changed on disk.\n');
 await wait(800);
 await win.getByRole('button', { name: 'Done' }).click();

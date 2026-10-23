@@ -19,10 +19,10 @@ function fakeClaude(script: string) {
 }
 
 describe('agents', () => {
-  afterEach(() => { delete process.env.PROMPTORY_CLAUDE_BIN; });
+  afterEach(() => { delete process.env.ROBORATORY_CLAUDE_BIN; });
 
   it('runs claude headless, streams tool calls and returns structured_output', async () => {
-    process.env.PROMPTORY_CLAUDE_BIN = fakeClaude(`
+    process.env.ROBORATORY_CLAUDE_BIN = fakeClaude(`
 const out = (o) => console.log(JSON.stringify(o));
 out({ type: 'system', subtype: 'init' });
 out({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Read', input: { file_path: 'a.md' } }] } });
@@ -37,12 +37,12 @@ out({ type: 'result', subtype: 'success', is_error: false, result: 'done', struc
   });
 
   it('reports a failed claude run with its subtype', async () => {
-    process.env.PROMPTORY_CLAUDE_BIN = fakeClaude(`console.log(JSON.stringify({ type: 'result', subtype: 'error_max_turns', is_error: true, errors: ['too many turns'] }));`);
+    process.env.ROBORATORY_CLAUDE_BIN = fakeClaude(`console.log(JSON.stringify({ type: 'result', subtype: 'error_max_turns', is_error: true, errors: ['too many turns'] }));`);
     expect((await runAgent(base())).error).toMatch(/error_max_turns: too many turns/);
   });
 
   it('times out and kills the process', async () => {
-    process.env.PROMPTORY_CLAUDE_BIN = fakeClaude(`setTimeout(() => {}, 10000);`);
+    process.env.ROBORATORY_CLAUDE_BIN = fakeClaude(`setTimeout(() => {}, 10000);`);
     expect((await runAgent(base({ timeoutMs: 200 }))).error).toMatch(/timed out/);
   });
 
@@ -70,7 +70,7 @@ out({ type: 'result', subtype: 'success', is_error: false, result: 'done', struc
   });
 
   it('runs the simulated agent and writes its files', async () => {
-    process.env.PROMPTORY_SIM_SPEED = '100';
+    process.env.ROBORATORY_SIM_SPEED = '100';
     const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'sim-'));
     const r = await runAgent(base({ agent: 'sim', cwd, sim: { seconds: 1, write: { 'A.md': 'hi {{box.t}}' }, output: { t: '{{box.t}}' }, bad_output: { t: 1 } }, simCtx: { box: { t: 'X' } } }));
     expect(r.output).toEqual({ t: 'X' });

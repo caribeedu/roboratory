@@ -3,13 +3,13 @@ import { MakerZIP } from '@electron-forge/maker-zip';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 
 const config: ForgeConfig = {
-  // PROMPTORY_OUT_DIR builds elsewhere, e.g. to check a change while the app in out/ is open
-  ...(process.env.PROMPTORY_OUT_DIR ? { outDir: process.env.PROMPTORY_OUT_DIR } : {}),
+  // ROBORATORY_OUT_DIR builds elsewhere, e.g. to check a change while the app in out/ is open
+  ...(process.env.ROBORATORY_OUT_DIR ? { outDir: process.env.ROBORATORY_OUT_DIR } : {}),
   packagerConfig: {
-    name: 'Promptory',
+    name: 'Roboratory',
     // icon.icns on macOS, icon.ico on Windows (forge picks the extension)
     icon: 'assets/icon',
-    appBundleId: 'app.promptory',
+    appBundleId: 'app.roboratory',
     asar: true,
     extraResource: ['assets/icon.png'],
   },

@@ -80,7 +80,7 @@ export function resultLine(content: unknown, isError = false): string {
 }
 
 export async function runClaude(req: AgentRequest): Promise<AgentResult> {
-  const bin = process.env.PROMPTORY_CLAUDE_BIN || 'claude';
+  const bin = process.env.ROBORATORY_CLAUDE_BIN || 'claude';
   let result: Record<string, unknown> | undefined;
   const { code, stderr, timedOut } = await spawnCollect(bin, claudeArgs({ ...req, schema: claudeSchema(req.schema, req.question) }), req, (line) => {
     let ev: Record<string, unknown>;
@@ -116,7 +116,7 @@ export async function runClaude(req: AgentRequest): Promise<AgentResult> {
 /** Which MCP servers the user's Claude Code has configured (parsed from `claude mcp list`). */
 export function claudeMcpServers(): Promise<string[] | null> {
   return new Promise((resolve) => {
-    const run = launch(process.env.PROMPTORY_CLAUDE_BIN || 'claude', ['mcp', 'list']);
+    const run = launch(process.env.ROBORATORY_CLAUDE_BIN || 'claude', ['mcp', 'list']);
     if (run.error) { resolve(null); return; }
     const child = spawn(run.file, run.args, { env: run.env, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
     let out = '';

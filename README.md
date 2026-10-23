@@ -1,25 +1,25 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/caribeedu/promptory/main/assets/banner.svg" alt="Promptory: a factory for AI agents, with deterministic production lines in pixel art" width="100%">
+  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/assets/banner.svg" alt="Roboratory: a factory for AI agents, with deterministic production lines in pixel art" width="100%">
 </p>
 
 <p align="center">
-  <a href="https://github.com/caribeedu/promptory/actions/workflows/tests.yml"><img src="https://github.com/caribeedu/promptory/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
-  <a href="https://github.com/caribeedu/promptory/releases"><img src="https://img.shields.io/github/v/release/caribeedu/promptory?include_prereleases&style=flat-square&color=c07a2c" alt="Latest release"></a>
+  <a href="https://github.com/caribeedu/roboratory/actions/workflows/tests.yml"><img src="https://github.com/caribeedu/roboratory/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
+  <a href="https://github.com/caribeedu/roboratory/releases"><img src="https://img.shields.io/github/v/release/caribeedu/roboratory?include_prereleases&style=flat-square&color=c07a2c" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-2a2825?style=flat-square" alt="macOS, Windows and Linux">
-  <a href="https://github.com/caribeedu/promptory/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-c07a2c?style=flat-square" alt="MIT"></a>
+  <a href="https://github.com/caribeedu/roboratory/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-c07a2c?style=flat-square" alt="MIT"></a>
 </p>
 
-# Promptory
+# Roboratory
 
 **A factory for AI agents.** You build production lines out of machines, belts, signals and gates. Agents work the machines, and you watch the whole floor in pixel art.
 
-Promptory is for work that has to be repeatable and auditable: turning tickets into pull requests, answering incidents, shipping to production. Each line is a deterministic workflow defined in files and versioned in git. The agents only produce what goes inside each step, and every step's output has to pass a contract before it moves on.
+Roboratory is for work that has to be repeatable and auditable: turning tickets into pull requests, answering incidents, shipping to production. Each line is a deterministic workflow defined in files and versioned in git. The agents only produce what goes inside each step, and every step's output has to pass a contract before it moves on.
 
-![The Engineering sector on the Floor](https://raw.githubusercontent.com/caribeedu/promptory/main/docs/screenshots/floor.png)
+![The Engineering sector on the Floor](https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/floor.png)
 
 ## Why
 
-Running several AI agents on real work today means either free-form chat between agents, which is hard to predict, or workflow engines that hide the agents behind logs. Promptory treats agent work like a factory floor:
+Running several AI agents on real work today means either free-form chat between agents, which is hard to predict, or workflow engines that hide the agents behind logs. Roboratory treats agent work like a factory floor:
 
 - **Deterministic lines.** The order of steps, the routing, the checks and the gates are defined in files. Agents fill in each step's content and never decide the flow.
 - **Contracts at every step.** A machine's output is validated against a JSON Schema. If it does not match, the step runs again; when attempts run out, the machine catches fire and the line stops behind it.
@@ -31,7 +31,7 @@ Running several AI agents on real work today means either free-form chat between
 ## How it works
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/caribeedu/promptory/main/assets/how-it-works.svg" alt="How Promptory works: an intake starts a run; machines, signals and gates carry validated boxes to a pallet; return belts send work back; managers propose and you decide; everything is files in a git repository" width="100%">
+  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/assets/how-it-works.svg" alt="How Roboratory works: an intake starts a run; machines, signals and gates carry validated boxes to a pallet; return belts send work back; managers propose and you decide; everything is files in a git repository" width="100%">
 </p>
 
 A run starts at an **intake** with a work order. Each **machine** runs a headless agent (Claude Code or Codex) with a fresh context, and the step ends when the process exits. The output is a **box** that must match the machine's contract. **Signals** (scripts) and **gates** (you, or a rule) check the box before it moves on, **return belts** send work back for rework within a lap limit, and the last box lands on the **pallet**: the deliverable.
@@ -61,18 +61,18 @@ A run starts at an **intake** with a work order. Each **machine** runs a headles
 
 <table>
   <tr>
-    <td><img src="https://raw.githubusercontent.com/caribeedu/promptory/main/docs/screenshots/fire-panel.png" alt="A machine on fire, with its fire panel"></td>
-    <td><img src="https://raw.githubusercontent.com/caribeedu/promptory/main/docs/screenshots/gate.png" alt="A two-confirmation gate"></td>
+    <td><img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/fire-panel.png" alt="A machine on fire, with its fire panel"></td>
+    <td><img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/gate.png" alt="A two-confirmation gate"></td>
   </tr>
   <tr>
-    <td><img src="https://raw.githubusercontent.com/caribeedu/promptory/main/docs/screenshots/manager-proposal.png" alt="A Sector Manager proposing a change"></td>
-    <td><img src="https://raw.githubusercontent.com/caribeedu/promptory/main/docs/screenshots/ledger.png" alt="The Ledger"></td>
+    <td><img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/manager-proposal.png" alt="A Sector Manager proposing a change"></td>
+    <td><img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/ledger.png" alt="The Ledger"></td>
   </tr>
 </table>
 
 ## Getting started
 
-**Requirements:** Node 22.12 or later and git. To run real agents you also need [Claude Code](https://claude.com/claude-code) or [Codex](https://github.com/openai/codex) installed and signed in. Promptory runs on macOS, Windows and Linux; on Windows, signals run through `sh` (install Git for Windows) and agent CLIs must be native executables. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#platform-notes).
+**Requirements:** Node 22.12 or later and git. To run real agents you also need [Claude Code](https://claude.com/claude-code) or [Codex](https://github.com/openai/codex) installed and signed in. Roboratory runs on macOS, Windows and Linux; on Windows, signals run through `sh` (install Git for Windows) and agent CLIs must be native executables. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#platform-notes).
 
 ```sh
 npm ci
@@ -82,18 +82,18 @@ npm ci
 npm start
 ```
 
-Choose **Open the demo factory** on the welcome screen. It creates a factory in `~/Promptory/Demo Factory` with three sectors and two demo target repositories. Its machines use the simulated agent, so it runs offline and costs nothing. To build or change lines, press **Build** on the Floor. To run a real agent, choose `claude` (or `codex`) as a machine's agent. **Real agents spend money**, so check a line with the simulated agent first.
+Choose **Open the demo factory** on the welcome screen. It creates a factory in `~/Roboratory/Demo Factory` with three sectors and two demo target repositories. Its machines use the simulated agent, so it runs offline and costs nothing. To build or change lines, press **Build** on the Floor. To run a real agent, choose `claude` (or `codex`) as a machine's agent. **Real agents spend money**, so check a line with the simulated agent first.
 
 ## Documentation
 
 | Document | About |
 |---|---|
-| [Product](docs/PRODUCT.md) | What Promptory is, entity by entity, and how you use it |
+| [Product](docs/PRODUCT.md) | What Roboratory is, entity by entity, and how you use it |
 | [Architecture](docs/ARCHITECTURE.md) | File layout, runtime and scope |
 | [Decisions](docs/DECISIONS.md) | Every design decision, with its reasoning (D1–D43) |
 | [Roadmap](docs/ROADMAP.md) | What is planned and what is still open |
 | [Assessment](docs/ASSESSMENT.md) | An honest assessment after the first real run |
-| [Competitors](docs/COMPETITORS.md) | Other tools that orchestrate coding agents, and what Promptory takes from each |
+| [Competitors](docs/COMPETITORS.md) | Other tools that orchestrate coding agents, and what Roboratory takes from each |
 | [Development](docs/DEVELOPMENT.md) | Setup, code layout, conventions and lessons about the agent CLIs |
 | [Changelog](CHANGELOG.md) | What is built |
 
@@ -101,7 +101,7 @@ The first interactive concept is [docs/prototype/factory-floor.html](docs/protot
 
 ## Status
 
-Promptory is an early release (v0.7): the factory, the Floor, headless machines, managers and build mode are built; a headless engine, permission requests and automatic intakes are planned ([docs/ROADMAP.md](docs/ROADMAP.md)).
+Roboratory is an early release (v0.7): the factory, the Floor, headless machines, managers and build mode are built; a headless engine, permission requests and automatic intakes are planned ([docs/ROADMAP.md](docs/ROADMAP.md)).
 
 ## Contributing and security
 

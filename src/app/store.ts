@@ -2,14 +2,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LogEntry, Snapshot } from '../shared/types';
 
-export const api = () => window.promptory;
+export const api = () => window.roboratory;
 
 export function errText(e: unknown) {
   const m = e instanceof Error ? e.message : String(e);
   return m.replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
 }
 
-export function usePromptory() {
+export function useRoboratory() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [recent, setRecent] = useState<string[]>([]);

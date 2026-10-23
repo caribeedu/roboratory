@@ -5,8 +5,8 @@ import path from 'node:path';
 import { render, renderDeep } from '../template';
 import type { AgentRequest, AgentResult } from './types';
 
-/** Speeds up the simulated agent; tests set PROMPTORY_SIM_SPEED=50. */
-const simSpeed = () => Number(process.env.PROMPTORY_SIM_SPEED || 1);
+/** Speeds up the simulated agent; tests set ROBORATORY_SIM_SPEED=50. */
+const simSpeed = () => Number(process.env.ROBORATORY_SIM_SPEED || 1);
 const sleep = (ms: number, signal?: AbortSignal) => new Promise<void>((resolve, reject) => {
   const t = setTimeout(resolve, ms);
   signal?.addEventListener('abort', () => { clearTimeout(t); reject(new Error('aborted')); }, { once: true });
@@ -34,7 +34,7 @@ export async function runSim(req: AgentRequest): Promise<AgentResult> {
   }
   if (!req.readOnly && sim.commit && fs.existsSync(path.join(req.cwd, '.git'))) {
     try {
-      const env = { ...process.env, GIT_AUTHOR_NAME: 'Promptory', GIT_AUTHOR_EMAIL: 'machine@promptory.local', GIT_COMMITTER_NAME: 'Promptory', GIT_COMMITTER_EMAIL: 'machine@promptory.local' };
+      const env = { ...process.env, GIT_AUTHOR_NAME: 'Roboratory', GIT_AUTHOR_EMAIL: 'machine@roboratory.local', GIT_COMMITTER_NAME: 'Roboratory', GIT_COMMITTER_EMAIL: 'machine@roboratory.local' };
       execFileSync('git', ['add', '-A'], { cwd: req.cwd, env });
       execFileSync('git', ['commit', '-q', '-m', String(render(String(sim.commit), ctx))], { cwd: req.cwd, env });
     } catch { /* nothing to commit */ }

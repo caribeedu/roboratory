@@ -1,12 +1,12 @@
-# Promptory — Product
+# Roboratory — Product
 
-What Promptory is and how it behaves. For how it is built, see [ARCHITECTURE.md](ARCHITECTURE.md). For why, see [DECISIONS.md](DECISIONS.md).
+What Roboratory is and how it behaves. For how it is built, see [ARCHITECTURE.md](ARCHITECTURE.md). For why, see [DECISIONS.md](DECISIONS.md).
 
 Sections marked *planned* describe designed behavior that is not built yet; the list is in [ROADMAP.md](ROADMAP.md) §3.
 
 ## 1. Vision
 
-Running several AI agents on real work today means either free-form chat between agents, which is hard to predict, or workflow engines that hide the agents behind logs. Promptory treats agent work like a factory floor. Lines are designed in advance, every step's output is checked against a contract, humans hold the gates that matter, and the whole operation is visible at a glance.
+Running several AI agents on real work today means either free-form chat between agents, which is hard to predict, or workflow engines that hide the agents behind logs. Roboratory treats agent work like a factory floor. Lines are designed in advance, every step's output is checked against a contract, humans hold the gates that matter, and the whole operation is visible at a glance.
 
 **Principles**
 
@@ -181,7 +181,7 @@ A manager's proposed change appears on the Floor as translucent ghost pieces: ad
 - Changes with no visual form, such as a role's text or a contract's schema, show only as a diff, with a marker on the affected piece.
 
 ### 3.10 Blueprint (planned)
-The factory's files: the file tree, the pending diff against the last commit, and the commit history. Promptory reads git and never writes to it.
+The factory's files: the file tree, the pending diff against the last commit, and the commit history. Roboratory reads git and never writes to it.
 - Accepting a proposal or confirming build mode only writes files. Committing and pushing are up to you, in your own tools.
 - Lines always run from the files on disk.
 
