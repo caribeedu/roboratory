@@ -15,7 +15,7 @@
 
 Roboratory is for work that has to be repeatable and auditable: turning tickets into pull requests, answering incidents, shipping to production. Each line is a deterministic workflow defined in files and versioned in git. The agents only produce what goes inside each step, and every step's output has to pass a contract before it moves on.
 
-![The Engineering sector on the Floor](https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/floor.png)
+![The Releases sector on the Floor, with a release line at work](https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/floor.png)
 
 ## Why
 
@@ -79,20 +79,13 @@ A run starts at an **intake** with a work order. Each **machine** runs a headles
 
   <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/manager-proposal.png" alt="A Sector Manager proposing a change, shown as a diff" width="900">
 
+- **Stay in control:** when a machine burns or a gate waits for you, the Floor says so and opens the piece's panel: the error and the agent's last steps with a hint field for the retry, or the signals before the gate and its confirmations.
+
+  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/fire-panel.png" alt="A machine on fire, with its fire panel" width="440"> <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/gate.png" alt="A two-confirmation gate" width="440">
+
 - **Build the factory on the Floor:** create sectors and lines, insert machines, signals and gates with "+" slots, connect return belts, edit roles and contracts, and save only after the checks pass. YAML is edited in place, so your diffs stay small.
 
   <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/build-mode.png" alt="Build mode on the Floor, with a plus slot on every belt" width="900">
-
-### Stay in control
-
-When something burns, or a gate waits for you, the Floor tells you and opens the piece's panel: the error and the agent's last steps with a hint field for the retry, or the signals before the gate with its confirmations.
-
-<table>
-  <tr>
-    <td><img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/fire-panel.png" alt="A machine on fire, with its fire panel"></td>
-    <td><img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/gate.png" alt="A two-confirmation gate"></td>
-  </tr>
-</table>
 
 ## Getting started
 

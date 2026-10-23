@@ -1,4 +1,4 @@
-// Screenshots for the README that need a specific frame: a line at work, and build mode.
+// Screenshots for the README that need a specific frame: the Floor, a line at work, and build mode.
 // Usage: node e2e/readme-shots.mjs [out-dir]   (default docs/screenshots)
 import { _electron as electron } from 'playwright';
 import fs from 'node:fs';
@@ -17,7 +17,18 @@ await wait(1500);
 await win.getByText('Open the demo factory').click();
 await wait(2500);
 
-// a line at work: one run, a few seconds in
+// the Floor, calm and busy: a release line with the live log folded and nothing burning
+await win.getByText('Live log').first().click().catch(() => {});
+await win.getByRole('button', { name: /Releases/ }).first().click();
+await wait(800);
+await win.evaluate(() => window.roboratory.run('releases/orders-api', { tag: 'v4.18.0' }));
+await wait(3300);
+await win.screenshot({ path: path.join(out, 'floor.png') });
+console.log('wrote floor.png');
+
+// a line at work: an engineering ticket, a few seconds in
+await win.getByRole('button', { name: /Engineering/ }).first().click();
+await wait(800);
 await win.evaluate(() => window.roboratory.run('engineering/orders-api', { ticket: 'PROJ-812' }));
 await wait(9000);
 await win.screenshot({ path: path.join(out, 'line.png'), clip: { x: 60, y: 274, width: 1200, height: 200 } });
