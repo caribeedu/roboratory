@@ -679,6 +679,29 @@ pieces:
     expect(e2.runEvents(id).filter((x) => x.type === 'piece.start').map((x) => x.piece)).toEqual(['a', 'b']);
   });
 
+  it('refuses an answer or a retry while it waits to restart, since neither would survive it', async () => {
+    const asker = { ...machine('{ ok: true }'), 'machine.yaml': 'agent: sim\nattempts: 1\nsim:\n  seconds: 1\n  ask: { question: "Which?" }\n  output: { ok: true }\n' };
+    const flaky = { ...machine('{ ok: true }'), 'machine.yaml': 'agent: sim\nattempts: 1\nsim:\n  seconds: 1\n  fail_first_run: true\n  bad_output: { ok: false }\n  output: { ok: true }\n' };
+    const { f } = factory(`intake: { kind: manual }
+pieces:
+  - { id: ask, machine: asker }
+  - { id: flaky, machine: flaky }
+`, { asker, flaky }, {}, false);
+    const e = make(f);
+    await e.run('s/l', {});
+    await until(() => e.lineView('s/l').pieces.ask.state === 'asking');
+    e.pauseDispatch();
+    expect(() => e.answer('s/l', 'ask', 'this one')).toThrow(/restarting/);
+    e.resumeDispatch();
+    e.answer('s/l', 'ask', 'this one');
+    await until(() => e.lineView('s/l').pieces.flaky.state === 'fire');
+    e.pauseDispatch();
+    expect(() => e.retry('s/l', 'flaky', 'again')).toThrow(/restarting/);
+    e.resumeDispatch();
+    e.retry('s/l', 'flaky', 'again');
+    await until(() => e.runSummaries()[0].status === 'done');
+  });
+
   it('audits the source of a verb next to its actor', async () => {
     const { f } = twoSteps();
     const e = make(f);

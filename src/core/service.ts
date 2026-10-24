@@ -51,6 +51,9 @@ export class FactoryService {
     this.schedulePush();
   }
 
+  /** Build mode has a draft open (it lives in memory, so a restart would lose it). */
+  get buildOpen() { return !!this.session; }
+
   reload() {
     if (!this.factory || !this.engine) return;
     this.factory = loadFactory(this.factory.root);

@@ -200,7 +200,7 @@ Every action is a verb: run, retry, release, answer, halt, resume, and accepting
 ### 3.14 The engine and the command line
 The app is a window onto the factory's engine, a separate process that keeps your runs going when you quit or rebuild the app (D43). It starts when you open a factory and ends by itself a minute after the last run and the last window are gone.
 - **`roboratory serve | stop | status`** start, stop and inspect the engine of the factory you are in (or `--factory <dir>`).
-- **`roboratory run <line> --input k=v`, `release <line> <gate>`, `answer`, `retry`, `halt`, `resume`** are the buttons of the Floor, for a terminal or a script. A line that the open build-mode draft changes is refused here too.
+- **`roboratory run <line> --input k=v`, `release <line> <gate>`, `answer`, `retry`, `halt`, `resume`** are the buttons of the Floor, for a terminal or a script. A gate that asks for several confirmations is released with `--confirm <n>`, so each "are you sure?" is still yours to give. A line that the open build-mode draft changes is refused here too.
 - **`roboratory watch`** prints what needs you: gates waiting, questions, fires, reworks and the end of each run, with the cost so far.
 - **`roboratory restart --when-idle`**, or the banner when the app is newer than the engine: no new work starts, the running machines and signals finish, and the engine comes back as the new version with every gate, question and fire where it was.
 - **File → Install command-line tool** puts `roboratory` in `~/.local/bin` when you confirm. Build mode stays in the app.

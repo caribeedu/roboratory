@@ -11,7 +11,9 @@ export const defaultBinDir = (home = os.homedir()) => path.join(home, '.local', 
 /** Contents of the launcher for a platform. */
 export function launcher(spec: Pick<InstallSpec, 'execPath' | 'script' | 'platform'>): string {
   if ((spec.platform ?? process.platform) === 'win32') {
-    return `@echo off\r\nset ELECTRON_RUN_AS_NODE=1\r\n"${spec.execPath}" "${spec.script}" %*\r\n`;
+    // setlocal keeps the variable out of the shell that ran the command; "%" in a path would be expanded by cmd
+    const cmd = (s: string) => s.replace(/%/g, '%%');
+    return `@echo off\r\nsetlocal\r\nset ELECTRON_RUN_AS_NODE=1\r\n"${cmd(spec.execPath)}" "${cmd(spec.script)}" %*\r\n`;
   }
   const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
   return `#!/bin/sh\nELECTRON_RUN_AS_NODE=1 exec ${q(spec.execPath)} ${q(spec.script)} "$@"\n`;

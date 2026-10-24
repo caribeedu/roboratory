@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { EngineClient, launchFor } from './core/client';
-import { readLock, startServer } from './core/server';
+import { liveLock, startServer } from './core/server';
 import type { Snapshot } from './shared/types';
 
 export const USAGE = `roboratory <command> [options]
@@ -85,7 +85,7 @@ export async function main(argv: string[], env: CliEnv): Promise<number> {
     const root = factoryRoot(p.flags);
 
     if (p.cmd === 'status') {
-      const lock = readLock(root);
+      const lock = await liveLock(root);
       if (!lock) { env.out(`No engine is running for ${root}.\n`); return 0; }
       const c = await EngineClient.connect(root, { client: 'cli' });
       try {
@@ -103,7 +103,7 @@ export async function main(argv: string[], env: CliEnv): Promise<number> {
     }
 
     if (p.cmd === 'stop') {
-      if (!readLock(root)) { env.out('No engine is running.\n'); return 0; }
+      if (!(await liveLock(root))) { env.out('No engine is running.\n'); return 0; }
       const c = await EngineClient.connect(root, { client: 'cli' });
       await c.call('stop');
       c.close();
@@ -132,7 +132,10 @@ export async function main(argv: string[], env: CliEnv): Promise<number> {
           need(2, 'release <line> <gate> [--choice c] [--note n] [--confirm n]');
           const line = resolveLine(snapshot, p.pos[0]);
           const piece = snapshot.factory?.sectors.flatMap((s) => s.lines).find((l) => l.id === line)?.pieces.find((x) => x.id === p.pos[1]);
-          const confirm = p.flags.confirm ? Number(p.flags.confirm[0]) : (piece?.confirmations ?? 1);
+          const needed = piece?.confirmations ?? 1;
+          // the "are you sure?" of a gate is yours to give: with more than one, say how many you give
+          if (!p.flags.confirm && needed > 1) throw new Error(`${p.pos[1]} asks for ${needed} confirmations. Pass --confirm ${needed} to give them.`);
+          const confirm = p.flags.confirm ? Number(p.flags.confirm[0]) : needed;
           const decision = p.flags.choice ? { choice: p.flags.choice[0], note: p.flags.note?.[0] ?? '' } : undefined;
           await c.call('release', line, p.pos[1], confirm, decision);
           env.out('Released.\n');
@@ -144,8 +147,15 @@ export async function main(argv: string[], env: CliEnv): Promise<number> {
         case 'resume': need(1, 'resume <line>'); await c.call('resume', resolveLine(snapshot, p.pos[0])); env.out('Resumed.\n'); return 0;
         case 'restart':
           if (!p.flags['when-idle']) throw new Error('Usage: roboratory restart --when-idle');
-          await c.call('restartWhenIdle');
-          env.out('The engine stops dispatching new work and restarts once nothing is running.\n');
+          {
+            // this client starts the new engine when the old one leaves, so it waits for that
+            const back = new Promise<void>((resolve) => c.once('connected', () => resolve()));
+            await c.call('restartWhenIdle');
+            env.out('No new work starts. Waiting for the running machines and signals to finish…\n');
+            const lost = new Promise<never>((_, reject) => c.once('stopped', () => reject(new Error('The engine stopped and did not come back.'))));
+            await Promise.race([back, lost]);
+            env.out(`The engine is back (${c.info.version}).\n`);
+          }
           return 0;
         case 'watch': return await watch(c, snapshot, env);
       }
@@ -160,10 +170,17 @@ export async function main(argv: string[], env: CliEnv): Promise<number> {
 async function serve(p: Parsed, env: CliEnv): Promise<number> {
   const root = p.pos[0] ? path.resolve(p.pos[0]) : factoryRoot(p.flags);
   const stamp = () => new Date().toISOString();
-  const srv = await startServer(root, {
-    version: env.version,
-    onExit: (restart) => { env.out(`${stamp()} engine stopped${restart ? ' (restart)' : ''}\n`); process.exit(0); },
-  });
+  let srv;
+  try {
+    srv = await startServer(root, {
+      version: env.version,
+      onExit: (restart) => { env.out(`${stamp()} engine stopped${restart ? ' (restart)' : ''}\n`); process.exit(0); },
+    });
+  } catch (e) {
+    // the starter shows the tail of this log, so the reason has to be in it
+    env.err(`${stamp()} the engine could not start: ${(e as Error).message}\n`);
+    return 1;
+  }
   env.out(`${stamp()} engine ${env.version} serving ${root} on ${srv.socket} (pid ${process.pid})\n`);
   const bye = () => void srv.close();
   process.on('SIGTERM', bye);
@@ -192,6 +209,8 @@ async function watch(c: EngineClient, snap: Snapshot, env: CliEnv): Promise<numb
   };
   c.on('watch', (d) => { const l = line(d); if (l) env.out(`${now()} ${l}\n`); });
   await c.call('watch');
+  // after the engine restarts, the new one has to be asked again
+  c.on('connected', () => { void c.call('watch').catch(() => {}); });
   return new Promise<number>((resolve) => {
     c.on('stopped', () => { env.err('The engine stopped.\n'); resolve(1); });
     const done = () => { c.close(); resolve(0); };

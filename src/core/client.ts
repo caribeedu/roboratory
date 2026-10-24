@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { RUNS_DIR } from './engine';
-import { readLock } from './server';
+import { liveLock, readLock, socketPathFor, type EngineLock } from './server';
 
 export interface LaunchSpec { command: string; args: string[]; env?: Record<string, string> }
 export interface EngineInfo { version: string; pid: number; root: string; name: string; restarting: boolean }
@@ -53,14 +53,23 @@ export class EngineClient extends EventEmitter {
   static running(root: string) { return readLock(path.resolve(root)); }
 
   private async attach(start: boolean) {
-    let lock = readLock(this.root);
+    let lock = await liveLock(this.root);
     if (!lock) {
       if (!start) throw new Error('No engine is running for this factory.');
       lock = await this.startEngine();
     }
-    const sock = await open(lock.socket, 5000);
+    // the path is worked out here, never read from the lock, so a lock cannot send a client elsewhere
+    const sock = await open(socketPathFor(this.root), 5000);
     this.bind(sock);
-    this.info = await this.call<EngineInfo>('hello', { client: this.opts.client ?? 'app' });
+    try {
+      this.info = await this.call<EngineInfo>('hello', { client: this.opts.client ?? 'app', token: lock.token });
+    } catch (e) {
+      if (this.sock === sock) this.sock = null;
+      sock.destroy();
+      throw e;
+    }
+    // an engine that is already waiting to restart is restarted by whoever connects to it
+    if (this.info.restarting) this.restartSeen = true;
   }
 
   private bind(sock: net.Socket) {
@@ -143,8 +152,11 @@ export class EngineClient extends EventEmitter {
     fs.closeSync(fd);
     const until = Date.now() + (this.opts.startTimeoutMs ?? 20_000);
     while (Date.now() < until) {
-      const lock = readLock(this.root);
-      if (lock) return lock;
+      // the lock is written before the engine has loaded the factory and listens: ready is when it answers
+      const lock: EngineLock | null = readLock(this.root);
+      if (lock) {
+        try { (await open(socketPathFor(this.root), 300)).destroy(); return lock; } catch { /* not listening yet */ }
+      }
       if (exited !== undefined) break;
       await sleep(50);
     }

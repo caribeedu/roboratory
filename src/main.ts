@@ -47,6 +47,7 @@ function disconnect() {
 async function open(root: string) {
   if (!fs.existsSync(path.join(root, 'factory.yaml')) && !fs.existsSync(path.join(root, 'sectors'))) throw new Error(`${root} is not a Roboratory factory (no factory.yaml or sectors/ folder).`);
   disconnect();
+  send('snapshot', EMPTY);
   const c = await EngineClient.connect(root, { client: 'app', start: true, launch: launchFor(engineScript()) });
   client = c;
   c.on('snapshot', (s) => send('snapshot', s));
@@ -54,7 +55,7 @@ async function open(root: string) {
   c.on('messages', (k) => send('messages', k));
   c.on('build', (v) => send('build', v));
   c.on('restarting', () => setEngine({ state: 'restarting' }));
-  c.on('connected', () => { setEngine({ state: statusOf(c), version: c.info.version }); void refresh(c); });
+  c.on('connected', () => { setEngine({ state: statusOf(c), version: c.info.version }); void refresh(c).catch(() => {}); });
   c.on('stopped', () => setEngine({ state: 'stopped' }));
   setEngine({ state: statusOf(c), version: c.info.version });
   remember(root);
@@ -66,6 +67,11 @@ async function open(root: string) {
 async function refresh(c: EngineClient) {
   const s = await c.call<{ snapshot: Snapshot }>('state');
   send('snapshot', s.snapshot);
+}
+
+async function openLast() {
+  const last = readSettings().recent.find((r) => fs.existsSync(path.join(r, 'factory.yaml')));
+  if (last) { try { await open(last); } catch { /* show the welcome screen */ } }
 }
 
 function iconPath() {
@@ -156,9 +162,8 @@ app.whenReady().then(async () => {
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(iconPath());
   addMenuItem();
   createWindow();
-  const last = readSettings().recent.find((r) => fs.existsSync(path.join(r, 'factory.yaml')));
-  if (last) { try { await open(last); } catch { /* show the welcome screen */ } }
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+  await openLast();
+  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) { createWindow(); if (!client) void openLast(); } });
 });
 // quitting closes the connection only; the engine and its runs go on
 app.on('window-all-closed', () => { disconnect(); if (process.platform !== 'darwin') app.quit(); });

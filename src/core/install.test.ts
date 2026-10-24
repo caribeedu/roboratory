@@ -9,7 +9,7 @@ describe('the roboratory launcher', () => {
       .toBe(`#!/bin/sh\nELECTRON_RUN_AS_NODE=1 exec '/Apps/Roboratory.app/Contents/MacOS/Roboratory' '/Apps/Roboratory.app/Contents/Resources/app.asar/.vite/build/engine.js' "$@"\n`);
     expect(launcher({ execPath: "/o'neil/app", script: '/s.js', platform: 'linux' })).toContain(`'/o'\\''neil/app'`);
     expect(launcher({ execPath: 'C:\Roboratory\Roboratory.exe', script: 'C:\Roboratory\resources\app.asar\.vite\build\engine.js', platform: 'win32' }))
-      .toBe('@echo off\r\nset ELECTRON_RUN_AS_NODE=1\r\n"C:\Roboratory\Roboratory.exe" "C:\Roboratory\resources\app.asar\.vite\build\engine.js" %*\r\n');
+      .toBe('@echo off\r\nsetlocal\r\nset ELECTRON_RUN_AS_NODE=1\r\n"C:\Roboratory\Roboratory.exe" "C:\Roboratory\resources\app.asar\.vite\build\engine.js" %*\r\n');
   });
 
   it('writes it into the folder and says whether the folder is on PATH', () => {

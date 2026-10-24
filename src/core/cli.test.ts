@@ -51,8 +51,9 @@ describe('the roboratory command and the engine as a process', () => {
       expect(cli(root, 'halt', LINE).code).toBe(0);
       expect(cli(root, 'status').out).toMatch(/\(halted\)/);
       expect(cli(root, 'resume', LINE).code).toBe(0);
-      // the gate asks for two confirmations; the command reads that from the factory
-      expect(cli(root, 'release', LINE, 'launch').code).toBe(0);
+      // the gate asks for two confirmations, and the command wants you to say you give them
+      expect(cli(root, 'release', LINE, 'launch').err).toMatch(/--confirm 2/);
+      expect(cli(root, 'release', LINE, 'launch', '--confirm', '2').code).toBe(0);
       await until(() => events(root, runId).some((e) => e.type === 'run.end'));
 
       const ev = events(root, runId);

@@ -149,9 +149,10 @@ export class Engine extends EventEmitter {
     run.summary.dirty = !!v.diff;
     if (v.diff) fs.writeFileSync(path.join(dir, 'factory.diff'), v.diff);
     this.source = source;
-    this.record(run, { type: 'run.start', input, actor, baseCommit: v.commit, dirty: !!v.diff });
-    this.record(run, { type: 'verb', verb: 'run', actor });
-    this.source = undefined;
+    try {
+      this.record(run, { type: 'run.start', input, actor, baseCommit: v.commit, dirty: !!v.diff });
+      this.record(run, { type: 'verb', verb: 'run', actor });
+    } finally { this.source = undefined; }
     this.log({ level: 'factory', sectorId: line.def.sectorId, lineId, runId: id, kind: 'info', text: `${line.def.name}: run started (${Object.values(input).join(', ') || 'no input'}) by ${actor}` });
     const box: Box = { id: `${id}:intake`, runId: id, payload: { ...input }, color: '#c8a46a' };
     this.finishPiece(run, '@intake', box);
@@ -159,7 +160,13 @@ export class Engine extends EventEmitter {
     return id;
   }
 
+  /** An answer or a retry hint lives in memory until the step starts, which a restart would lose. */
+  private notWhileRestarting(what: string) {
+    if (this.paused) throw new Error(`The engine is restarting; ${what} once it is back.`);
+  }
+
   retry(lineId: string, pieceId: string, hint = '', actor = 'you') {
+    this.notWhileRestarting('retry');
     const line = this.mustLine(lineId);
     const p = this.mustPiece(line, pieceId);
     if (p.state !== 'fire' || !p.current) throw new Error(`${p.def.label} is not stopped`);
@@ -205,6 +212,7 @@ export class Engine extends EventEmitter {
 
   /** Answers a machine that asked for you (D21); it reruns without spending an attempt. */
   answer(lineId: string, pieceId: string, text: string, actor = 'you') {
+    this.notWhileRestarting('answer');
     const line = this.mustLine(lineId);
     const p = this.mustPiece(line, pieceId);
     if (p.state !== 'asking' || !p.current || !p.question) throw new Error(`${p.def.label} is not asking anything`);

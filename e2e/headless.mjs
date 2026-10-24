@@ -78,7 +78,7 @@ check(await until(() => ended(demo, LINE, run1)?.status === 'done'), '3. the run
 const run2 = await win.evaluate(([l]) => window.roboratory.run(l, { tag: 'v2' }), [LINE]);
 await until(() => gateHolding(win));
 await quit(app);
-check(cli(demo, 'release', LINE, 'launch').code === 0, '1. release from the command with the app closed');
+check(cli(demo, 'release', LINE, 'launch', '--confirm', '2').code === 0, '1. release from the command with the app closed');
 check(await until(() => ended(demo, LINE, run2)?.status === 'done'), '1. the simulated line reaches its pallet with the app closed');
 
 // ---------- 2. the command drives every verb ----------
