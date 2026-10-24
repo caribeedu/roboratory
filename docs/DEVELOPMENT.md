@@ -33,18 +33,67 @@ The e2e specs and tools launch the packaged app: they find it in `out/` for your
 
 ## Tests
 
-Three layers, each testing what a person (or the next layer) can see, not how the code is arranged inside:
+### Philosophy
 
-- **Unit and integration (`src/**/*.test.ts`)**, in Vitest. The engine's specs live in `src/core/lines/`, one file per thing a line does (running, gates, rework, signals, questions, restarting, what an agent is given, verbs). They describe a factory, run it with simulated agents and watch the floor, the run files and what the agents receive; `src/test/harness.ts` has the builders and the waits. Nothing is mocked: an agent CLI is a fake script on disk, the engine is a real engine, a socket is a real socket. The server, the client and the command are tested against a real engine (in-process in `server.test.ts` and `cli-main.test.ts`, as a separate process in `cli.test.ts`).
-- **Interface (`src/app/**/*.test.tsx`)**, in Vitest with jsdom and Testing Library. They do what a person does (`getByRole`, type, click) and check what the window shows and what it asks the main process to do. The one thing faked is the bridge to the main process, `window.roboratory` (`installBridge` in `src/test/ui.ts`); the PixiJS floor is replaced by a stand-in in `App.test.tsx` and exercised by the e2e specs instead.
-- **End to end (`e2e/specs/*.spec.ts`)**, in Playwright Test, on the packaged app. Each test launches the app in a sandbox of its own (user data, home folder, demo factory and so an engine of its own; `e2e/support/app.ts`), so specs run in parallel and never touch your own factories. They cover the welcome screen, the Floor, dispatching and releasing work, fires, the Ledger, the managers, build mode, the engine outliving the app, the command, and the app's log. A window that logs an error fails the test unless it says it expects one.
+A test says what a person (or the next layer) can see, in the words of the product. It is a sentence about behavior, it fails when the behavior breaks and not when the code is rearranged, and it is written so that someone who has never read the implementation can tell what was promised.
 
-Habits that keep the suite honest:
+- **Test through the public surface:** the floor view, the run files (`run.jsonl` is an open format, so it is fair to read), what an agent receives, what the window shows, the bridge, the command. Never private fields, never the order of internal calls. If a behavior cannot be seen from outside, make it visible (an event in the run file) instead of reading the inside.
+- **Mock only the boundary you do not own.** An agent CLI is a fake script on disk, the engine is a real engine, a socket is a real socket. The one fake in the interface tests is the bridge to the main process, because that is where the renderer ends.
+- **A bug fix starts with the test that fails.** When the cause is a race, reproduce it deterministically (slow belts, a slow machine, a checker that takes longer) before fixing; a flake you cannot reproduce is not fixed, only unseen.
+- **Test it once, at the lowest layer that can see it.** The e2e suite is for what only the packaged app can show (Electron, the canvas, real processes, packaging); a rule of the engine belongs in `src/core/lines/`, a form in an interface test. A capability gets one journey in e2e, not one per detail.
+- **A green test must be able to go red.** Before trusting a new test, break the code it covers (or run it against the old code) and watch it fail.
 
-- A test name is a sentence about behavior ("refuses an answer or a retry while it waits to restart"), and a bug fix comes with the test that failed first.
-- Wait for what you expect (`until`, `expect.poll`, `findBy…`), never for a fixed time. The only fixed waits are for something that must *not* happen (`quietFor`), and they say so.
-- Reach in through the public surface (the floor view, the run files, the bridge, the command), not through private fields or the order of internal calls. If a behavior cannot be seen from outside, make it visible (an event in `run.jsonl`) rather than reading the inside.
-- Anything spawned on Windows is spawned with `windowsHide: true`, in tests too.
+### Which layer, and where it lives
+
+| You are testing | Write it in | Using |
+|---|---|---|
+| What a line does: routing, gates, rework, signals, questions, restarting, what an agent is given, verbs | `src/core/lines/<thing>.test.ts` | `src/test/harness.ts` |
+| A pure function or a loader with a clear input and output | next to the code, `<file>.test.ts` | plain Vitest |
+| The socket server, the client, the command | `src/core/server.test.ts`, `client.test.ts`, `cli-main.test.ts` (in-process), `cli.test.ts` (as a separate process) | a real engine |
+| An agent CLI adapter | `src/core/agents/*.test.ts` | a fake CLI script |
+| A panel or form | `src/app/**/*.test.tsx` | Testing Library, `src/test/ui.ts` |
+| The whole window | `src/app/App.test.tsx` (the PixiJS floor is a stand-in there) | the fake bridge |
+| What needs Electron, the real canvas, a real engine process or the packaged app | `e2e/specs/<capability>.spec.ts` | `e2e/support/app.ts` |
+
+`src/test/` holds what the Vitest layers share. `e2e/support/` holds the Playwright fixtures. `e2e/tools/` are scripts that screenshot or demo the app, not tests.
+
+### Writing a case
+
+- **Name:** a present-tense sentence in the product's words. `describe` names a situation ("when two checkers send the same piece back"), `it` names what happens ("reworks it once, with both findings, when they report together"). Say *what the person gets*, not what the function does. No "should", no "test that", no ticket numbers; refer to a decision as `D#` when it explains why.
+- **Shape:** describe the factory, act, watch the outcome. One behavior per test; several assertions are fine when they are facets of that one behavior.
+- **Comments** say why the scenario is built the way it is ("b is slow: it judges the first output of t after t was already reworked"), never what a line of code does.
+- **Waits:** wait for the thing you expect (`until`, `whenState`, `whenDone`, `expect.poll`, `findBy…`), never a fixed time. A fixed wait is only for something that must *not* happen, and it goes through `quietFor` so it says so.
+- **Data:** build it in the test with the harness, in a temporary folder; do not read fixtures from the repository or touch the real home folder (the e2e sandbox sets `HOME`).
+- **Delete** a test when the behavior is removed, and fold a test into its neighbour when it only repeats it. A shorter suite that says the same is better.
+
+### What the shared code gives you
+
+- **Engine (`src/test/harness.ts`):** `buildFactory(lineYaml, machines, files, withRepo)` and `line(pieces, pallet)` describe a factory; `simMachine`, `strictMachine`, `checker([...verdicts])` and `claudeMachine` are machines; `fakeClaude(answers)` stands in for the Claude CLI and records what it was given (`calls()`, `waitForCalls(n)`); `startEngine` and `restartEngine` run an engine that is stopped after the test; `until`, `whenState`, `whenDone`, `whenEnded`, `quietFor` wait; `eventsOf` and `piecesRun` read the run file. Simulated agents run 200 times faster than they say.
+- **Interface (`src/test/ui.ts`):** `installBridge(overrides)` installs the fake `window.roboratory` (calls are `vi.fn`, `emit` pushes from the main process); `makeFactory`, `snapshot`, `lineView`, `buildView` give a small factory to look at; `settle()` lets what the bridge answered reach the screen. Query by role and label, as a person would.
+- **E2E (`e2e/support/app.ts`):** `test` gives each case its own sandbox (`sandbox`: user data, home, demo factory), the app (`app`, `window`), the page object (`roboratory`: `openDemo`, `run`, `piece`, `openPiece`, `panel`, `attention`, `goToSector`, `pieceState`…) and the command (`cli`). `launch`, `quit` and `cliFor` are for cases that start the app themselves. A page error fails the case unless `allowPageErrors` is set. `patience(ms)` scales a wait for a slow CI machine.
+
+### Pitfalls we met
+
+- **A push is not a promise.** The engine sends a state update when something changes; a test that needs one makes a change (`halt`, a run) instead of hoping one is on its way.
+- **`act` warnings are races.** A state update after the test moved on means the test did not wait for what the component fetched. `await settle()` after rendering, and prefer `findBy…` to `getBy…` for anything that arrives later.
+- **Do not name a Playwright fixture `window`** if you also use the browser's `window` inside `evaluate`; the closure sees the fixture. Put the call in the `Roboratory` page object.
+- **Ports and processes the test harness adds.** Playwright gives the app a remote-debugging port and a child can inherit it, so a "no network port" check leaves out what the app itself listens on.
+- **Graceful and forced stops differ by platform.** A kill is forced on Windows and graceful elsewhere; test the graceful path (`roboratory stop`) as well as the abrupt one.
+- **Windows CI is slow.** One worker, longer timeouts and `patience()` exist for it. When a wait fails only there, look for the real cost (Electron start, the engine, Git's `sh`) before raising a number.
+- **Spawn with `windowsHide: true`**, in tests too, or a console window opens for every child.
+- **Paths:** build them with `path`, write factory-relative paths with `/`, and put a literal Windows path in `String.raw`.
+- **Reproduce a CI failure on its own system.** Windows can run Linux through WSL; a fix that only makes the failure disappear on your machine is a guess.
+
+### Running them
+
+| | |
+|---|---|
+| `npm test` | every Vitest test: the engine, the loader, the command and the interface |
+| `npm run test:coverage` | the same, and fails under the floor in `vitest.config.mts` (a floor, not a goal) |
+| `npm run package`, then `npm run test:e2e` | the Playwright specs against the packaged app; `ROBORATORY_OUT_DIR` and `ROBORATORY_EXE` choose the build |
+| `npx playwright test <file> --repeat-each=5` | how stable a spec is |
+
+The CI (`.github/workflows/tests.yml`) runs the Vitest layers and the e2e suite on macOS, Windows and Linux, and keeps the report and the traces of a failed e2e job.
 
 ## Layout
 

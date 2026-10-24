@@ -12,3 +12,13 @@ These hold unless a person explicitly signs off a change, recorded as a new deci
 6. **Every action is a verb through the broker,** and every verb is audited. (D30)
 7. **Everything stays local:** no telemetry, and open file formats.
 8. **Real agents spend money.** Tests, the demo and dry runs use `agent: sim`. A real run needs a cost estimate and approval first.
+
+## Tests
+
+How the suite is organized and written is in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#tests). The rules that hold for every change:
+
+1. **Every behavior change comes with a test, at the lowest layer that can see it:** `src/core/lines/` for what a line does, a test beside the code for a function, `src/app/**/*.test.tsx` for the window, `e2e/specs/` only for what needs the packaged app. A bug fix starts with the test that fails, reproduced deterministically when the cause is a race.
+2. **A test is a sentence about behavior** in the product's words, and reaches in through what a person or the next layer can see: the floor, the run files, what an agent receives, what the window shows. Not private fields, not the order of internal calls.
+3. **Mock only the boundary you do not own.** The engine, the sockets and the files are real; an agent CLI is a fake script; the interface tests fake only the bridge to the main process. No test calls a real agent (invariant 8).
+4. **Wait for what you expect, never a fixed time.** A fixed wait is only for something that must not happen, and it says so (`quietFor`).
+5. **Keep it short.** Test a thing once; delete a test whose behavior is gone; build the data in the test, in a temporary folder, never in the real home folder.
