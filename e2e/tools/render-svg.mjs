@@ -1,5 +1,5 @@
 // Renders an SVG file to a PNG with the packaged app's browser engine.
-// Usage: node e2e/render-svg.mjs <file.svg> <out.png> [scale]
+// Usage: node e2e/tools/render-svg.mjs <file.svg> <out.png> [scale]
 import { _electron as electron } from 'playwright';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { appExecutable } from './exe.mjs';
 
 const [svg, out, scale = '1'] = process.argv.slice(2);
-if (!svg || !out) { console.error('usage: node e2e/render-svg.mjs <file.svg> <out.png> [scale]'); process.exit(1); }
+if (!svg || !out) { console.error('usage: node e2e/tools/render-svg.mjs <file.svg> <out.png> [scale]'); process.exit(1); }
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'roboratory-svg-'));
 const app = await electron.launch({ executablePath: appExecutable(), env: { ...process.env, ROBORATORY_USER_DATA: path.join(tmp, 'ud') } });
 const win = await app.firstWindow();

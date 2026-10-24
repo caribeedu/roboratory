@@ -109,9 +109,12 @@ function createWindow() {
 
 const handle = (ch: string, fn: (...a: any[]) => unknown) => ipcMain.handle(ch, (_e, ...a) => fn(...a));
 /** The calls that go to the engine as they are, by the name of the API. */
-const forward = (name: string, fallback?: unknown) => handle(name, (...a: unknown[]) => {
+// A call with a fallback is a read the window repeats on its own (the Ledger polls, a conversation reloads): with no
+// factory open or the engine away it gets the empty answer instead of an error, and the banner says what is wrong.
+const forward = (name: string, fallback?: unknown) => handle(name, async (...a: unknown[]) => {
   if (!client) { if (fallback !== undefined) return fallback; throw new Error('No factory is open.'); }
-  return client.call(name, ...a);
+  if (fallback === undefined) return client.call(name, ...a);
+  try { return await client.call(name, ...a); } catch { return fallback; }
 });
 
 handle('state', async () => {
@@ -134,12 +137,14 @@ handle('closeFactory', () => { disconnect(); send('snapshot', EMPTY); });
 handle('engineStart', async () => { if (client) { await client.restart(); setEngine({ state: statusOf(client), version: client.info.version }); } });
 handle('engineRestartWhenIdle', () => client?.call('restartWhenIdle'));
 for (const name of [
-  'run', 'retry', 'release', 'answer', 'halt', 'resume', 'runDetail', 'ask', 'acceptProposal', 'rejectProposal',
-  'buildStart', 'buildApply', 'buildUndo', 'buildRedo', 'buildFields', 'buildServers', 'buildRead', 'buildSave', 'buildDiscard',
+  'run', 'retry', 'release', 'answer', 'halt', 'resume', 'ask', 'acceptProposal', 'rejectProposal',
+  'buildStart', 'buildApply', 'buildUndo', 'buildRedo', 'buildFields', 'buildRead', 'buildSave', 'buildDiscard',
 ]) forward(name);
 forward('runs', []);
 forward('messages', []);
 forward('buildList', []);
+forward('runDetail', null);
+forward('buildServers', null);
 handle('reveal', (t: string) => { if (fs.existsSync(t)) shell.showItemInFolder(t); });
 
 // ---------- the roboratory command ----------

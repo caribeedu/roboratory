@@ -4,3 +4,8 @@ out/
 coverage/
 .runs/
 .DS_Store
+
+# Playwright
+e2e/.results/
+e2e/.report/
+coverage/

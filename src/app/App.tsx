@@ -6,6 +6,7 @@ import { PieceEditor } from './build/PieceEditor';
 import { SaveDialog } from './build/SaveDialog';
 import { Settings, type SettingsPanel } from './build/Settings';
 import { Floor, type Selection } from './floor/Floor';
+import { EngineBanner, InstallCliButton } from './panels/EngineBanner';
 import { Inspector } from './panels/Inspector';
 import { AttentionQueue } from './panels/AttentionQueue';
 import { Minimap } from './panels/Minimap';
@@ -96,7 +97,9 @@ export function App() {
   // attention: chirp when something new needs you
   const known = useRef<Set<string> | null>(null);
   useEffect(() => {
-    const items = snapshot?.attention ?? [];
+    // what was already waiting when the window opened is not news: the first snapshot only sets the baseline
+    if (!snapshot) return;
+    const items = snapshot.attention;
     const ids = new Set(items.map((i) => `${i.id}@${i.runId}`));
     if (known.current) {
       const fresh = items.filter((i) => !known.current!.has(`${i.id}@${i.runId}`));
@@ -190,19 +193,11 @@ export function App() {
           {factory.warnings.length > 0 && (
             <button className="pill warn" onClick={() => setShowWarnings((v) => !v)}>{factory.warnings.length} warning{factory.warnings.length === 1 ? '' : 's'}</button>
           )}
-          {cli !== 'installed' && (
-            <button className="pill" onClick={() => void act(() => api().cliInstall())} title="Put the roboratory command on your machine, to drive this factory from a terminal">{cli === 'outdated' ? 'Update CLI' : 'Install CLI'}</button>
-          )}
+          <InstallCliButton state={cli} onInstall={() => void act(() => api().cliInstall())} />
           <button className="pill" onClick={() => api().reveal(factory.root + '/factory.yaml')} title="Show the factory folder">Files</button>
           <button className="pill" onClick={() => (build ? leaveBuild('Save or discard your build changes before closing the factory.', () => void act(() => api().closeFactory())) : void act(() => api().closeFactory()))} title="Close this factory">Close</button>
         </div>
-        {factory && (engine.state === 'stopped' || engine.state === 'older' || engine.state === 'restarting') && (
-          <div className="engine-banner frame" role="status">
-            {engine.state === 'stopped' && <><span>Engine stopped. Runs are paused until it starts again.</span><button className="btn primary" onClick={() => void act(() => api().engineStart())}>Start</button></>}
-            {engine.state === 'older' && <><span>{engine.version === engine.appVersion ? 'The engine runs an earlier build than the app.' : `The engine is older than the app (${engine.version} and ${engine.appVersion}).`} It keeps your runs going until you restart it.</span><button className="btn" onClick={() => void act(() => api().engineRestartWhenIdle(), 'The engine restarts once nothing is running')}>Restart when idle</button></>}
-            {engine.state === 'restarting' && <span>The engine restarts once nothing is running. No new work starts until then.</span>}
-          </div>
-        )}
+        {factory && <EngineBanner engine={engine} onStart={() => void act(() => api().engineStart())} onRestartWhenIdle={() => void act(() => api().engineRestartWhenIdle(), 'The engine restarts once nothing is running')} />}
         {showWarnings && (
           <div className="warnings-pop frame" role="dialog" aria-label="Warnings">
             <h3>Factory warnings</h3>

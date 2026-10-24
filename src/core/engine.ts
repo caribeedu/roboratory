@@ -19,7 +19,9 @@ const validators = new Map<string, ValidateFunction>();
 
 type Payload = Record<string, unknown>;
 interface Box { id: string; runId: string; payload: Payload; color: string }
-interface Work { runId: string; box: Box; hint?: string; attempt?: number; /** stop this piece as soon as it picks the work up */ stop?: string }
+interface Work { runId: string; box: Box; hint?: string; attempt?: number; /** stop this piece as soon as it picks the work up */ stop?: string;
+  /** how many outputs each ancestor had made when this piece picked the work up: a different count later means the input is out of date */
+  seen?: Record<string, number> }
 interface PieceRt {
   def: PieceDef;
   state: PieceState;
@@ -51,6 +53,8 @@ interface RunRt {
   laps: Map<string, number>;
   /** how many times each machine has run in this run */
   calls: Map<string, number>;
+  /** how many forward outputs each piece has made in this run */
+  outputs: Map<string, number>;
 }
 
 /** What a machine may answer instead of its contract (D21). */
@@ -141,7 +145,7 @@ export class Engine extends EventEmitter {
     fs.mkdirSync(dir, { recursive: true });
     const run: RunRt = {
       summary: { id, sectorId: line.def.sectorId, lineId, status: 'running', startedAt: this.now(), input },
-      dir, line: line.def, arrivals: new Map(), skipped: new Set(), done: new Set(), skippedPieces: new Set(), branches: new Map(), auto: {}, laps: new Map(), calls: new Map(),
+      dir, line: line.def, arrivals: new Map(), skipped: new Set(), done: new Set(), skippedPieces: new Set(), branches: new Map(), auto: {}, laps: new Map(), calls: new Map(), outputs: new Map(),
     };
     this.runs.set(id, run);
     const v = await factoryVersion(this.factory.root);
@@ -297,6 +301,7 @@ export class Engine extends EventEmitter {
     run.done.add(pieceId);
     const p = line.pieces.get(pieceId);
     if (!p) return;
+    if (!backOnly) run.outputs.set(pieceId, (run.outputs.get(pieceId) ?? 0) + 1);
     if (!backOnly) { p.lastBox = box.payload; p.lastRunId = run.summary.id; } // a failed signal sent nothing forward
     this.record(run, { type: 'piece.done', piece: pieceId, box: box.payload, branch: run.branches.get(pieceId), ...(backOnly ? { failed: true } : {}) });
     let taken = 0;
@@ -446,6 +451,39 @@ export class Engine extends EventEmitter {
     this.pump(line, p);
   }
 
+  /** The forward outputs made so far by every piece upstream of `pieceId`. */
+  private ancestorOutputs(run: RunRt, pieceId: string): Record<string, number> {
+    const byId = new Map(run.line.model.pieces.map((q) => [q.id, q]));
+    const seen: Record<string, number> = {};
+    const stack = [pieceId];
+    while (stack.length) for (const n of byId.get(stack.pop()!)?.needs ?? []) {
+      if (n.back || n.from in seen) continue;
+      seen[n.from] = run.outputs.get(n.from) ?? 0;
+      stack.push(n.from);
+    }
+    return seen;
+  }
+
+  /**
+   * A piece judged or built from an input that an upstream piece has since replaced (a rework made it again while
+   * this piece was still working): its result is about the old input and must not count.
+   */
+  private staleInput(run: RunRt, w: Work) {
+    return Object.entries(w.seen ?? {}).some(([id, n]) => (run.outputs.get(id) ?? 0) !== n);
+  }
+
+  /** Drops a result that came from an out-of-date input; the piece takes the new input as soon as it is free. */
+  private dropStale(line: LineRt, run: RunRt, p: PieceRt) {
+    this.record(run, { type: 'piece.stale', piece: p.def.id });
+    this.log({ level: 'sector', sectorId: run.line.sectorId, lineId: run.line.id, pieceId: p.def.id, runId: run.summary.id, kind: 'info', text: `${p.def.label}: its result was about an input that has since changed, so it runs again` });
+    p.state = 'idle';
+    p.current = undefined;
+    p.attempt = undefined;
+    this.changed();
+    this.checkReady(run, p.def.id);
+    this.pump(line, p);
+  }
+
   /** Starts the next queued work on a piece; pieces handle one box at a time. */
   private pump(line: LineRt, p: PieceRt) {
     if (line.halted || p.current || !p.queue.length) return;
@@ -455,6 +493,7 @@ export class Engine extends EventEmitter {
     const run = this.runs.get(work.runId);
     if (!run) return;
     p.current = work;
+    work.seen = this.ancestorOutputs(run, p.def.id);
     p.since = this.now();
     if (work.stop) { const why = work.stop; delete work.stop; this.stop(run, p, why); return; }
     if (p.def.kind === 'gate') {
@@ -599,6 +638,7 @@ export class Engine extends EventEmitter {
       }
       if (res.error) { lastError = res.error; }
       else if (!validate(res.output)) { lastError = ajv.errorsText(validate.errors, { dataVar: 'output' }); }
+      else if (this.staleInput(run, w)) { this.dropStale(line, run, p); return; }
       else {
         if (branch) {
           const c = await commitLeftovers(dir, `${def.label}: work left uncommitted by the agent (${run.summary.id})`);
@@ -671,6 +711,7 @@ export class Engine extends EventEmitter {
       child.on('close', (c) => { clearTimeout(timer); resolve(c); });
       child.on('exit', () => group('SIGTERM')); // nothing the script left behind outlives it
     });
+    if (!timedOut && this.staleInput(run, w)) { this.dropStale(line, run, p); return; }
     if (code === 0 && !timedOut) {
       this.log({ level: 'sector', sectorId: run.line.sectorId, lineId: run.line.id, pieceId: def.id, runId: run.summary.id, kind: 'ok', text: `${def.label} passed` });
       p.state = 'passed';
@@ -782,7 +823,7 @@ export class Engine extends EventEmitter {
     if (!start) return;
     const run: RunRt = {
       summary: { id, sectorId: l.def.sectorId, lineId: l.def.id, status: 'running', startedAt: start.t, input: start.input, baseCommit: start.baseCommit, dirty: start.dirty },
-      dir, line: l.def, arrivals: new Map(), skipped: new Set(), done: new Set(), skippedPieces: new Set(), branches: new Map(), auto: {}, laps: new Map(), calls: new Map(),
+      dir, line: l.def, arrivals: new Map(), skipped: new Set(), done: new Set(), skippedPieces: new Set(), branches: new Map(), auto: {}, laps: new Map(), calls: new Map(), outputs: new Map(),
     };
     this.runs.set(id, run);
     const boxes = new Map<string, Payload>();

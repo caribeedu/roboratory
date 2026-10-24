@@ -120,7 +120,7 @@ function ProposalCard({ p, m, scope, factory, notify }: { p: Proposal; m: Manage
         <div className="actions">
           {step > 0 && <span className="confirm-q small">{step === 1 ? 'Are you sure?' : 'Are you really sure?'}</span>}
           <button className="btn primary" onClick={() => void accept()}>{p.kind === 'patch' ? 'Accept (write files)' : step > 0 ? (step < need ? 'Yes' : 'Yes, release') : label}</button>
-          <button className="btn ghost" onClick={() => { setStep(0); void api().rejectProposal(scope, m.id, p.id); }}>{step > 0 ? 'Cancel' : 'Reject'}</button>
+          <button className="btn ghost" onClick={() => { setStep(0); if (step === 0) void api().rejectProposal(scope, m.id, p.id); }}>{step > 0 ? 'Cancel' : 'Reject'}</button>
         </div>
       )}
     </div>

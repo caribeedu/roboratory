@@ -18,7 +18,7 @@ From the assessment of the first real ticket run ([ASSESSMENT.md](ASSESSMENT.md)
 ### v0.10 — Metrics and a cheap rehearsal
 
 1. **Metrics per machine** from `run.jsonl` (`roboratory stats`): cost, duration, attempts, laps, denied commands, questions, blocks, and checker passes later proved wrong (a pass followed by a question or rework further down the line). Costs say whether they are estimates.
-2. **A cheap rehearsal with real permissions** (`roboratory rehearse`): the real roles, signals and permissions, a cheap model, and every outward action denied, to find role and permission defects for cents. It finds defects of roles and permissions, not of quality. `e2e/factory-sim-check.mjs` keeps checking the flow for free.
+2. **A cheap rehearsal with real permissions** (`roboratory rehearse`): the real roles, signals and permissions, a cheap model, and every outward action denied, to find role and permission defects for cents. It finds defects of roles and permissions, not of quality. `e2e/tools/factory-sim-check.mjs` keeps checking the flow for free.
 
 ### v0.11 — Checkers prove their work
 
@@ -55,7 +55,7 @@ None of these exist in the code yet.
 ## 4. Not yet verified with real agents
 
 1. A real Codex run.
-2. A real draft PR on GitHub: `node e2e/real-agent-check.mjs --github owner/repo`.
+2. A real draft PR on GitHub: `node e2e/tools/real-agent-check.mjs --github owner/repo`.
 3. The lines of the reference engineering factory (D42). Only one step has run for real, a data framing step that cost US$ 4.64 on opus before it moved to sonnet. Unverified until full runs:
    - whether the incident tool's API can set custom fields and decline an incident, and whether follow-up creation can set a team;
    - the real durations of the signal scripts and CI watches.

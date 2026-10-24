@@ -2,7 +2,7 @@
 // (outputs shaped by each contract; checks fail once then pass, to exercise return belts),
 // replaces signals with `true`, then drives each line to its pallet answering gates and questions.
 // It starts a real engine process on the copy and drives it over the socket, as the app and the command line do.
-// Usage: node e2e/factory-sim-check.mjs <factory-dir>
+// Usage: node e2e/tools/factory-sim-check.mjs <factory-dir>
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
