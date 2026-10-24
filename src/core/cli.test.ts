@@ -23,7 +23,7 @@ const factoryDir = () => {
   return createDemoFactory(path.join(dir, 'factory'), path.join(dir, 'repos'));
 };
 const cli = (root: string, ...args: string[]) => {
-  const r = spawnSync(process.execPath, [bundle, ...args, '--factory', root], { encoding: 'utf8', env: process.env, timeout: 60_000 });
+  const r = spawnSync(process.execPath, [bundle, ...args, '--factory', root], { encoding: 'utf8', env: process.env, timeout: 60_000, windowsHide: true });
   return { code: r.status, out: r.stdout, err: r.stderr };
 };
 const until = async (fn: () => boolean | Promise<boolean>, ms = 30_000) => {
@@ -102,7 +102,7 @@ describe('the roboratory command and the engine as a process', () => {
     const root = factoryDir();
     try {
       // an engine that reports an older version, started by hand
-      const old = spawn(process.execPath, [bundle, 'serve', root], { detached: true, stdio: 'ignore', env: { ...process.env, ROBORATORY_ENGINE_VERSION: '0.0.1' } });
+      const old = spawn(process.execPath, [bundle, 'serve', root], { detached: true, stdio: 'ignore', windowsHide: true, env: { ...process.env, ROBORATORY_ENGINE_VERSION: '0.0.1' } });
       old.unref();
       await until(() => !!readLock(root));
       const app = await EngineClient.connect(root, { client: 'app', start: true, launch: launchFor(bundle) });
@@ -125,7 +125,7 @@ describe('the roboratory command and the engine as a process', () => {
     const root = factoryDir();
     try {
       expect(cli(root, 'run', LINE, '--input', 'tag=v3').code).toBe(0);
-      const w = spawn(process.execPath, [bundle, 'watch', '--factory', root], { env: process.env });
+      const w = spawn(process.execPath, [bundle, 'watch', '--factory', root], { env: process.env, windowsHide: true });
       let out = '';
       w.stdout.on('data', (d) => { out += d; });
       await until(() => /gate releases\/orders-api\/launch is waiting for you/.test(out) || /gate .*launch.*waiting/.test(out));

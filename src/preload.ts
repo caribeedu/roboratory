@@ -10,6 +10,9 @@ const on = (ch: string) => (cb: (p: any) => void) => {
 
 const api: RoboratoryApi = {
   state: call('state') as RoboratoryApi['state'],
+  cliStatus: call('cliStatus') as RoboratoryApi['cliStatus'],
+  cliInstall: call('cliInstall') as RoboratoryApi['cliInstall'],
+  onCli: on('cli'),
   engineStart: call('engineStart') as RoboratoryApi['engineStart'],
   engineRestartWhenIdle: call('engineRestartWhenIdle') as RoboratoryApi['engineRestartWhenIdle'],
   onEngine: on('engine'),

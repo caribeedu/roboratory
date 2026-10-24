@@ -19,6 +19,17 @@ export function launcher(spec: Pick<InstallSpec, 'execPath' | 'script' | 'platfo
   return `#!/bin/sh\nELECTRON_RUN_AS_NODE=1 exec ${q(spec.execPath)} ${q(spec.script)} "$@"\n`;
 }
 
+export type InstallState = 'installed' | 'outdated' | 'missing';
+
+/** Whether the launcher is there and still points at this build (an app that moved or updated leaves it outdated). */
+export function installStatus(spec: InstallSpec): { state: InstallState; file: string } {
+  const dir = spec.dir ?? defaultBinDir(spec.home);
+  const file = path.join(dir, (spec.platform ?? process.platform) === 'win32' ? 'roboratory.cmd' : 'roboratory');
+  let have: string;
+  try { have = fs.readFileSync(file, 'utf8'); } catch { return { state: 'missing', file }; }
+  return { state: have === launcher(spec) ? 'installed' : 'outdated', file };
+}
+
 /** Writes the launcher and returns where. The folder may not be on PATH yet. */
 export function installCommand(spec: InstallSpec): { file: string; onPath: boolean } {
   const dir = spec.dir ?? defaultBinDir(spec.home);

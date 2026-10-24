@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { installCommand, launcher } from './install';
+import { installCommand, installStatus, launcher } from './install';
 
 describe('the roboratory launcher', () => {
   it('runs the bundle with the app binary in Node mode', () => {
@@ -10,6 +10,15 @@ describe('the roboratory launcher', () => {
     expect(launcher({ execPath: "/o'neil/app", script: '/s.js', platform: 'linux' })).toContain(`'/o'\\''neil/app'`);
     expect(launcher({ execPath: 'C:\Roboratory\Roboratory.exe', script: 'C:\Roboratory\resources\app.asar\.vite\build\engine.js', platform: 'win32' }))
       .toBe('@echo off\r\nsetlocal\r\nset ELECTRON_RUN_AS_NODE=1\r\n"C:\Roboratory\Roboratory.exe" "C:\Roboratory\resources\app.asar\.vite\build\engine.js" %*\r\n');
+  });
+
+  it('tells whether the launcher is missing, installed, or outdated because the app moved', () => {
+    const dir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'roboratory-bin-')), 'bin');
+    const spec = { dir, execPath: '/Apps/Roboratory', script: '/Apps/engine.js' };
+    expect(installStatus(spec).state).toBe('missing');
+    installCommand(spec);
+    expect(installStatus(spec).state).toBe('installed');
+    expect(installStatus({ ...spec, script: '/Moved/engine.js' }).state).toBe('outdated');
   });
 
   it('writes it into the folder and says whether the folder is on PATH', () => {

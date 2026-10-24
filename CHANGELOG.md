@@ -16,7 +16,10 @@ The engine moves out of the app. It runs as its own process, one per factory, an
 ### The command line
 - **`roboratory`** with `serve`, `stop`, `status`, `run <line> --input k=v`, `release`, `answer`, `retry`, `halt`, `resume`, `restart --when-idle` and `watch`. Each verb is audited as `you` with the source `cli`, and a refusal (for example a line the open build-mode draft changes) exits non-zero with the engine's message. Build mode stays in the app.
 - **`watch`** prints one line for each gate waiting, question, fire, rework and end of a run, with the cost so far.
-- **One bundle for both.** The packaged app runs the engine and the command with its own binary in Node mode; File → Install command-line tool writes the `roboratory` launcher to `~/.local/bin` when you confirm. In development, `npm run cli -- <command>`.
+- **One bundle for both.** The packaged app runs the engine and the command with its own binary in Node mode; File → Install command-line tool writes the `roboratory` launcher to `~/.local/bin` when you confirm. The menu shows whether it is installed, outdated or missing, and the top bar offers an Install CLI button when it is not installed. In development, `npm run cli -- <command>`.
+
+### Logs
+- **The app keeps a log** (`app.log` in its user-data folder, File → Show log file) of uncaught errors, a renderer or child process that died, renderer console errors, an engine that stopped and a factory that could not be opened. Every process the engine and the app start on Windows is hidden, so no terminal window flashes.
 
 ### Tests
 - A real engine process, driven through the same client as the command, backs the new tests; `e2e/factory-sim-check.mjs` drives the engine over the socket, and `e2e/headless.mjs` checks the seven exit criteria against the packaged app and its command.

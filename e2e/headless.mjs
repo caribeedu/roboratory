@@ -41,7 +41,7 @@ const launch = async () => {
 // the command: the packaged binary in Node mode running the engine bundle
 let script = '';
 const cli = (root, ...args) => {
-  const r = spawnSync(exe, [script, ...args, '--factory', root], { encoding: 'utf8', env: { ...appEnv, ELECTRON_RUN_AS_NODE: '1' }, timeout: 60000 });
+  const r = spawnSync(exe, [script, ...args, '--factory', root], { encoding: 'utf8', env: { ...appEnv, ELECTRON_RUN_AS_NODE: '1' }, timeout: 60000, windowsHide: true });
   return { code: r.status, out: r.stdout ?? '', err: r.stderr ?? '' };
 };
 const lockOf = (root) => { try { return JSON.parse(fs.readFileSync(path.join(root, '.runs', 'engine.lock'), 'utf8')); } catch { return null; } };
@@ -61,6 +61,15 @@ await win.getByText('Open the demo factory').click();
 await until(async () => (await win.evaluate(() => window.roboratory.state())).snapshot.factory !== null);
 const lock1 = lockOf(demo);
 check(!!lock1 && alive(lock1.pid) && lock1.pid !== app.process().pid, 'the engine is its own process, not the app');
+// the command's state shows in the File menu and, when it is not installed, as a button (nothing is installed here)
+const cliState = await win.evaluate(() => window.roboratory.cliStatus());
+const menuLabel = await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items.flatMap((i) => i.submenu?.items ?? []).map((i) => i.label).find((l) => /command-line tool/i.test(l)));
+const labels = { installed: 'Command-line tool: installed', outdated: 'Update command-line tool…', missing: 'Install command-line tool…' };
+check(menuLabel === labels[cliState], `the File menu shows the command's state (${cliState})`);
+check((await win.getByRole('button', { name: /(Install|Update) CLI/ }).count()) === (cliState === 'installed' ? 0 : 1), 'the window offers a button to install it only when it is not installed');
+// what goes wrong is written to a log
+await win.evaluate(() => console.error('e2e probe'));
+check(await until(() => { try { return fs.readFileSync(path.join(userData, 'logs', 'app.log'), 'utf8').includes('e2e probe'); } catch { return false; } }, 5000), 'a renderer error is written to the app log');
 const run1 = await win.evaluate(([l]) => window.roboratory.run(l, { tag: 'v1' }), [LINE]);
 check(await until(() => gateHolding(win)), 'a run reaches its gate');
 
@@ -98,7 +107,7 @@ const files = {
 };
 for (const [rel, text] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(verbs, rel)), { recursive: true }); fs.writeFileSync(path.join(verbs, rel), text); }
 const L = 's/l';
-const watcher = spawn(exe, [script, 'watch', '--factory', verbs], { env: { ...appEnv, ELECTRON_RUN_AS_NODE: '1' } });
+const watcher = spawn(exe, [script, 'watch', '--factory', verbs], { windowsHide: true, env: { ...appEnv, ELECTRON_RUN_AS_NODE: '1' } });
 let watched = '';
 watcher.stdout.on('data', (d) => { watched += d; });
 check(cli(verbs, 'status').out.includes('No engine is running'), '2. status with no engine');
@@ -128,7 +137,7 @@ if (process.platform === 'win32') {
   check((fs.statSync(lockV.socket).mode & 0o077) === 0, '7. the socket is open to your user only');
 }
 let ports = '';
-if (process.platform === 'win32') ports = execFileSync('netstat', ['-ano', '-p', 'TCP'], { encoding: 'utf8' }).split('\n').filter((l) => /LISTENING/.test(l) && new RegExp(`\\s${lockV.pid}\\s*$`).test(l.trim() + ' ')).join('');
+if (process.platform === 'win32') ports = execFileSync('netstat', ['-ano', '-p', 'TCP'], { encoding: 'utf8', windowsHide: true }).split('\n').filter((l) => /LISTENING/.test(l) && new RegExp(`\\s${lockV.pid}\\s*$`).test(l.trim() + ' ')).join('');
 else { const r = spawnSync('lsof', ['-nP', '-iTCP', '-sTCP:LISTEN', '-a', '-p', String(lockV.pid)], { encoding: 'utf8' }); ports = r.stdout.trim(); }
 check(ports.trim() === '', '7. the engine opens no network port');
 cli(verbs, 'stop');
@@ -136,7 +145,7 @@ cli(verbs, 'stop');
 // ---------- 4 and 5. an older engine, and build mode against the command ----------
 stopEngine(demo);
 await until(() => !lockOf(demo) || !alive(lockOf(demo).pid));
-const old = spawn(exe, [script, 'serve', demo], { detached: true, stdio: 'ignore', env: { ...appEnv, ELECTRON_RUN_AS_NODE: '1', ROBORATORY_ENGINE_VERSION: '0.0.1' } });
+const old = spawn(exe, [script, 'serve', demo], { detached: true, stdio: 'ignore', windowsHide: true, env: { ...appEnv, ELECTRON_RUN_AS_NODE: '1', ROBORATORY_ENGINE_VERSION: '0.0.1' } });
 old.unref();
 await until(() => lockOf(demo));
 const oldPid = lockOf(demo).pid;
@@ -167,7 +176,7 @@ await quit(app);
 stopEngine(demo);
 
 // ---------- 6. the dry run goes through the real engine ----------
-const dry = spawnSync(process.execPath, ['e2e/factory-sim-check.mjs', demo], { encoding: 'utf8', env: process.env, timeout: 280000 });
+const dry = spawnSync(process.execPath, ['e2e/factory-sim-check.mjs', demo], { encoding: 'utf8', env: process.env, timeout: 280000, windowsHide: true });
 console.log(dry.stdout.trim().split('\n').map((l) => `     ${l}`).join('\n'));
 check(dry.status === 0, '6. the factory dry run passes through the engine over the socket (flow tests: npm test)');
 

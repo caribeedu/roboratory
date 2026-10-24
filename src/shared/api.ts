@@ -11,6 +11,11 @@ export interface EngineStatus { state: 'none' | 'running' | 'restarting' | 'stop
 
 export interface RoboratoryApi {
   state(): Promise<{ snapshot: Snapshot; logs: LogEntry[]; recent: string[]; demoPath: string; engine: EngineStatus }>;
+  /** Whether the `roboratory` command is installed for this build. */
+  cliStatus(): Promise<'installed' | 'outdated' | 'missing'>;
+  /** Asks, then writes the `roboratory` launcher; resolves to the status afterwards. */
+  cliInstall(): Promise<'installed' | 'outdated' | 'missing'>;
+  onCli(cb: (s: 'installed' | 'outdated' | 'missing') => void): () => void;
   /** Starts the engine again after it stopped. */
   engineStart(): Promise<void>;
   /** Stops dispatching and restarts the engine once no machine or signal is running. */

@@ -19,7 +19,7 @@ import logo from '../../assets/logo-64.png';
 export type View = 'floor' | 'ledger';
 
 export function App() {
-  const { snapshot, logs, recent, demoPath, msgTick, refreshRecent, engine } = useRoboratory();
+  const { snapshot, logs, recent, demoPath, msgTick, refreshRecent, engine, cli } = useRoboratory();
   const factory = snapshot?.factory ?? null;
   const [view, setView] = useState<View>('floor');
   const [sectorId, setSectorId] = useState<string | null>(null);
@@ -189,6 +189,9 @@ export function App() {
         <div className="topbar-right">
           {factory.warnings.length > 0 && (
             <button className="pill warn" onClick={() => setShowWarnings((v) => !v)}>{factory.warnings.length} warning{factory.warnings.length === 1 ? '' : 's'}</button>
+          )}
+          {cli !== 'installed' && (
+            <button className="pill" onClick={() => void act(() => api().cliInstall())} title="Put the roboratory command on your machine, to drive this factory from a terminal">{cli === 'outdated' ? 'Update CLI' : 'Install CLI'}</button>
           )}
           <button className="pill" onClick={() => api().reveal(factory.root + '/factory.yaml')} title="Show the factory folder">Files</button>
           <button className="pill" onClick={() => (build ? leaveBuild('Save or discard your build changes before closing the factory.', () => void act(() => api().closeFactory())) : void act(() => api().closeFactory()))} title="Close this factory">Close</button>

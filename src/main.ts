@@ -4,7 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { EngineClient, launchFor } from './core/client';
 import { createDemoFactory } from './core/demo';
-import { defaultBinDir, installCommand } from './core/install';
+import { appLog } from './core/applog';
+import { defaultBinDir, installCommand, installStatus, type InstallState } from './core/install';
 import type { EngineStatus } from './shared/api';
 import type { Snapshot } from './shared/types';
 
@@ -22,6 +23,8 @@ const remember = (root: string) => {
 };
 const demoPath = process.env.ROBORATORY_DEMO_DIR || path.join(os.homedir(), 'Roboratory', 'Demo Factory');
 if (process.env.ROBORATORY_USER_DATA) app.setPath('userData', process.env.ROBORATORY_USER_DATA);
+
+const log = appLog(path.join(app.getPath('userData'), 'logs', 'app.log'));
 
 const send = (ch: string, payload: unknown) => { if (win && !win.isDestroyed()) win.webContents.send(ch, payload); };
 
@@ -56,7 +59,7 @@ async function open(root: string) {
   c.on('build', (v) => send('build', v));
   c.on('restarting', () => setEngine({ state: 'restarting' }));
   c.on('connected', () => { setEngine({ state: statusOf(c), version: c.info.version }); void refresh(c).catch(() => {}); });
-  c.on('stopped', () => setEngine({ state: 'stopped' }));
+  c.on('stopped', () => { log.error(`the engine for ${root} stopped (its log: ${path.join(root, '.runs', 'engine.log')})`); setEngine({ state: 'stopped' }); });
   setEngine({ state: statusOf(c), version: c.info.version });
   remember(root);
   win?.setTitle(`${c.info.name || 'Roboratory'} — Roboratory`);
@@ -71,7 +74,7 @@ async function refresh(c: EngineClient) {
 
 async function openLast() {
   const last = readSettings().recent.find((r) => fs.existsSync(path.join(r, 'factory.yaml')));
-  if (last) { try { await open(last); } catch { /* show the welcome screen */ } }
+  if (last) { try { await open(last); } catch (e) { log.error(`could not reopen ${last}`, e); /* show the welcome screen */ } }
 }
 
 function iconPath() {
@@ -92,6 +95,9 @@ function createWindow() {
   else win.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
   // pinch gestures belong to the floor's camera, not to page zoom
   win.webContents.on('did-finish-load', () => { void win?.webContents.setVisualZoomLevelLimits(1, 1); });
+  win.webContents.on('console-message', (e) => { if (e.level === 'error') log.error(`renderer: ${e.message} (${e.sourceId}:${e.lineNumber})`); });
+  win.webContents.on('did-fail-load', (_e, code, desc, url) => log.error(`the window failed to load ${url}: ${desc} (${code})`));
+  win.on('unresponsive', () => log.error('the window stopped responding'));
   win.webContents.setWindowOpenHandler(({ url }) => { void shell.openExternal(url); return { action: 'deny' }; });
 }
 
@@ -112,10 +118,10 @@ handle('openFactory', async () => {
   await open(r.filePaths[0]);
   return true;
 });
-handle('openFactoryAt', (root: string) => open(root));
+handle('openFactoryAt', (root: string) => open(root).catch((e) => { log.error(`could not open ${root}`, e); throw e; }));
 handle('createDemo', async () => {
   if (!fs.existsSync(path.join(demoPath, 'factory.yaml'))) createDemoFactory(demoPath, path.join(path.dirname(demoPath), 'demo-repos'));
-  await open(demoPath);
+  await open(demoPath).catch((e) => { log.error('could not open the demo factory', e); throw e; });
 });
 // closing a factory drops the connection; the engine keeps its runs
 handle('closeFactory', () => { disconnect(); send('snapshot', EMPTY); });
@@ -130,40 +136,84 @@ forward('messages', []);
 forward('buildList', []);
 handle('reveal', (t: string) => { if (fs.existsSync(t)) shell.showItemInFolder(t); });
 
-/** File → Install command-line tool: writes the `roboratory` launcher after you confirm. */
-async function installCli() {
-  const dir = defaultBinDir();
-  const ok = await dialog.showMessageBox(win!, {
-    type: 'question', buttons: ['Install', 'Cancel'], defaultId: 0, cancelId: 1,
-    message: 'Install the roboratory command?',
-    detail: `This writes a small launcher to ${dir}. It runs the same engine as the app, so runs started from the terminal show up in the window.`,
-  });
-  if (ok.response !== 0) return;
-  try {
-    const { file, onPath } = installCommand({ dir, execPath: process.execPath, script: engineScript() });
-    await dialog.showMessageBox(win!, {
-      type: 'info', message: 'The roboratory command is installed.',
-      detail: `${file}${onPath ? '' : `\n\n${dir} is not on your PATH yet. Add it to use \`roboratory\` from any folder.`}`,
-    });
-  } catch (e) { dialog.showErrorBox('Could not install the command', (e as Error).message); }
+// ---------- the roboratory command ----------
+
+const cliSpec = () => ({ dir: defaultBinDir(), execPath: process.execPath, script: engineScript() });
+const cliState = (): InstallState => installStatus(cliSpec()).state;
+
+let cliItem: MenuItem | null = null;
+const cliLabel: Record<InstallState, string> = {
+  installed: 'Command-line tool: installed',
+  outdated: 'Update command-line tool…',
+  missing: 'Install command-line tool…',
+};
+
+/** Checks the launcher and tells the menu and the window. */
+function refreshCli(): InstallState {
+  const state = cliState();
+  if (cliItem) { cliItem.label = cliLabel[state]; cliItem.enabled = state !== 'installed'; }
+  const menu = Menu.getApplicationMenu();
+  if (menu) Menu.setApplicationMenu(menu);
+  send('cli', state);
+  return state;
 }
 
-function addMenuItem() {
+/** Writes the `roboratory` launcher after you confirm. */
+async function installCli(): Promise<InstallState> {
+  const spec = cliSpec();
+  const update = cliState() === 'outdated';
+  const ok = await dialog.showMessageBox(win!, {
+    type: 'question', buttons: [update ? 'Update' : 'Install', 'Cancel'], defaultId: 0, cancelId: 1,
+    message: update ? 'Update the roboratory command?' : 'Install the roboratory command?',
+    detail: `This writes a small launcher to ${spec.dir}. It runs the same engine as the app, so runs started from the terminal show up in the window.`,
+  });
+  if (ok.response !== 0) return refreshCli();
+  try {
+    const { file, onPath } = installCommand(spec);
+    log.info(`installed the roboratory command at ${file}`);
+    await dialog.showMessageBox(win!, {
+      type: 'info', message: 'The roboratory command is installed.',
+      detail: `${file}${onPath ? '' : `\n\n${spec.dir} is not on your PATH yet. Add it to use \`roboratory\` from any folder.`}`,
+    });
+  } catch (e) {
+    log.error('could not install the roboratory command', e);
+    dialog.showErrorBox('Could not install the command', (e as Error).message);
+  }
+  return refreshCli();
+}
+
+handle('cliStatus', () => cliState());
+handle('cliInstall', () => installCli());
+
+/** File menu: the command's state and how to install it, and where the log is. */
+function addMenuItems() {
   const menu = Menu.getApplicationMenu();
   if (!menu) return;
-  const item = new MenuItem({ label: 'Install command-line tool…', click: () => void installCli() });
+  cliItem = new MenuItem({ label: cliLabel[cliState()], enabled: cliState() !== 'installed', click: () => void installCli() });
+  const logItem = new MenuItem({ label: 'Show log file', click: () => { if (fs.existsSync(log.file)) shell.showItemInFolder(log.file); else void dialog.showMessageBox(win!, { message: 'Nothing has gone wrong yet.', detail: `Problems are written to ${log.file}.` }); } });
   const file = menu.items.find((i) => i.role === 'fileMenu' || i.label === 'File');
-  if (file?.submenu) file.submenu.append(item);
-  else menu.append(new MenuItem({ label: 'Tools', submenu: [{ label: item.label, click: () => void installCli() }] }));
+  if (file?.submenu) { file.submenu.append(new MenuItem({ type: 'separator' })); file.submenu.append(cliItem); file.submenu.append(logItem); }
+  else { const tools = new Menu(); tools.append(cliItem); tools.append(logItem); menu.append(new MenuItem({ label: 'Tools', submenu: tools })); }
   Menu.setApplicationMenu(menu);
 }
 
+// ---------- what went wrong, in a file (userData/logs/app.log) ----------
+
+process.on('uncaughtException', (e) => {
+  log.error('uncaught exception in the main process', e);
+  dialog.showErrorBox('Roboratory hit an error', `${e.message}\n\nDetails are in ${log.file}`);
+});
+process.on('unhandledRejection', (e) => log.error('unhandled rejection in the main process', e));
+app.on('render-process-gone', (_e, _wc, d) => log.error(`the window's renderer process is gone (${d.reason}, exit code ${d.exitCode})`));
+app.on('child-process-gone', (_e, d) => log.error(`a ${d.type} process is gone (${d.reason}, exit code ${d.exitCode})`));
+
 app.whenReady().then(async () => {
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(iconPath());
-  addMenuItem();
+  addMenuItems();
   createWindow();
   await openLast();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) { createWindow(); if (!client) void openLast(); } });
+  app.on('browser-window-focus', () => { refreshCli(); }); // installed or removed from a terminal meanwhile
 });
 // quitting closes the connection only; the engine and its runs go on
 app.on('window-all-closed', () => { disconnect(); if (process.platform !== 'darwin') app.quit(); });
