@@ -90,7 +90,7 @@ export class Engine extends EventEmitter {
   constructor(factory: FactoryDef, opts: EngineOptions = {}) {
     super();
     this.factory = factory;
-    this.beltMs = opts.beltMs ?? 2400;
+    this.beltMs = opts.beltMs ?? (Number(process.env.ROBORATORY_BELT_MS) || 2400);
     this.now = opts.now ?? Date.now;
     this.signalTimeoutMs = opts.signalTimeoutMs ?? 10 * 60000;
     for (const s of factory.sectors) for (const l of s.lines) this.lines.set(l.id, this.makeLine(l));

@@ -21,7 +21,9 @@ npm start
 | `npm run typecheck` | TypeScript |
 | `npm run package` | Builds the app into `out/` |
 | `npm run make` | Builds the distributable archives into `out/make/` |
-| `node e2e/factory-sim-check.mjs <path>` | Dry-runs every line of a factory with the simulated agent, for free |
+| `npm run cli -- <command>` | Runs the engine and the `roboratory` command from source (bundled with esbuild into `.vite/cli/`) |
+| `node e2e/factory-sim-check.mjs <path>` | Dry-runs every line of a factory with the simulated agent, for free; it starts a real engine and drives it over the socket |
+| `node e2e/headless.mjs` | Checks the v0.8 exit criteria on the packaged app and its command: the engine outlives the app, every verb from the command, restart when idle, the build-mode locks and the socket |
 | `node e2e/shoot.mjs <dir>` | Drives the packaged app with Playwright and saves screenshots |
 | `node e2e/build-mode.mjs <dir>` | Checks build mode through the UI: build a line from scratch, edit a real one, the locks |
 | `node e2e/gesture-check.mjs`, `e2e/factory-shots.mjs` | Gesture and screenshot checks on the packaged app |
@@ -32,10 +34,10 @@ The e2e scripts launch the packaged app: they find it in `out/` for your platfor
 
 ## Layout
 
-- `src/core/`: main-process logic, free of Electron and tested with Vitest: the loader, the engine, agents, git, managers and the service. `src/core/build/` is build mode (the draft, its edits, checks and sessions). `src/core/agents/` has one adapter per agent CLI (Claude Code, Codex, the simulated agent).
+- `src/core/`: the logic that runs in the engine process, free of Electron and tested with Vitest: the loader, the engine, agents, git, managers, the service, the socket server (`server.ts`) and its client (`client.ts`). `src/engine.ts` bundles the server and the command (`src/cli.ts`) into `engine.js`. `src/core/build/` is build mode (the draft, its edits, checks and sessions). `src/core/agents/` has one adapter per agent CLI (Claude Code, Codex, the simulated agent).
 - `src/shared/`: code and types used by both sides (layout, rule expressions, API types).
 - `src/app/`: the renderer: React panels, the PixiJS floor and its procedural sprites. `src/app/build/` holds build mode's panels.
-- `src/main.ts` and `src/preload.ts`: the Electron wiring.
+- `src/main.ts` and `src/preload.ts`: the Electron wiring. The main process holds an `EngineClient` and relays the interface's calls to the engine; it keeps no factory state.
 - `e2e/`: Playwright scripts and the dry-run checker. `tools/make-icon.mjs` draws the pixel-art logo and writes the app icons.
 
 ## Conventions
@@ -66,3 +68,5 @@ Tests, the demo and dry runs use `agent: sim`. Do not run a line with `agent: cl
 - **Agent CLIs must be native executables on Windows** (for example `claude.exe`). A `.cmd` shim cannot receive multi-line arguments, so the adapters refuse it with a message. `ROBORATORY_CLAUDE_BIN` and `ROBORATORY_CODEX_BIN` point at a specific executable.
 - **There is no executable bit on Windows.** Scripts written by build mode are marked executable on macOS and Linux only.
 - **A rebuilt app only takes effect after you quit the running one** (⌘Q on macOS): launching it again can bring the old process back. When the app is open it locks `out/`; build a copy with `ROBORATORY_OUT_DIR=<dir>`.
+- **The engine is a separate process** (`.runs/engine.lock`, `.runs/engine.log`). Quitting or rebuilding the app does not restart it: a new build takes effect in the engine when it restarts. Run `npm run cli -- restart --when-idle` (or press "Restart when idle" in the app) to move it to the new build once nothing runs, or `npm run cli -- stop` to end it. Engines of the same version are reused as they are, so after changing engine code in development stop the engine.
+- **On Windows the engine listens on a named pipe,** which drops whatever the other side has not read when the server closes it; the server waits a moment before closing connections. A test harness that waits for an app's pipes to close (Playwright) does not return from `close()` while an engine it started is alive, because the engine inherits them; `e2e/headless.mjs` waits for the app's process to exit instead.

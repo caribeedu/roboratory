@@ -4,76 +4,7 @@ Everything that is planned, open or accepted as a limit, checked against the cod
 
 ## 1. Roadmap by version
 
-From the assessment of the first real ticket run ([ASSESSMENT.md](ASSESSMENT.md)): trust before automation. Each version below is planned; each change of design needs its decision in DECISIONS.md before code. Real-agent runs stay limited to checks until these versions are built, because checkers and permissions are the weak points the assessment found. What a version delivered moves to [CHANGELOG.md](../CHANGELOG.md). Items with no version are in §2 and after.
-
-### v0.8 — The engine runs without the app (D43)
-
-The engine moves out of the Electron app into its own process; the app becomes a window onto it. The other items depend on where the engine lives: permission requests and the manager's investigations need a process that waits for you.
-
-- **One engine per factory, started on demand** by the app or the CLI (`roboratory serve`). It keeps running when the app quits and ends with `roboratory stop`, or by itself when no run is open and no client is connected. A lock file in the factory allows one engine per factory. State stays in the factory's files.
-- **A Unix socket** at `.runs/engine.sock`, open to your user only, with one JSON message per line: the methods of `src/shared/api.ts` as calls, and state updates pushed on the same channel. The Electron main process relays between the interface and the socket; the interface does not change. No network port is opened.
-- **Everything in `FactoryService` moves to the engine:** runs, build-mode sessions and their locks (D41), managers and their proposals, and reloading the factory. A draft lives as long as the engine.
-- **A CLI for the verbs:** `serve`, `stop`, `status`, `run <line> --input k=v`, `release`, `answer`, `retry`, `halt`, `resume` and `watch` (live events). Each is audited like the app's, as `you` with the source `cli`. Build mode stays in the app.
-- **Runtime:** the packaged app's own binary in Node mode (`ELECTRON_RUN_AS_NODE=1`) runs `engine.cjs`, the engine and CLI in one bundle. The app's menu installs the `roboratory` command in `~/.local/bin` when you ask. In development, `npm run cli`.
-- **New versions:** when the app finds an older engine, it offers "Restart when idle". The engine stops dispatching new work and restarts when no machine or signal is running; gates, questions and fires survive the restart.
-- **The engine's log** is `.runs/engine.log`. When the engine stops unexpectedly, the app says so and offers to start it.
-- **Tests** drive a real engine on a temporary factory through the same client as the CLI. Flow tests and `e2e/factory-sim-check.mjs` move to it; the engine's unit tests stay; Playwright tests cover the interface only.
-
-Exit criteria, all with the simulated agent:
-1. Quitting the app does not stop runs: a simulated line reaches its pallet with the app closed.
-2. The CLI drives a simulated run to its pallet (`run`, `release`, `answer`, `retry`, `halt`, `resume`, `status`, `watch`) with no app.
-3. Rebuilding and reopening the app during a run shows the current state, and the run goes on.
-4. An older engine with an open run restarts by itself when idle, and no step catches fire because of it.
-5. Build-mode locks apply to the CLI: `roboratory run` on a line the open draft changes is refused.
-6. Flow tests and the factory dry run go through the real engine over the socket; the existing tests still pass.
-7. Only your user can connect to the socket, and no network port is open.
-
-#### Execution plan
-
-Facts the plan rests on:
-- `FactoryService` (`src/core/service.ts`) has no Electron import and reports through callbacks (`snapshot`, `logs`, `messages`, `build`); `src/main.ts` only binds it to the IPC handlers. No file under `src/core` or `src/shared` imports Electron.
-- The packaged app runs as Node with `ELECTRON_RUN_AS_NODE=1` (Node 24.18.0), no Electron fuse disables it, and in that mode it reads files inside `app.asar`.
-- On macOS, Node does not refuse a Unix socket path longer than about 104 bytes: it shortens it without an error, so the socket is not created at the requested path. Long paths need a fallback.
-
-Each step ends with `npm test` and `npm run typecheck` green before the next one starts. Everything runs with the simulated agent; nothing spends money.
-
-1. **The engine server** (`src/core/server.ts`).
-   - Wraps one `FactoryService` for one factory.
-   - Listens on `.runs/engine.sock` with mode 0600. When that path is too long, it listens on a socket in the temporary folder named after a hash of the factory's path, and records the path it uses in the lock file.
-   - The lock file `.runs/engine.lock` holds the pid, the version and the socket path. A lock whose pid no longer exists is stale: the server removes it and its socket.
-   - Protocol: one JSON object per line. Calls are `{id, method, params}` with the methods of `src/shared/api.ts`; replies are `{id, result}` or `{id, error}`; pushed events are `{event, data}` for `snapshot`, `logs`, `messages` and `build`. A `hello` call returns the version, the pid and the factory.
-   - It exits when no run is open and no client is connected, after one minute of grace.
-   - Tests: two servers on one factory (the second one refuses), a stale lock, a long path, the idle exit, calls and pushed events.
-2. **Restart when idle** in `Engine`.
-   - A global pause of dispatch, like `halt` but for every line and without writing `HALTED`: queued work waits, and nothing new starts.
-   - When no machine or signal is running, the server exits and its client starts it again.
-   - Tests: a pause during a simulated run lets the busy step finish and starts nothing new; after the restart, gates, questions and fires are back as they were and no step catches fire.
-3. **The client** (`src/core/client.ts`).
-   - The methods of `api.ts` and the pushed events, over the socket.
-   - `connect(root, { start })` reads the lock and connects; with `start`, when no engine runs it starts `engine.cjs` detached, with `ELECTRON_RUN_AS_NODE=1` in the packaged app or the project's Node in development, output appended to `.runs/engine.log`, and waits for `hello`.
-   - It reconnects when the socket drops and reports the engine as stopped after a few failed tries.
-4. **The bundle** `engine.cjs`.
-   - A new entry `src/engine.ts` (the server and the CLI) built with the main-process Vite config, so it ships in the packaged app next to `main.js`.
-   - `npm run cli -- <command>` runs it in development.
-   - Stop and show the engine running alone: start it from the CLI, run a simulated line to its pallet, quit, check the lock and socket are gone.
-5. **The CLI.**
-   - `serve`, `stop`, `status`, `run <line> --input k=v`, `release <line> <gate> [--choice c] [--note n] [--confirm n]`, `answer <line> <piece> <text>`, `retry <line> <piece> [--hint h]`, `halt <line>`, `resume <line>`, `restart --when-idle` and `watch`.
-   - `watch` prints one line per run event worth acting on: gates waiting, questions, fires, reworks, and the end of a run, with the cost so far.
-   - Every action is audited as `you` with the source `cli`. A refused action (for example a build-mode lock) exits non-zero with the engine's message.
-6. **The app.**
-   - `src/main.ts` replaces `FactoryService` with the client and relays the handlers; dialogs, the recent list and revealing files stay in the main process.
-   - Opening a factory connects to its engine, starting it when needed. Quitting the app closes the connection only.
-   - A banner "Engine stopped" with Start, and a banner "Engine is older than the app" with "Restart when idle".
-   - A menu item "Install command-line tool" that writes `~/.local/bin/roboratory` after you confirm.
-7. **Tests through the real engine.**
-   - A helper starts a server on a temporary factory and connects with the client. Flow tests move to it; the `Engine` unit tests stay as they are.
-   - `e2e/factory-sim-check.mjs` drives the engine through the client.
-   - One test starts the engine as a separate process.
-   - `e2e/headless.mjs` checks the seven exit criteria against the packaged app and the CLI.
-8. **Docs and closing.**
-   - PRODUCT.md (the app is a window onto the engine; the CLI), ARCHITECTURE.md §3.10 rewritten as built, CHANGELOG.md v0.8, and v0.8 removed from this roadmap.
-   - CLAUDE.md: rebuilding the app no longer stops runs, and how to restart the engine.
-   - An independent review by a subagent before the version is closed.
+From the assessment of the first real ticket run ([ASSESSMENT.md](ASSESSMENT.md)): trust before automation. Each version below is planned; each change of design needs its decision in DECISIONS.md before code. Real-agent runs stay limited to checks until these versions are built, because checkers and permissions are the weak points the assessment found. The engine already runs without the app (D43), which the permission requests of v0.9 and the manager's investigations of v0.12 depend on. What a version delivered moves to [CHANGELOG.md](../CHANGELOG.md). Items with no version are in §2 and after.
 
 ### v0.9 — Permissions, and a frozen core
 
@@ -119,8 +50,7 @@ None of these exist in the code yet.
 7. **A git identity per machine** (D9, D10). Today every machine commits as "Roboratory" (`src/core/git.ts`).
 8. **Container isolation for machines** (D32).
 9. **Remote or shared factories.**
-10. **A command-line interface for the verbs** (D30). Planned in v0.8 (§1).
-11. **An interactive terminal in a machine's folder.** No PTY is in the project.
+10. **An interactive terminal in a machine's folder.** No PTY is in the project.
 
 ## 4. Not yet verified with real agents
 

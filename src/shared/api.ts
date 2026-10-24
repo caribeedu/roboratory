@@ -6,8 +6,16 @@ export type ScopeArg = { kind: 'sector'; sectorId: string } | { kind: 'factory' 
 
 export interface RunDetail { summary: RunSummary; events: Record<string, any>[]; diff?: string; dir: string }
 
+/** The engine process behind the window (D43). `older`: it runs an earlier version than the app and can restart when idle. */
+export interface EngineStatus { state: 'none' | 'running' | 'restarting' | 'stopped' | 'older'; version?: string; appVersion: string }
+
 export interface RoboratoryApi {
-  state(): Promise<{ snapshot: Snapshot; logs: LogEntry[]; recent: string[]; demoPath: string }>;
+  state(): Promise<{ snapshot: Snapshot; logs: LogEntry[]; recent: string[]; demoPath: string; engine: EngineStatus }>;
+  /** Starts the engine again after it stopped. */
+  engineStart(): Promise<void>;
+  /** Stops dispatching and restarts the engine once no machine or signal is running. */
+  engineRestartWhenIdle(): Promise<void>;
+  onEngine(cb: (s: EngineStatus) => void): () => void;
   openFactory(): Promise<boolean>;
   openFactoryAt(root: string): Promise<void>;
   createDemo(): Promise<void>;

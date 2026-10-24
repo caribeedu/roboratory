@@ -19,7 +19,7 @@ import logo from '../../assets/logo-64.png';
 export type View = 'floor' | 'ledger';
 
 export function App() {
-  const { snapshot, logs, recent, demoPath, msgTick, refreshRecent } = useRoboratory();
+  const { snapshot, logs, recent, demoPath, msgTick, refreshRecent, engine } = useRoboratory();
   const factory = snapshot?.factory ?? null;
   const [view, setView] = useState<View>('floor');
   const [sectorId, setSectorId] = useState<string | null>(null);
@@ -193,6 +193,13 @@ export function App() {
           <button className="pill" onClick={() => api().reveal(factory.root + '/factory.yaml')} title="Show the factory folder">Files</button>
           <button className="pill" onClick={() => (build ? leaveBuild('Save or discard your build changes before closing the factory.', () => void act(() => api().closeFactory())) : void act(() => api().closeFactory()))} title="Close this factory">Close</button>
         </div>
+        {factory && (engine.state === 'stopped' || engine.state === 'older' || engine.state === 'restarting') && (
+          <div className="engine-banner frame" role="status">
+            {engine.state === 'stopped' && <><span>Engine stopped. Runs are paused until it starts again.</span><button className="btn primary" onClick={() => void act(() => api().engineStart())}>Start</button></>}
+            {engine.state === 'older' && <><span>The engine is older than the app ({engine.version} and {engine.appVersion}). It keeps your runs going until you restart it.</span><button className="btn" onClick={() => void act(() => api().engineRestartWhenIdle(), 'The engine restarts once nothing is running')}>Restart when idle</button></>}
+            {engine.state === 'restarting' && <span>The engine restarts once nothing is running. No new work starts until then.</span>}
+          </div>
+        )}
         {showWarnings && (
           <div className="warnings-pop frame" role="dialog" aria-label="Warnings">
             <h3>Factory warnings</h3>

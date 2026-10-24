@@ -1,5 +1,6 @@
 // App state: the latest snapshot from the main process plus UI choices.
 import { useEffect, useRef, useState } from 'react';
+import type { EngineStatus } from '../shared/api';
 import type { LogEntry, Snapshot } from '../shared/types';
 
 export const api = () => window.roboratory;
@@ -15,21 +16,23 @@ export function useRoboratory() {
   const [recent, setRecent] = useState<string[]>([]);
   const [demoPath, setDemoPath] = useState('');
   const [msgTick, setMsgTick] = useState<Record<string, number>>({});
+  const [engine, setEngine] = useState<EngineStatus>({ state: 'none', appVersion: '' });
   const loaded = useRef(false);
   useEffect(() => {
     const offs = [
+      api().onEngine((e) => setEngine(e)),
       api().onSnapshot((s) => setSnapshot(s)),
       api().onLogs((l) => setLogs((prev) => { const next = prev.concat(l); return next.length > 2500 ? next.slice(-2000) : next; })),
       api().onMessages((k) => setMsgTick((m) => ({ ...m, [k]: (m[k] ?? 0) + 1 }))),
     ];
     if (!loaded.current) {
       loaded.current = true;
-      void api().state().then((s) => { setSnapshot(s.snapshot); setLogs(s.logs); setRecent(s.recent); setDemoPath(s.demoPath); });
+      void api().state().then((s) => { setSnapshot(s.snapshot); setLogs(s.logs); setRecent(s.recent); setDemoPath(s.demoPath); setEngine(s.engine); });
     }
     return () => offs.forEach((f) => f());
   }, []);
   const refreshRecent = () => api().state().then((s) => { setRecent(s.recent); setLogs(s.logs); });
-  return { snapshot, logs, setLogs, recent, demoPath, msgTick, refreshRecent };
+  return { snapshot, logs, setLogs, recent, demoPath, msgTick, refreshRecent, engine };
 }
 
 /** A short square-wave chirp for attention (Web Audio; no asset files). */

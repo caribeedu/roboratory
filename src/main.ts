@@ -1,11 +1,12 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, MenuItem, shell } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { EngineClient, launchFor } from './core/client';
 import { createDemoFactory } from './core/demo';
-import { FactoryService } from './core/service';
-import type { ScopeArg } from './shared/api';
-import type { BuildOp } from './shared/build';
+import { defaultBinDir, installCommand } from './core/install';
+import type { EngineStatus } from './shared/api';
+import type { Snapshot } from './shared/types';
 
 // The macOS menu bar and Dock read this name (dev builds otherwise show "Electron").
 app.setName('Roboratory');
@@ -23,17 +24,48 @@ const demoPath = process.env.ROBORATORY_DEMO_DIR || path.join(os.homedir(), 'Rob
 if (process.env.ROBORATORY_USER_DATA) app.setPath('userData', process.env.ROBORATORY_USER_DATA);
 
 const send = (ch: string, payload: unknown) => { if (win && !win.isDestroyed()) win.webContents.send(ch, payload); };
-const service = new FactoryService({
-  snapshot: (s) => send('snapshot', s),
-  logs: (l) => send('logs', l),
-  messages: (k) => send('messages', k),
-  build: (v) => send('build', v),
-});
 
-function open(root: string) {
-  service.open(root);
+// The engine runs in its own process (D43); the window only talks to it through a client.
+const engineScript = () => path.join(__dirname, 'engine.js');
+const EMPTY: Snapshot = { factory: null, lines: {}, attention: [], now: 0 };
+let client: EngineClient | null = null;
+let engine: EngineStatus = { state: 'none', appVersion: app.getVersion() };
+
+function setEngine(next: Partial<EngineStatus>) {
+  engine = { ...engine, ...next, appVersion: app.getVersion() };
+  send('engine', engine);
+}
+
+const statusOf = (c: EngineClient): EngineStatus['state'] => (c.info.restarting ? 'restarting' : c.info.version !== app.getVersion() ? 'older' : 'running');
+
+function disconnect() {
+  client?.close();
+  client = null;
+  setEngine({ state: 'none', version: undefined });
+}
+
+async function open(root: string) {
+  if (!fs.existsSync(path.join(root, 'factory.yaml')) && !fs.existsSync(path.join(root, 'sectors'))) throw new Error(`${root} is not a Roboratory factory (no factory.yaml or sectors/ folder).`);
+  disconnect();
+  const c = await EngineClient.connect(root, { client: 'app', start: true, launch: launchFor(engineScript()) });
+  client = c;
+  c.on('snapshot', (s) => send('snapshot', s));
+  c.on('logs', (l) => send('logs', l));
+  c.on('messages', (k) => send('messages', k));
+  c.on('build', (v) => send('build', v));
+  c.on('restarting', () => setEngine({ state: 'restarting' }));
+  c.on('connected', () => { setEngine({ state: statusOf(c), version: c.info.version }); void refresh(c); });
+  c.on('stopped', () => setEngine({ state: 'stopped' }));
+  setEngine({ state: statusOf(c), version: c.info.version });
   remember(root);
-  win?.setTitle(`${service.factory?.name ?? 'Roboratory'} — Roboratory`);
+  win?.setTitle(`${c.info.name || 'Roboratory'} — Roboratory`);
+  await refresh(c);
+}
+
+/** After a reconnect the window starts again from the engine's state. */
+async function refresh(c: EngineClient) {
+  const s = await c.call<{ snapshot: Snapshot }>('state');
+  send('snapshot', s.snapshot);
 }
 
 function iconPath() {
@@ -58,49 +90,75 @@ function createWindow() {
 }
 
 const handle = (ch: string, fn: (...a: any[]) => unknown) => ipcMain.handle(ch, (_e, ...a) => fn(...a));
+/** The calls that go to the engine as they are, by the name of the API. */
+const forward = (name: string, fallback?: unknown) => handle(name, (...a: unknown[]) => {
+  if (!client) { if (fallback !== undefined) return fallback; throw new Error('No factory is open.'); }
+  return client.call(name, ...a);
+});
 
-handle('state', () => ({ snapshot: service.snapshot(), logs: service.logs(), recent: readSettings().recent.filter((r) => fs.existsSync(r)), demoPath }));
+handle('state', async () => {
+  const s = client ? await client.call<{ snapshot: Snapshot; logs: unknown[] }>('state').catch(() => null) : null;
+  return { snapshot: s?.snapshot ?? EMPTY, logs: s?.logs ?? [], recent: readSettings().recent.filter((r) => fs.existsSync(r)), demoPath, engine };
+});
 handle('openFactory', async () => {
   const r = await dialog.showOpenDialog(win!, { title: 'Open a factory', properties: ['openDirectory', 'createDirectory'], message: 'Choose a folder with a factory.yaml' });
   if (r.canceled || !r.filePaths[0]) return false;
-  open(r.filePaths[0]);
+  await open(r.filePaths[0]);
   return true;
 });
 handle('openFactoryAt', (root: string) => open(root));
-handle('createDemo', () => {
+handle('createDemo', async () => {
   if (!fs.existsSync(path.join(demoPath, 'factory.yaml'))) createDemoFactory(demoPath, path.join(path.dirname(demoPath), 'demo-repos'));
-  open(demoPath);
+  await open(demoPath);
 });
-handle('closeFactory', () => service.close());
-handle('run', (l: string, input: Record<string, string>) => service.run(l, input));
-handle('retry', (l: string, p: string, h: string) => service.retry(l, p, h));
-handle('release', (l: string, p: string, c: number, d?: { choice: string; note: string }) => service.release(l, p, c, d));
-handle('answer', (l: string, p: string, t: string) => service.answer(l, p, t));
-handle('halt', (l: string) => service.halt(l));
-handle('resume', (l: string) => service.resume(l));
-handle('runs', () => service.runs());
-handle('runDetail', (id: string) => service.runDetail(id));
-handle('ask', (s: ScopeArg, q: string) => service.ask(s, q));
-handle('messages', (s: ScopeArg) => service.messages(s));
-handle('acceptProposal', (s: ScopeArg, m: string, p: string, c?: number) => service.accept(s, m, p, c));
-handle('rejectProposal', (s: ScopeArg, m: string, p: string) => service.reject(s, m, p));
+// closing a factory drops the connection; the engine keeps its runs
+handle('closeFactory', () => { disconnect(); send('snapshot', EMPTY); });
+handle('engineStart', async () => { if (client) { await client.restart(); setEngine({ state: statusOf(client), version: client.info.version }); } });
+handle('engineRestartWhenIdle', () => client?.call('restartWhenIdle'));
+for (const name of [
+  'run', 'retry', 'release', 'answer', 'halt', 'resume', 'runDetail', 'ask', 'acceptProposal', 'rejectProposal',
+  'buildStart', 'buildApply', 'buildUndo', 'buildRedo', 'buildFields', 'buildServers', 'buildRead', 'buildSave', 'buildDiscard',
+]) forward(name);
+forward('runs', []);
+forward('messages', []);
+forward('buildList', []);
 handle('reveal', (t: string) => { if (fs.existsSync(t)) shell.showItemInFolder(t); });
-handle('buildStart', (s: string) => service.buildStart(s));
-handle('buildApply', (op: BuildOp) => service.buildApply(op));
-handle('buildUndo', () => service.buildUndo());
-handle('buildRedo', () => service.buildRedo());
-handle('buildFields', (l: string, from: string, back?: boolean) => service.buildFields(l, from, back));
-handle('buildServers', () => service.buildServers());
-handle('buildRead', (p: string) => service.buildRead(p));
-handle('buildList', (p: string) => service.buildList(p));
-handle('buildSave', (r?: Record<string, 'mine' | 'disk'>) => service.buildSave(r));
-handle('buildDiscard', () => service.buildDiscard());
 
-app.whenReady().then(() => {
+/** File → Install command-line tool: writes the `roboratory` launcher after you confirm. */
+async function installCli() {
+  const dir = defaultBinDir();
+  const ok = await dialog.showMessageBox(win!, {
+    type: 'question', buttons: ['Install', 'Cancel'], defaultId: 0, cancelId: 1,
+    message: 'Install the roboratory command?',
+    detail: `This writes a small launcher to ${dir}. It runs the same engine as the app, so runs started from the terminal show up in the window.`,
+  });
+  if (ok.response !== 0) return;
+  try {
+    const { file, onPath } = installCommand({ dir, execPath: process.execPath, script: engineScript() });
+    await dialog.showMessageBox(win!, {
+      type: 'info', message: 'The roboratory command is installed.',
+      detail: `${file}${onPath ? '' : `\n\n${dir} is not on your PATH yet. Add it to use \`roboratory\` from any folder.`}`,
+    });
+  } catch (e) { dialog.showErrorBox('Could not install the command', (e as Error).message); }
+}
+
+function addMenuItem() {
+  const menu = Menu.getApplicationMenu();
+  if (!menu) return;
+  const item = new MenuItem({ label: 'Install command-line tool…', click: () => void installCli() });
+  const file = menu.items.find((i) => i.role === 'fileMenu' || i.label === 'File');
+  if (file?.submenu) file.submenu.append(item);
+  else menu.append(new MenuItem({ label: 'Tools', submenu: [{ label: item.label, click: () => void installCli() }] }));
+  Menu.setApplicationMenu(menu);
+}
+
+app.whenReady().then(async () => {
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(iconPath());
+  addMenuItem();
   createWindow();
   const last = readSettings().recent.find((r) => fs.existsSync(path.join(r, 'factory.yaml')));
-  if (last) { try { open(last); } catch { /* show the welcome screen */ } }
+  if (last) { try { await open(last); } catch { /* show the welcome screen */ } }
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
-app.on('window-all-closed', () => { service.close(); if (process.platform !== 'darwin') app.quit(); });
+// quitting closes the connection only; the engine and its runs go on
+app.on('window-all-closed', () => { disconnect(); if (process.platform !== 'darwin') app.quit(); });

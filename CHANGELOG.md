@@ -2,6 +2,25 @@
 
 What Roboratory delivers. The reasoning behind each choice is in [docs/DECISIONS.md](docs/DECISIONS.md), and what is still open is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
+## v0.8.0
+
+The engine moves out of the app. It runs as its own process, one per factory, and the app and a new `roboratory` command are clients of it: runs go on when the app quits or is rebuilt, and every verb can be driven from a terminal (D43).
+
+### The engine process
+- **One engine per factory, started on demand** by the app or the command, with a lock in `.runs/engine.lock`. It ends with `roboratory stop`, or by itself after a minute with no open run and no connected client. Its log is `.runs/engine.log`.
+- **A local socket open to your user only,** with one JSON message per line: the methods of the app's API as calls, and state updates pushed on the same connection. It is a Unix socket at `.runs/engine.sock` on macOS and Linux, a hashed path in the temporary folder when that one is too long, and a named pipe on Windows. No network port is opened.
+- **Everything the service did now lives in the engine:** runs, build-mode drafts and their locks, managers and their proposals, and reloading the factory. A draft lasts as long as the engine.
+- **The app is a window onto it.** The main process relays between the interface and the socket and reconnects when the connection drops. Closing a factory or quitting the app only drops the connection. A banner offers to start an engine that stopped, and to restart one older than the app.
+- **Restart when idle.** A global pause of dispatch lets running machines and signals finish, starts nothing new and refuses new runs; the engine then leaves and its client starts the new version. Gates, questions and fires come back as they were and no step catches fire.
+
+### The command line
+- **`roboratory`** with `serve`, `stop`, `status`, `run <line> --input k=v`, `release`, `answer`, `retry`, `halt`, `resume`, `restart --when-idle` and `watch`. Each verb is audited as `you` with the source `cli`, and a refusal (for example a line the open build-mode draft changes) exits non-zero with the engine's message. Build mode stays in the app.
+- **`watch`** prints one line for each gate waiting, question, fire, rework and end of a run, with the cost so far.
+- **One bundle for both.** The packaged app runs the engine and the command with its own binary in Node mode; File → Install command-line tool writes the `roboratory` launcher to `~/.local/bin` when you confirm. In development, `npm run cli -- <command>`.
+
+### Tests
+- A real engine process, driven through the same client as the command, backs the new tests; `e2e/factory-sim-check.mjs` drives the engine over the socket, and `e2e/headless.mjs` checks the seven exit criteria against the packaged app and its command.
+
 ## v0.7.0
 
 The first release. A factory is a git repository; Roboratory draws it as a pixel-art floor, runs its lines with headless agents and lets you build and change it from the Floor itself.

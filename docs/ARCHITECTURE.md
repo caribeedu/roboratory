@@ -10,6 +10,7 @@ How Roboratory is built. Product behavior is in [PRODUCT.md](PRODUCT.md); the re
 | Floor renderer | PixiJS (WebGL, nearest-neighbor scaling) | Sprite-based pixel art with many animated pieces and a pannable, zoomable camera |
 | HUD panels | React | Inspector, megaphone, minimap chrome, views |
 | Contract validation | Ajv | Validates each machine's output against its JSON Schema |
+| Engine | A Node process per factory (the app's binary in Node mode), reached over a local socket | Runs go on when the app quits, and the `roboratory` command drives the same engine |
 | Agent processes | Child processes running each agent CLI headless | Process exit marks the end of a step |
 | Runtime state | JSONL per run and per manager conversation, under `.runs/` | Open, greppable formats with no database server |
 | Fonts | Pixelify Sans, Atkinson Hyperlegible, JetBrains Mono, bundled | The app works offline |
@@ -184,7 +185,7 @@ Roboratory reads the factory repository's git state and never writes to it. (Tar
 
 ### 3.6 Verbs
 All actions go through one engine API: `run`, `retry`, `release`, `halt` and `resume`, plus accepting a manager's change.
-- UI buttons and manager proposals call it today. A command-line interface (`roboratory`) is planned (D43).
+- UI buttons, manager proposals and the `roboratory` command (D43) call it. Calls from the command also carry `source: "cli"`.
 - Every call is appended with the actor and the time: to each affected run's `run.jsonl`, and for halts, resumes and accepted changes also to `.runs/<sector>/audit.jsonl`.
 - A halted line stays halted across restarts (`.runs/<sector>/<line>/HALTED`).
 
@@ -197,7 +198,7 @@ All actions go through one engine API: `run`, `retry`, `release`, `halt` and `re
 Managers are agents run headless on demand when you ask them something. Each runs read-only under its own contract (`answer`, `evidence`, `proposals`), with the factory's state, runs and files plus the MCP tools listed in `sector.yaml` (or `factory.yaml` for the General Manager). A verb proposal is checked before it is shown: it must name a valid verb and target. A change proposal carries a patch, shown as ghosts and a diff for review.
 
 ### 3.9 Build mode
-Build mode edits the factory through a draft in the main process; the renderer sends edits and draws what comes back (D41). The code is in `src/core/build/`.
+Build mode edits the factory through a draft in the engine process (§3.10); the renderer sends edits and draws what comes back (D41). The code is in `src/core/build/`.
 - **Draft.** A draft is an overlay of file changes over the disk (`vfs.ts`): a written file replaces the one on disk, and a deletion hides a file or a whole folder. The loader reads through the overlay, so the Floor draws the draft with the same loader as the live factory. In tolerant mode the loader keeps structural problems (an unknown input, a return belt without a rule, a missing machine, a duplicate id) instead of failing, so a half-edited line can still be drawn.
 - **Edits.** Each edit is a function over the draft (`ops.ts`): insert, connect, disconnect, set a rule, remove, piece and machine settings, files, line, sector and factory settings, new sectors, lines and models, separating a model. A piece with no `needs` implicitly needs the piece before it in the list, so before an edit changes which piece comes first, the affected piece's needs are written out explicitly. Ids become folder names and are checked first; nothing outside the factory, nor `.git` or `.runs`, can be touched. A new machine never replaces or shadows a machine of the same name.
 - **YAML in place.** An edited YAML file keeps every line the edit did not touch as it was written, comments included; only new or changed lines come from the YAML writer, in the file's style. If re-reading a file would move its line breaks (multi-line strings), the whole file is rewritten.
@@ -205,8 +206,16 @@ Build mode edits the factory through a draft in the main process; the renderer s
 - **Session.** One per sector (`session.ts`), with undo and redo. It remembers what each touched file held on disk, so a file changed on disk meanwhile, or added inside a folder the draft removes, is a conflict you resolve file by file. It lists the lines a draft affects: their model, machines, shared roles, sector and factory culture, shared signals, and their own entry in `lines.yaml`. Saving is refused while problems remain or an affected line has a run in progress; it checks every target, writes new content to temporary files under `.runs/`, removes what the draft removes, then moves the new files into place.
 - **Locks.** While a session is open, dispatching a line the draft changes is refused for every caller (you, a manager's proposal, a policy auto-run), and accepting a manager's change is refused. A manager's change to a line with a run in progress waits too.
 
-### 3.10 The engine process (planned, D43)
-Today the engine runs in the Electron main process, so runs stop when the app quits. It is planned to move to its own process per factory, reached over a Unix socket at `.runs/engine.sock` by the app and the `roboratory` command; the roadmap and exit criteria are in [ROADMAP.md](ROADMAP.md) §1.
+### 3.10 The engine process (D43)
+The engine runs in its own process, one per factory. The app and the `roboratory` command are clients of it, so runs go on when the app quits or is rebuilt.
+- **Server (`src/core/server.ts`).** It wraps one `FactoryService` and listens on a local socket: `.runs/engine.sock` with mode 0600 on macOS and Linux, a named pipe (`\\.\pipe\roboratory-<hash>`) on Windows, which Node creates for the creating user only. When the socket path would pass about 100 bytes (macOS shortens longer ones without an error), it uses a socket in the temporary folder named after a hash of the factory's path. No network port is opened.
+- **Lock.** `.runs/engine.lock` holds the pid, the version and the socket path. Starting a second engine for the factory is refused; a lock whose pid no longer exists is stale and is replaced.
+- **Protocol.** One JSON object per line. A call is `{id, method, params: [...]}` with the methods of `src/shared/api.ts` (`state`, `run`, `release`, the `build*` calls and so on), and its reply is `{id, result}` or `{id, error}`. The engine pushes `{event, data}` on the same connection: `snapshot`, `logs`, `messages`, `build` and `restarting`, and, to clients that called `watch`, `watch` events for what needs you. `hello` returns the version, the pid and the factory, and takes `{client: 'cli'}` so the connection's verbs are audited with `source: "cli"` next to the actor `you`. `status`, `stop`, `restartWhenIdle` and `cancelRestart` are the engine's own calls.
+- **Client (`src/core/client.ts`).** `EngineClient.connect(root, { start, launch })` reads the lock and connects; with `start`, when no engine runs, it starts the bundle detached, with its output appended to `.runs/engine.log`, and waits for `hello`. It reconnects when the connection drops, starting a newer engine when the old one announced a restart, and reports `stopped` after a few failed tries.
+- **Bundle.** `src/engine.ts` is the engine and the command in one file (`engine.js` next to `main.js` in the packaged app). The packaged app runs it with its own binary in Node mode (`ELECTRON_RUN_AS_NODE=1`); `npm run cli` bundles it with esbuild and runs it with the project's Node. `src/cli.ts` holds the commands; the app's menu writes a `roboratory` launcher into `~/.local/bin` (`src/core/install.ts`) when you ask.
+- **Lifetime.** The engine ends with `roboratory stop`, or by itself after a minute with no run open and no client connected. Runs, build-mode drafts and their locks, managers and proposals live in the engine; a draft lasts as long as the engine does.
+- **New versions.** A client that finds an engine of another version offers "Restart when idle". `restartWhenIdle` pauses dispatch for every line: queued work waits, and nothing new starts, but gates still take boxes. When no machine or signal is running, the engine leaves and its client starts the new one. Everything the new engine needs is in `run.jsonl`: gates come back holding, questions asking, fires on fire, and boxes that were queued are rebuilt from the belts that had delivered them. Runs are refused during the pause.
+- **Windows.** A pipe closed by the server drops what the client has not read, so the engine waits a moment before closing connections. An engine started by a process that holds pipes (a test harness) inherits them; this only matters to a parent that waits for those pipes to close.
 
 ## 4. Visual system
 - Three-quarter top-down camera and nearest-neighbor pixel art.
