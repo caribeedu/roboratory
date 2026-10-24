@@ -1,5 +1,5 @@
 // Opens a simulated copy of a factory in the packaged app and screenshots decision gates,
-// return belts and questions. Usage: node e2e/factory-shots.mjs <factory-dir> <out-dir>
+// return belts and questions. Usage: node e2e/tools/factory-shots.mjs <factory-dir> <out-dir>
 import { appExecutable } from './exe.mjs';
 import { _electron as electron } from 'playwright';
 import { execFileSync } from 'node:child_process';
@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const root = execFileSync('node', ['e2e/factory-sim-check.mjs', process.argv[2], '--prepare-only']).toString().trim();
+const root = execFileSync('node', ['e2e/tools/factory-sim-check.mjs', process.argv[2], '--prepare-only']).toString().trim();
 const out = process.argv[3]; fs.mkdirSync(out, { recursive: true });
 const app = await electron.launch({ executablePath: appExecutable(), env: { ...process.env, ROBORATORY_USER_DATA: fs.mkdtempSync(path.join(os.tmpdir(), 'ud-')), ROBORATORY_SIM_SPEED: '3' } });
 const win = await app.firstWindow();

@@ -12,5 +12,5 @@
     "noEmit": true,
     "types": ["node", "vitest/globals"]
   },
-  "include": ["src", "tools", "forge.env.d.ts", "forge.config.ts", "vite.*.config.ts", "vitest.config.mts"]
+  "include": ["src", "tools", "e2e", "playwright.config.ts", "forge.env.d.ts", "forge.config.ts", "vite.*.config.ts", "vitest.config.mts"]
 }

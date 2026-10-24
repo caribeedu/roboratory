@@ -2,6 +2,39 @@
 
 What Roboratory delivers. The reasoning behind each choice is in [docs/DECISIONS.md](docs/DECISIONS.md), and what is still open is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
+## v0.8.0
+
+The engine moves out of the app. It runs as its own process, one per factory, and the app and a new `roboratory` command are clients of it: runs go on when the app quits or is rebuilt, and every verb can be driven from a terminal (D43).
+
+### The engine process
+- **One engine per factory, started on demand** by the app or the command, with a lock in `.runs/engine.lock`. It ends with `roboratory stop`, or by itself after a minute with no open run and no connected client. Its log is `.runs/engine.log`.
+- **A local socket,** with one JSON message per line: the methods of the app's API as calls, and state updates pushed on the same connection. It is a Unix socket at `.runs/engine.sock` on macOS and Linux, a path in the temporary folder when that one is too long, and a named pipe on Windows. No network port is opened, and the engine serves only connections that open with the token in its lock file, which only you can read.
+- **Everything the service did now lives in the engine:** runs, build-mode drafts and their locks, managers and their proposals, and reloading the factory. A draft lasts as long as the engine.
+- **The app is a window onto it.** The main process relays between the interface and the socket and reconnects when the connection drops. Closing a factory or quitting the app only drops the connection. A banner offers to start an engine that stopped, and to restart one older than the app.
+- **Restart when idle.** A global pause of dispatch lets running machines and signals finish, starts nothing new and refuses new runs, answers and retries; the engine then leaves and a client starts the new version. Gates, questions and fires come back as they were and no step catches fire. It is refused while build mode holds a draft. An engine counts as older when its version differs or it runs another build of the bundle (a hash of it), so a rebuilt app does not have to wait for ⌘Q to take effect.
+
+### The command line
+- **`roboratory`** with `serve`, `stop`, `status`, `run <line> --input k=v`, `release`, `answer`, `retry`, `halt`, `resume`, `restart --when-idle` and `watch`. Each verb is audited as `you` with the source `cli`, and a refusal (for example a line the open build-mode draft changes) exits non-zero with the engine's message. Build mode stays in the app.
+- **`watch`** prints one line for each gate waiting, question, fire, rework and end of a run, with the cost so far.
+- **One bundle for both.** The packaged app runs the engine and the command with its own binary in Node mode; File → Install command-line tool writes the `roboratory` launcher to `~/.local/bin` when you confirm. The menu shows whether it is installed, outdated or missing, and the top bar offers an Install CLI button when it is not installed. In development, `npm run cli -- <command>`.
+
+### Logs
+- **The app keeps a log** (`app.log` in its user-data folder, File → Show log file) of uncaught errors, a renderer or child process that died, renderer console errors, an engine that stopped and a factory that could not be opened. Every process the engine and the app start on Windows is hidden, so no terminal window flashes.
+
+### Fixed
+- **A checker's verdict on an old output reworked a piece again.** When two checkers judge the same output and one is slow, its "fail" could arrive after the piece had already been reworked for the other's finding, and the piece ran a third time. A result about an input that an upstream piece has since replaced is now dropped and the piece looks again at the new one. Found by a CI failure and reproduced with a deliberately slow checker.
+- **Cancelling a confirmation of a manager's suggestion rejected it.** "Cancel" now only steps back.
+- **Opening the app told you about items that were already waiting** (a toast and a sound for each). Only what arrives afterwards is news.
+- **Stopping the engine with `roboratory stop` sent the window back to the welcome screen.** The engine pushed an empty snapshot while closing, which the window took for a closed factory; it now shows the floor with the "Engine stopped" banner and a Start button. (A forced kill never showed it, which is why it went unseen on one platform.)
+- **With the engine away, the window logged an error** each time it refreshed a conversation or the Ledger. Those reads now come back empty and the banner says what is wrong.
+
+### Tests
+- **Three layers, written as behavior.** The engine's specs moved from one file to `src/core/lines/`, one per thing a line does, on a shared harness (`src/test/harness.ts`) that describes a factory, runs it with simulated agents and reads the floor and the run files. The ones that read private state or called internal functions now watch what an agent receives instead. The interface has 180 tests in jsdom (Testing Library, the bridge to the main process as the only fake), and `e2e/specs/` is a Playwright Test suite on the packaged app, each test in a sandbox of its own: welcome, Floor, work, managers, build mode, the engine and the command, the app shell.
+- **A real engine backs the new tests.** Server, client and command are tested against a real engine, in-process and as a separate process; `e2e/tools/factory-sim-check.mjs` drives the engine over the socket.
+- **The CI found what a single machine could not:** the graceful-stop bug above, two tests that relied on timing, and a security check that Playwright's own debugging port fooled on Linux. A socket on the shared temporary folder moved to a private folder of the user.
+- **Coverage** is measured (`npm run test:coverage`) with a floor in `vitest.config.mts`, and the CI runs the specs on macOS, Windows and Linux.
+- The scripts that only screenshot or demo the app moved to `e2e/tools/`.
+
 ## v0.7.0
 
 The first release. A factory is a git repository; Roboratory draws it as a pixel-art floor, runs its lines with headless agents and lets you build and change it from the Floor itself.

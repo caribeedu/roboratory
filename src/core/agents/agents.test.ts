@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { claudeArgs, claudeSchema, mcpServerOf, resultLine, shellRules, toolArgs, toolLabel, unwrapClaude } from './claude';
+import { claudeSchema, mcpServerOf, resultLine, shellRules, toolArgs, toolLabel, unwrapClaude } from './claude';
 import { runAgent, type AgentEvent, type AgentRequest } from './index';
 import { extractJson } from './process';
 
@@ -46,27 +46,45 @@ out({ type: 'result', subtype: 'success', is_error: false, result: 'done', struc
     expect((await runAgent(base({ timeoutMs: 200 }))).error).toMatch(/timed out/);
   });
 
-  it('tells a machine which shell commands it may run, and nothing when its shell is open', () => {
-    const p = claudeArgs(base({ allow: ['Bash(gh pr view:*)', 'Bash(curl:*)'] }))[1];
-    expect(p).toContain('Shell: you may run only commands that start with `git`, `gh pr view`, `curl`. Anything else is denied.');
-    expect(p).toContain('A denied command does not mean the others are denied.');
-    expect(claudeArgs(base({ allow: ['Bash'] }))[1]).toBe('do it');
-    expect(claudeArgs(base({ readOnly: true }))[1]).toBe('do it');
-    expect(shellRules(['Read'])).toMatch(/you have no shell/);
+  // what the CLI is started with, read from a fake CLI that writes its arguments down
+  async function startedWith(over: Partial<AgentRequest>) {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'fake-claude-args-')), 'args.json');
+    process.env.ROBORATORY_CLAUDE_BIN = fakeClaude(`require('fs').writeFileSync(${JSON.stringify(file)}, JSON.stringify(process.argv.slice(2)));
+console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: '', structured_output: { ok: true } }));`);
+    await runAgent(base(over));
+    const args: string[] = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const value = (flag: string) => args[args.indexOf(flag) + 1];
+    return { args, prompt: value('-p'), value };
+  }
+
+  it('tells a machine which shell commands it may run, and nothing when its shell is open', async () => {
+    const { prompt } = await startedWith({ allow: ['Bash(gh pr view:*)', 'Bash(curl:*)'] });
+    expect(prompt).toContain('Shell: you may run only commands that start with `git`, `gh pr view`, `curl`. Anything else is denied.');
+    expect(prompt).toContain('A denied command does not mean the others are denied.');
+    expect((await startedWith({ allow: ['Bash'] })).prompt).toBe('do it');
+    expect((await startedWith({ readOnly: true })).prompt).toBe('do it');
   });
 
-  it('runs managers read-only: no write tools exist in the session', () => {
-    const args = claudeArgs(base({ readOnly: true, tools: ['mcp__nr__q'] }));
-    expect(args[args.indexOf('--tools') + 1]).toBe('Read,Grep,Glob');
-    expect(args[args.indexOf('--allowedTools') + 1]).toBe('Read,Grep,Glob,mcp__nr__q');
-    expect(args[args.indexOf('--permission-mode') + 1]).toBe('dontAsk');
-    const machine = claudeArgs(base({ allow: ['Bash(sh test.sh)'], addDirs: ['/x'], effort: 'high', model: 'opus' }));
-    expect(machine.slice(machine.indexOf('--effort'), machine.indexOf('--effort') + 2)).toEqual(['--effort', 'high']);
-    expect(machine.slice(machine.indexOf('--model'), machine.indexOf('--model') + 2)).toEqual(['--model', 'opus']);
-    expect(machine).not.toContain('--tools');
-    expect(machine[machine.indexOf('--allowedTools') + 1]).toContain('Edit');
-    expect(machine).toContain('/x');
-    for (const a of [args, machine]) expect(a[a.indexOf('--disallowedTools') + 1]).toBe('Agent');
+  it('says a shell is off when no command is allowed at all', () => {
+    expect(shellRules(['Read', 'Grep'])).toMatch(/you have no shell/);
+  });
+
+  it('starts managers read-only, so no write tools exist in their session', async () => {
+    const manager = await startedWith({ readOnly: true, tools: ['mcp__nr__q'] });
+    expect(manager.value('--tools')).toBe('Read,Grep,Glob');
+    expect(manager.value('--allowedTools')).toBe('Read,Grep,Glob,mcp__nr__q');
+    expect(manager.value('--permission-mode')).toBe('dontAsk');
+    expect(manager.value('--disallowedTools')).toBe('Agent');
+  });
+
+  it('starts machines with file edits, the chosen model and effort, the extra folders, and no sub-agents', async () => {
+    const machine = await startedWith({ allow: ['Bash(sh test.sh)'], addDirs: ['/x'], effort: 'high', model: 'opus' });
+    expect(machine.value('--effort')).toBe('high');
+    expect(machine.value('--model')).toBe('opus');
+    expect(machine.args).not.toContain('--tools');
+    expect(machine.value('--allowedTools')).toContain('Edit');
+    expect(machine.args).toContain('/x');
+    expect(machine.value('--disallowedTools')).toBe('Agent');
   });
 
   it('runs the simulated agent and writes its files', async () => {

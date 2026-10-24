@@ -1,5 +1,5 @@
 // Draws one picture per piece (machine, belt, box...) with the app's own sprites, for the README.
-// Usage: node e2e/piece-images.mjs [out-dir]   (needs the packaged app; default out-dir is docs/pieces)
+// Usage: node e2e/tools/piece-images.mjs [out-dir]   (needs the packaged app; default out-dir is docs/pieces)
 import { _electron as electron } from 'playwright';
 import { build } from 'esbuild';
 import fs from 'node:fs';

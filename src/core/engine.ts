@@ -18,8 +18,11 @@ const ajv = new Ajv({ allErrors: true, strict: false });
 const validators = new Map<string, ValidateFunction>();
 
 type Payload = Record<string, unknown>;
-interface Box { id: string; runId: string; payload: Payload; color: string }
-interface Work { runId: string; box: Box; hint?: string; attempt?: number; /** stop this piece as soon as it picks the work up */ stop?: string }
+/** `gen`: which output of its piece this box is (1 for the first, 2 after a rework…), so a box that arrives late is known for what it is. */
+interface Box { id: string; runId: string; payload: Payload; color: string; gen?: number }
+interface Work { runId: string; box: Box; hint?: string; attempt?: number; /** stop this piece as soon as it picks the work up */ stop?: string;
+  /** how many outputs each ancestor had made when this piece picked the work up: a different count later means the input is out of date */
+  seen?: Record<string, number> }
 interface PieceRt {
   def: PieceDef;
   state: PieceState;
@@ -51,6 +54,8 @@ interface RunRt {
   laps: Map<string, number>;
   /** how many times each machine has run in this run */
   calls: Map<string, number>;
+  /** how many forward outputs each piece has made in this run */
+  outputs: Map<string, number>;
 }
 
 /** What a machine may answer instead of its contract (D21). */
@@ -83,11 +88,14 @@ export class Engine extends EventEmitter {
   private signalTimeoutMs: number;
   private seq = 0;
   private simFailed = new Set<string>();
+  private paused = false;
+  /** Where the verb being called comes from ("cli"); audited next to the actor. Set by the server around a call. */
+  source?: string;
 
   constructor(factory: FactoryDef, opts: EngineOptions = {}) {
     super();
     this.factory = factory;
-    this.beltMs = opts.beltMs ?? 2400;
+    this.beltMs = opts.beltMs ?? (Number(process.env.ROBORATORY_BELT_MS) || 2400);
     this.now = opts.now ?? Date.now;
     this.signalTimeoutMs = opts.signalTimeoutMs ?? 10 * 60000;
     for (const s of factory.sectors) for (const l of s.lines) this.lines.set(l.id, this.makeLine(l));
@@ -111,7 +119,10 @@ export class Engine extends EventEmitter {
   }
 
   private record(run: RunRt, ev: Record<string, unknown>) {
-    fs.appendFileSync(path.join(run.dir, 'run.jsonl'), JSON.stringify({ t: this.now(), ...ev }) + '\n');
+    const from = ev.type === 'verb' && this.source ? { source: this.source } : {};
+    const full = { t: this.now(), ...ev, ...from };
+    fs.appendFileSync(path.join(run.dir, 'run.jsonl'), JSON.stringify(full) + '\n');
+    this.emit('record', run.summary, full);
   }
 
   private sectorOf(line: LineDef) { return this.factory.sectors.find((s) => s.id === line.sectorId)!; }
@@ -122,6 +133,8 @@ export class Engine extends EventEmitter {
   runGuard?: (lineId: string) => string | undefined;
 
   async run(lineId: string, input: Payload, actor = 'you'): Promise<string> {
+    if (this.paused) throw new Error('The engine is restarting and starts no new runs. Try again in a moment.');
+    const source = this.source;
     const refused = this.runGuard?.(lineId);
     if (refused) throw new Error(refused);
     const line = this.lines.get(lineId);
@@ -133,15 +146,18 @@ export class Engine extends EventEmitter {
     fs.mkdirSync(dir, { recursive: true });
     const run: RunRt = {
       summary: { id, sectorId: line.def.sectorId, lineId, status: 'running', startedAt: this.now(), input },
-      dir, line: line.def, arrivals: new Map(), skipped: new Set(), done: new Set(), skippedPieces: new Set(), branches: new Map(), auto: {}, laps: new Map(), calls: new Map(),
+      dir, line: line.def, arrivals: new Map(), skipped: new Set(), done: new Set(), skippedPieces: new Set(), branches: new Map(), auto: {}, laps: new Map(), calls: new Map(), outputs: new Map(),
     };
     this.runs.set(id, run);
     const v = await factoryVersion(this.factory.root);
     run.summary.baseCommit = v.commit;
     run.summary.dirty = !!v.diff;
     if (v.diff) fs.writeFileSync(path.join(dir, 'factory.diff'), v.diff);
-    this.record(run, { type: 'run.start', input, actor, baseCommit: v.commit, dirty: !!v.diff });
-    this.record(run, { type: 'verb', verb: 'run', actor });
+    this.source = source;
+    try {
+      this.record(run, { type: 'run.start', input, actor, baseCommit: v.commit, dirty: !!v.diff });
+      this.record(run, { type: 'verb', verb: 'run', actor });
+    } finally { this.source = undefined; }
     this.log({ level: 'factory', sectorId: line.def.sectorId, lineId, runId: id, kind: 'info', text: `${line.def.name}: run started (${Object.values(input).join(', ') || 'no input'}) by ${actor}` });
     const box: Box = { id: `${id}:intake`, runId: id, payload: { ...input }, color: '#c8a46a' };
     this.finishPiece(run, '@intake', box);
@@ -149,7 +165,13 @@ export class Engine extends EventEmitter {
     return id;
   }
 
+  /** An answer or a retry hint lives in memory until the step starts, which a restart would lose. */
+  private notWhileRestarting(what: string) {
+    if (this.paused) throw new Error(`The engine is restarting; ${what} once it is back.`);
+  }
+
   retry(lineId: string, pieceId: string, hint = '', actor = 'you') {
+    this.notWhileRestarting('retry');
     const line = this.mustLine(lineId);
     const p = this.mustPiece(line, pieceId);
     if (p.state !== 'fire' || !p.current) throw new Error(`${p.def.label} is not stopped`);
@@ -195,6 +217,7 @@ export class Engine extends EventEmitter {
 
   /** Answers a machine that asked for you (D21); it reruns without spending an attempt. */
   answer(lineId: string, pieceId: string, text: string, actor = 'you') {
+    this.notWhileRestarting('answer');
     const line = this.mustLine(lineId);
     const p = this.mustPiece(line, pieceId);
     if (p.state !== 'asking' || !p.current || !p.question) throw new Error(`${p.def.label} is not asking anything`);
@@ -244,7 +267,7 @@ export class Engine extends EventEmitter {
   audit(sectorId: string, entry: Record<string, unknown>) {
     const f = path.join(this.factory.root, RUNS_DIR, sectorId, 'audit.jsonl');
     fs.mkdirSync(path.dirname(f), { recursive: true });
-    fs.appendFileSync(f, JSON.stringify({ t: this.now(), ...entry }) + '\n');
+    fs.appendFileSync(f, JSON.stringify({ t: this.now(), ...entry, ...(this.source ? { source: this.source } : {}) }) + '\n');
   }
 
   private persistHalt(line: LineRt) {
@@ -279,6 +302,7 @@ export class Engine extends EventEmitter {
     run.done.add(pieceId);
     const p = line.pieces.get(pieceId);
     if (!p) return;
+    if (!backOnly) run.outputs.set(pieceId, (run.outputs.get(pieceId) ?? 0) + 1);
     if (!backOnly) { p.lastBox = box.payload; p.lastRunId = run.summary.id; } // a failed signal sent nothing forward
     this.record(run, { type: 'piece.done', piece: pieceId, box: box.payload, branch: run.branches.get(pieceId), ...(backOnly ? { failed: true } : {}) });
     let taken = 0;
@@ -300,11 +324,13 @@ export class Engine extends EventEmitter {
         continue;
       }
       taken++;
-      const belt: Belt = { box: { ...box, payload: { ...box.payload } }, from: pieceId, to: to.id, since: this.now(), ms: back ? this.beltMs * 2 : this.beltMs, back };
+      // the output of the target this box judges, if it goes back: a rework can replace that output while the box is on its way
+      const judged = back ? run.outputs.get(to.id) ?? 0 : undefined;
+      const belt: Belt = { box: { ...box, payload: { ...box.payload }, gen: run.outputs.get(pieceId) ?? 0 }, from: pieceId, to: to.id, since: this.now(), ms: back ? this.beltMs * 2 : this.beltMs, back };
       line.belts.push(belt);
       belt.timer = setTimeout(() => {
         line.belts = line.belts.filter((b) => b !== belt);
-        if (back) this.rework(run, to.id, pieceId, belt.box); else this.arrive(run, to.id, pieceId, belt.box);
+        if (back) this.rework(run, to.id, pieceId, belt.box, judged); else this.arrive(run, to.id, pieceId, belt.box);
       }, belt.ms);
     }
     // Skips go last, so a run with a live belt never looks stuck.
@@ -314,9 +340,22 @@ export class Engine extends EventEmitter {
   }
 
   /** A box came back along a return belt: reopen the stretch from `target` to `from` and run it again (D15). */
-  private rework(run: RunRt, target: string, from: string, box: Box) {
+  private rework(run: RunRt, target: string, from: string, box: Box, judged?: number) {
     const line = this.lines.get(run.summary.lineId)!;
-    if (line.halted) { line.deferred.push(() => this.rework(run, target, from, box)); return; }
+    if (line.halted) { line.deferred.push(() => this.rework(run, target, from, box, judged)); return; }
+    // The checker judged an output of the target that a rework has replaced since (two checkers sent it back, and the
+    // other one's rework came first): the target is not reworked again for it. The checker looks at the new output.
+    if (judged !== undefined && (run.outputs.get(target) ?? 0) !== judged) {
+      this.record(run, { type: 'piece.stale', piece: from, reason: 'its verdict was about an output that had been replaced' });
+      this.log({ level: 'sector', sectorId: run.line.sectorId, lineId: run.line.id, pieceId: from, runId: run.summary.id, kind: 'info', text: `${this.label(line, from)}: its verdict was about an output of ${this.label(line, target)} that had been replaced, so it looks at the new one` });
+      run.done.delete(from);
+      const arrival = run.arrivals.get(from)?.get(target);
+      // an older box from the target is not what it should look at; the newer one is kept if it is already here
+      if (arrival && (arrival.gen ?? 0) < (run.outputs.get(target) ?? 0)) run.arrivals.get(from)!.delete(target);
+      this.checkReady(run, from);
+      this.changed();
+      return;
+    }
     const need = line.def.model.pieces.find((p) => p.id === target)!.needs.find((n) => n.from === from && n.back)!;
     const key = `${from}>${target}`;
     const used = (run.laps.get(key) ?? 0) + 1;
@@ -376,6 +415,8 @@ export class Engine extends EventEmitter {
     const p = line.pieces.get(pieceId);
     if (!p) return;
     if (p.current?.runId === run.summary.id || p.queue.some((w) => w.runId === run.summary.id)) return;
+    // a box is on its way down from a piece that is still working (a rework): wait for it instead of working on the old one
+    if (this.upstreamPending(run, pieceId)) return;
     const arrived = run.arrivals.get(pieceId) ?? new Map<string, Box>();
     const fwdNeeds = p.def.needs.filter((n) => !n.back);
     const resolved = fwdNeeds.every((n) => arrived.has(n.from) || run.skipped.has(`${n.from}>${pieceId}`));
@@ -428,13 +469,63 @@ export class Engine extends EventEmitter {
     this.pump(line, p);
   }
 
+  /** Every piece upstream of `pieceId`, following forward belts only. */
+  private ancestors(run: RunRt, pieceId: string): string[] {
+    const byId = new Map(run.line.model.pieces.map((q) => [q.id, q]));
+    const found = new Set<string>();
+    const stack = [pieceId];
+    while (stack.length) for (const n of byId.get(stack.pop()!)?.needs ?? []) {
+      if (n.back || found.has(n.from)) continue;
+      found.add(n.from);
+      stack.push(n.from);
+    }
+    return [...found];
+  }
+
+  /** The forward outputs made so far by every piece upstream of `pieceId`. */
+  private ancestorOutputs(run: RunRt, pieceId: string): Record<string, number> {
+    return Object.fromEntries(this.ancestors(run, pieceId).map((id) => [id, run.outputs.get(id) ?? 0]));
+  }
+
+  /** A piece upstream of `pieceId` still has work of this run to do (a rework in progress, say), so a new box is on its way down. */
+  private upstreamPending(run: RunRt, pieceId: string): boolean {
+    const line = this.lines.get(run.summary.lineId)!;
+    return this.ancestors(run, pieceId).some((id) => {
+      const q = line.pieces.get(id);
+      return !!q && (q.current?.runId === run.summary.id || q.queue.some((w) => w.runId === run.summary.id));
+    });
+  }
+
+  /**
+   * A piece judged or built from an input that an upstream piece has replaced, or is about to replace (a rework made
+   * it again while this piece was still working, or is making it now): its result is about the old input and must not count.
+   */
+  private staleInput(run: RunRt, w: Work, pieceId: string) {
+    return Object.entries(w.seen ?? {}).some(([id, n]) => (run.outputs.get(id) ?? 0) !== n) || this.upstreamPending(run, pieceId);
+  }
+
+  /** Drops a result that came from an out-of-date input; the piece takes the new input as soon as it is free. */
+  private dropStale(line: LineRt, run: RunRt, p: PieceRt) {
+    this.record(run, { type: 'piece.stale', piece: p.def.id });
+    this.log({ level: 'sector', sectorId: run.line.sectorId, lineId: run.line.id, pieceId: p.def.id, runId: run.summary.id, kind: 'info', text: `${p.def.label}: its result was about an input that has since changed, so it runs again` });
+    p.state = 'idle';
+    p.current = undefined;
+    p.attempt = undefined;
+    this.changed();
+    this.checkReady(run, p.def.id);
+    this.pump(line, p);
+  }
+
   /** Starts the next queued work on a piece; pieces handle one box at a time. */
   private pump(line: LineRt, p: PieceRt) {
     if (line.halted || p.current || !p.queue.length) return;
+    // while the engine waits to restart (D43), nothing new starts; gates still take boxes, they run no process
+    if (this.paused && p.def.kind !== 'gate') return;
     const work = p.queue.shift()!;
     const run = this.runs.get(work.runId);
     if (!run) return;
     p.current = work;
+    work.seen = this.ancestorOutputs(run, p.def.id);
     p.since = this.now();
     if (work.stop) { const why = work.stop; delete work.stop; this.stop(run, p, why); return; }
     if (p.def.kind === 'gate') {
@@ -560,6 +651,8 @@ export class Engine extends EventEmitter {
       });
       p.abort = undefined;
       if (res.costUsd !== undefined) this.record(run, { type: 'cost', piece: def.id, usd: res.costUsd });
+      // whatever came back (an answer, a question, a block, an error) is about an input that has since been replaced
+      if (this.staleInput(run, w, def.id)) { this.dropStale(line, run, p); return; }
       const ask = (res.output as { needs_human?: HumanQuestion } | undefined)?.needs_human;
       if (!res.error && ask && typeof ask.question === 'string') {
         p.state = 'asking';
@@ -651,6 +744,7 @@ export class Engine extends EventEmitter {
       child.on('close', (c) => { clearTimeout(timer); resolve(c); });
       child.on('exit', () => group('SIGTERM')); // nothing the script left behind outlives it
     });
+    if (!timedOut && this.staleInput(run, w, def.id)) { this.dropStale(line, run, p); return; }
     if (code === 0 && !timedOut) {
       this.log({ level: 'sector', sectorId: run.line.sectorId, lineId: run.line.id, pieceId: def.id, runId: run.summary.id, kind: 'ok', text: `${def.label} passed` });
       p.state = 'passed';
@@ -705,6 +799,21 @@ export class Engine extends EventEmitter {
     return items.sort((a, b) => b.severity - a.severity || a.since - b.since);
   }
 
+  /** Stops starting machines and signals; the ones running finish. Queued work is rebuilt from the run files after a restart. */
+  pauseDispatch() { this.paused = true; this.changed(); }
+
+  resumeDispatch() {
+    if (!this.paused) return;
+    this.paused = false;
+    for (const l of this.lines.values()) for (const p of l.pieces.values()) this.pump(l, p);
+    this.changed();
+  }
+
+  get dispatchPaused() { return this.paused; }
+
+  /** Machines and signals running right now. */
+  runningCount() { let n = 0; for (const l of this.lines.values()) for (const p of l.pieces.values()) if (p.state === 'busy') n++; return n; }
+
   /** Lines with a run that has not ended (running, on fire, or halted). */
   activeLineIds(): Set<string> { return new Set([...this.runs.values()].filter((r) => !r.summary.endedAt).map((r) => r.summary.lineId)); }
 
@@ -747,7 +856,7 @@ export class Engine extends EventEmitter {
     if (!start) return;
     const run: RunRt = {
       summary: { id, sectorId: l.def.sectorId, lineId: l.def.id, status: 'running', startedAt: start.t, input: start.input, baseCommit: start.baseCommit, dirty: start.dirty },
-      dir, line: l.def, arrivals: new Map(), skipped: new Set(), done: new Set(), skippedPieces: new Set(), branches: new Map(), auto: {}, laps: new Map(), calls: new Map(),
+      dir, line: l.def, arrivals: new Map(), skipped: new Set(), done: new Set(), skippedPieces: new Set(), branches: new Map(), auto: {}, laps: new Map(), calls: new Map(), outputs: new Map(),
     };
     this.runs.set(id, run);
     const boxes = new Map<string, Payload>();

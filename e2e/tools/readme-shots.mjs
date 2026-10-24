@@ -1,5 +1,5 @@
 // Screenshots for the README that need a specific frame: the Floor, a line at work, and build mode.
-// Usage: node e2e/readme-shots.mjs [out-dir]   (default docs/screenshots)
+// Usage: node e2e/tools/readme-shots.mjs [out-dir]   (default docs/screenshots)
 import { _electron as electron } from 'playwright';
 import fs from 'node:fs';
 import os from 'node:os';

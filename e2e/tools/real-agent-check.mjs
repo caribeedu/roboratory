@@ -1,5 +1,5 @@
 // Runs a two-machine line with the REAL Claude Code agent. This spends money.
-// Usage: node e2e/real-agent-check.mjs [--github owner/repo]
+// Usage: node e2e/tools/real-agent-check.mjs [--github owner/repo]
 //   without --github: works on a local throwaway repo; the publisher "opens" a local PR note.
 //   with --github: the target repo is cloned from GitHub and the publisher opens a real draft PR there.
 import fs from 'node:fs';

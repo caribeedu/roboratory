@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { Proposal } from '../../shared/types';
 import { createDemoFactory } from '../demo';
 import { FactoryService } from '../service';
 
@@ -84,19 +83,35 @@ describe('build sessions', () => {
     expect(fs.readFileSync(path.join(root, role), 'utf8')).toBe('theirs\n');
   });
 
-  it('keeps a manager\'s change waiting while build mode is open, and while its line runs', async () => {
-    const { svc } = open();
-    const proposal: Proposal = { id: 'p', kind: 'patch', why: 'x', status: 'open', files: [{ path: `${MODEL}/machines/mitigator/role.md`, content: 'new\n' }] };
-    const m = svc.managers! as unknown as { find: () => Proposal; applyPatch: () => void };
-    m.find = () => proposal;
-    let applied = 0;
-    m.applyPatch = () => { applied++; };
-    svc.buildStart('incidents');
-    await expect(svc.accept({ kind: 'factory' }, 'm', 'p')).rejects.toThrow(/Finish build mode first/);
-    svc.buildDiscard();
-    await svc.run(LINE, { alert: 'ALT-1' });
-    await expect(svc.accept({ kind: 'factory' }, 'm', 'p')).rejects.toThrow(/run in progress on orders-api incidents/);
-    expect(applied).toBe(0);
+  describe("a manager's change to a line", () => {
+    const SCOPE = { kind: 'sector', sectorId: 'incidents' } as const;
+    /** asks the sector manager for a change, as a person would, and returns where to accept it */
+    const proposal = async (svc: FactoryService) => {
+      await svc.ask(SCOPE, 'add a smoke signal');
+      const msg = svc.messages(SCOPE).at(-1)!;
+      return { msg: msg.id, proposal: msg.proposals![0].id };
+    };
+    const lineHasSmoke = (root: string) => fs.readFileSync(path.join(root, MODEL, 'line.yaml'), 'utf8').includes('smoke');
+
+    it('waits while build mode is open', async () => {
+      const { svc, root } = open();
+      const p = await proposal(svc);
+      svc.buildStart('incidents');
+      await expect(svc.accept(SCOPE, p.msg, p.proposal)).rejects.toThrow(/Finish build mode first/);
+      expect(lineHasSmoke(root)).toBe(false);
+
+      svc.buildDiscard();
+      await svc.accept(SCOPE, p.msg, p.proposal);
+      expect(lineHasSmoke(root)).toBe(true);
+    });
+
+    it('waits while the line it changes has a run in progress', async () => {
+      const { svc, root } = open();
+      const p = await proposal(svc);
+      await svc.run(LINE, { alert: 'ALT-1' });
+      await expect(svc.accept(SCOPE, p.msg, p.proposal)).rejects.toThrow(/run in progress on orders-api incidents/);
+      expect(lineHasSmoke(root)).toBe(false);
+    });
   });
 
   it('keeps scripts executable when a model is separated', () => {

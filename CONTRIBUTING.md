@@ -22,7 +22,7 @@ Code layout, conventions and platform notes are in [docs/DEVELOPMENT.md](docs/DE
 
 ## Pull requests
 
-- Keep a change focused, and add or update tests next to the code. Bug fixes come with a regression test.
+- Keep a change focused, and add or update tests next to the code. Bug fixes come with a regression test. Tests describe behavior in sentences and reach in through what a person or the next layer can see; [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#tests) says how the three layers work.
 - Tests, the demo and dry runs use the simulated agent (`agent: sim`). Never make a test call a real agent: real runs spend money.
 - When behavior changes, update `docs/` in the same change. A design decision goes into [docs/DECISIONS.md](docs/DECISIONS.md) with its reasoning, before the code.
 - Work on what the [roadmap](docs/ROADMAP.md) lists, or open an issue to discuss something else first.
