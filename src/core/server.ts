@@ -106,6 +106,8 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
   let closed = false;
   let restarting = false;
   const sources = new WeakMap<net.Socket, string>();
+  const watchers = new Set<net.Socket>();
+  const spent = new Map<string, number>();
   let idleTimer: NodeJS.Timeout | null = null;
   let server: net.Server | null = null;
 
@@ -128,6 +130,8 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
     status: () => ({ version: opts.version, pid: process.pid, root, name: service.factory?.name ?? '', restarting, clients: clients.size, running: service.engine?.runningCount() ?? 0, runs: [...(service.engine?.activeLineIds() ?? [])] }),
     // stop dispatching; once no machine or signal runs the engine leaves and its client starts it again (D43)
     restartWhenIdle: () => { restarting = true; service.engine?.pauseDispatch(); push('restarting', {}); return true; },
+    // a stream of what is worth acting on, for `roboratory watch`
+    watch: (c: net.Socket) => { watchers.add(c); return true; },
     cancelRestart: () => { restarting = false; service.engine?.resumeDispatch(); return true; },
     stop: () => { setImmediate(() => void close()); return true; },
   };
@@ -147,8 +151,8 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
           if (line.trim()) void handle(c, line);
         }
       });
-      c.on('close', () => clients.delete(c));
-      c.on('error', () => clients.delete(c));
+      c.on('close', () => { clients.delete(c); watchers.delete(c); });
+      c.on('error', () => { clients.delete(c); watchers.delete(c); });
     });
     await new Promise<void>((resolve, reject) => { server!.once('error', reject); server!.listen(socket, () => resolve()); });
     if (process.platform !== 'win32') fs.chmodSync(socket, 0o600);
@@ -176,6 +180,14 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
       reply({ error: e?.message ?? String(e) });
     }
   }
+
+  const WORTH = new Set(['run.start', 'run.end', 'piece.hold', 'piece.ask', 'piece.fire', 'rework', 'piece.blocked']);
+  service.engine?.on('record', (run: { id: string; lineId: string }, ev: Record<string, any>) => {
+    if (ev.type === 'cost') spent.set(run.id, (spent.get(run.id) ?? 0) + ev.usd);
+    if (!watchers.size || !WORTH.has(ev.type)) return;
+    const line = JSON.stringify({ event: 'watch', data: { runId: run.id, lineId: run.lineId, costUsd: spent.get(run.id) ?? 0, ...ev } }) + '\n';
+    for (const w of watchers) w.write(line);
+  });
 
   // deferred so the reply to the call that caused it is written first
   function drained() { setImmediate(() => { if (restarting && !closed && (service.engine?.runningCount() ?? 0) === 0) void close(); }); }

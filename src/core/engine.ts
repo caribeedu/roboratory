@@ -115,7 +115,9 @@ export class Engine extends EventEmitter {
 
   private record(run: RunRt, ev: Record<string, unknown>) {
     const from = ev.type === 'verb' && this.source ? { source: this.source } : {};
-    fs.appendFileSync(path.join(run.dir, 'run.jsonl'), JSON.stringify({ t: this.now(), ...ev, ...from }) + '\n');
+    const full = { t: this.now(), ...ev, ...from };
+    fs.appendFileSync(path.join(run.dir, 'run.jsonl'), JSON.stringify(full) + '\n');
+    this.emit('record', run.summary, full);
   }
 
   private sectorOf(line: LineDef) { return this.factory.sectors.find((s) => s.id === line.sectorId)!; }
