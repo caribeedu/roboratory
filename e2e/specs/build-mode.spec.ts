@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
-import { expect, test, type Sandbox } from '../support/app';
+import { expect, test, type Sandbox, patience } from '../support/app';
 
 const panel = (page: Page) => page.locator('.build-insp');
 
@@ -29,7 +29,7 @@ async function rename(page: Page, name: string) {
   await expect(async () => {
     await field(page, 'Name', name);
     await expect(page.locator('.piece-label', { hasText: name }).first()).toBeVisible({ timeout: 2000 });
-  }).toPass({ timeout: 20_000 });
+  }).toPass({ timeout: patience(20_000) });
 }
 
 async function startBuilding(page: Page) {
@@ -102,7 +102,7 @@ function dryRun(sandbox: Sandbox, sector: string) {
     fs.cpSync(sandbox.demo, only, { recursive: true, filter: (p) => !p.includes(`${path.sep}.runs`) });
     for (const s of fs.readdirSync(path.join(only, 'sectors'))) if (s !== sector) fs.rmSync(path.join(only, 'sectors', s), { recursive: true });
   }
-  try { return execFileSync(process.execPath, ['e2e/tools/factory-sim-check.mjs', only], { encoding: 'utf8', windowsHide: true, timeout: 120_000 }); } catch (e) { return String((e as { stdout?: string }).stdout ?? e); }
+  try { return execFileSync(process.execPath, ['e2e/tools/factory-sim-check.mjs', only], { encoding: 'utf8', windowsHide: true, timeout: patience(120_000) }); } catch (e) { return String((e as { stdout?: string }).stdout ?? e); }
 }
 
 test.describe('Changing a line that exists', () => {

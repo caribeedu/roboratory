@@ -4,7 +4,7 @@ import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
-import { alive, cliFor, expect, launch, quit, readEngineLock, stopEngine, test, until, type Sandbox } from '../support/app';
+import { alive, cliFor, expect, launch, quit, readEngineLock, stopEngine, test, until, type Sandbox, patience } from '../support/app';
 import { appExecutable } from '../tools/exe.mjs';
 
 const LINE = 'releases/orders-api';
@@ -19,7 +19,7 @@ test.describe('When the app quits', () => {
 
   test('the engine keeps running, in a process of its own', async ({ app, roboratory, sandbox }) => {
     await roboratory.run(LINE, { tag: 'v1' });
-    await expect.poll(() => roboratory.pieceState(LINE, 'launch'), { timeout: 30_000 }).toBe('holding');
+    await expect.poll(() => roboratory.pieceState(LINE, 'launch'), { timeout: patience(30_000) }).toBe('holding');
     const lock = readEngineLock(sandbox.demo)!;
     expect(lock.pid).not.toBe(app.process().pid);
 
@@ -29,7 +29,7 @@ test.describe('When the app quits', () => {
 
   test('a simulated line reaches its pallet with the app closed, released from the command', async ({ app, roboratory, sandbox, cli }) => {
     const id = await roboratory.run(LINE, { tag: 'v2' });
-    await expect.poll(() => roboratory.pieceState(LINE, 'launch'), { timeout: 30_000 }).toBe('holding');
+    await expect.poll(() => roboratory.pieceState(LINE, 'launch'), { timeout: patience(30_000) }).toBe('holding');
     await quit(app);
 
     expect(cli('release', LINE, 'launch', '--confirm', '2').code).toBe(0);
@@ -38,7 +38,7 @@ test.describe('When the app quits', () => {
 
   test('a reopened app shows the run where it is, on the same engine, and the run goes on', async ({ app, roboratory, sandbox }) => {
     const id = await roboratory.run(LINE, { tag: 'v3' });
-    await expect.poll(() => roboratory.pieceState(LINE, 'launch'), { timeout: 30_000 }).toBe('holding');
+    await expect.poll(() => roboratory.pieceState(LINE, 'launch'), { timeout: patience(30_000) }).toBe('holding');
     const pid = readEngineLock(sandbox.demo)!.pid;
     await quit(app);
 
@@ -46,7 +46,7 @@ test.describe('When the app quits', () => {
     try {
       await expect(again.window.locator('.factory-name')).toHaveText('Demo Factory');
       const state = () => again.window.evaluate((l) => window.roboratory.state().then((s) => s.snapshot.lines[l]?.pieces.launch.state), LINE);
-      await expect.poll(state, { timeout: 30_000 }).toBe('holding');
+      await expect.poll(state, { timeout: patience(30_000) }).toBe('holding');
       expect(readEngineLock(sandbox.demo)!.pid).toBe(pid);
       await again.window.evaluate((l) => window.roboratory.release(l, 'launch', 2), LINE);
       expect(await until(() => ended(sandbox.demo, LINE, id)?.status === 'done', 45_000)).toBe(true);
@@ -117,7 +117,7 @@ test.describe('The command line', () => {
   test('asks for each confirmation of a gate that wants several, instead of giving them for you', async ({ roboratory, cli }) => {
     await roboratory.openDemo();
     await roboratory.run(LINE, { tag: 'v5' });
-    await expect.poll(() => roboratory.pieceState(LINE, 'launch'), { timeout: 30_000 }).toBe('holding');
+    await expect.poll(() => roboratory.pieceState(LINE, 'launch'), { timeout: patience(30_000) }).toBe('holding');
     const refused = cli('release', LINE, 'launch');
     expect(refused.code).toBe(1);
     expect(refused.err).toContain('--confirm 2');
@@ -144,9 +144,9 @@ test.describe('An engine older than the app', () => {
     const id = await roboratory.run(LINE, { tag: 'v4' });
 
     await window.getByRole('button', { name: 'Restart when idle' }).click();
-    await expect.poll(() => readEngineLock(sandbox.demo)?.pid, { timeout: 45_000 }).not.toBe(oldPid);
-    await expect(window.getByRole('status').filter({ hasText: /engine/ })).toHaveCount(0, { timeout: 30_000 });
-    await expect.poll(() => roboratory.pieceState(LINE, 'launch'), { timeout: 45_000 }).toBe('holding');
+    await expect.poll(() => readEngineLock(sandbox.demo)?.pid, { timeout: patience(45_000) }).not.toBe(oldPid);
+    await expect(window.getByRole('status').filter({ hasText: /engine/ })).toHaveCount(0, { timeout: patience(30_000) });
+    await expect.poll(() => roboratory.pieceState(LINE, 'launch'), { timeout: patience(45_000) }).toBe('holding');
 
     const pieces = Object.values((await roboratory.lineState(LINE))?.pieces ?? {});
     expect(pieces.some((p) => p.state === 'fire')).toBe(false);
@@ -208,7 +208,7 @@ test.describe('Dry-running a factory through the engine', () => {
   test('every line of the demo reaches its pallet in a simulated run', async ({ roboratory, sandbox }) => {
     await roboratory.openDemo();
     stopEngine(sandbox.demo);
-    const run = spawnSync(process.execPath, ['e2e/tools/factory-sim-check.mjs', sandbox.demo], { encoding: 'utf8', timeout: 280_000, windowsHide: true });
+    const run = spawnSync(process.execPath, ['e2e/tools/factory-sim-check.mjs', sandbox.demo], { encoding: 'utf8', timeout: patience(280_000), windowsHide: true });
     expect(run.stdout).toMatch(/OK +engineering\/orders-api: done/);
     expect(run.stdout).toMatch(/OK +incidents\/orders-api: done/);
     expect(run.stdout).toMatch(/OK +releases\/orders-api: done/);

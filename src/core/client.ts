@@ -153,7 +153,7 @@ export class EngineClient extends EventEmitter {
     child.on('error', (e) => { fs.appendFileSync(logFile, `Could not start the engine: ${e.message}\n`); exited = -1; });
     child.unref();
     fs.closeSync(fd);
-    const until = Date.now() + (this.opts.startTimeoutMs ?? 20_000);
+    const until = Date.now() + (this.opts.startTimeoutMs ?? 45_000);
     while (Date.now() < until) {
       // the lock is written before the engine has loaded the factory and listens: ready is when it answers
       const lock: EngineLock | null = readLock(this.root);

@@ -23,10 +23,13 @@ export interface Sandbox {
 
 export const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** How long to wait for something slow: a Windows CI runner takes several times longer than a laptop to start things. */
+export const patience = (ms: number) => (process.env.CI && process.platform === 'win32' ? ms * 3 : ms);
+
 export async function until(fn: () => boolean | Promise<boolean>, ms = 30_000, every = 100) {
   const t0 = Date.now();
   while (!(await fn())) {
-    if (Date.now() - t0 > ms) return false;
+    if (Date.now() - t0 > patience(ms)) return false;
     await wait(every);
   }
   return true;

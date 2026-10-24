@@ -1,5 +1,5 @@
 // Work on the floor: dispatch a work order, release a gate that waits for you, fight a fire, read it all in the Ledger.
-import { expect, test } from '../support/app';
+import { expect, test, patience } from '../support/app';
 
 test.describe('Dispatching work', () => {
   test.beforeEach(async ({ roboratory }) => { await roboratory.openDemo(); });
@@ -43,7 +43,7 @@ test.describe('A gate that waits for you', () => {
     await panel.getByRole('button', { name: 'Yes, release' }).click();
 
     await expect(window.getByRole('status').filter({ hasText: 'Launch released' })).toBeVisible();
-    await expect(roboratory.attention()).toContainText('All clear', { timeout: 30_000 });
+    await expect(roboratory.attention()).toContainText('All clear', { timeout: patience(30_000) });
   });
 
   test('can be left alone: cancelling a confirmation releases nothing', async ({ roboratory }) => {
@@ -64,7 +64,7 @@ test.describe('A gate that waits for you', () => {
 
     await roboratory.openLedger();
     await expect(window.locator('.run-list')).toContainText('v4.18.0');
-    await expect(window.locator('.run-list .chip').first()).toHaveText('Done', { timeout: 45_000 });
+    await expect(window.locator('.run-list .chip').first()).toHaveText('Done', { timeout: patience(45_000) });
     await expect(window.getByRole('heading', { name: 'Who did what' }).locator('xpath=following-sibling::ul[1]')).toContainText('released Launch after 2 confirmations');
     await expect(window.getByRole('heading', { name: 'On the pallet' })).toBeVisible();
   });
@@ -88,8 +88,8 @@ test.describe('A machine on fire', () => {
     await panel.getByLabel('Hint for the retry (optional)').fill('Include suspected_cause from the pool metrics.');
     await panel.getByRole('button', { name: 'Retry with hint' }).click();
     await expect(window.getByRole('status').filter({ hasText: 'Retrying' })).toBeVisible();
-    await expect(roboratory.attention().getByRole('button', { name: /Investigate stopped/ })).toHaveCount(0, { timeout: 30_000 });
-    await expect(roboratory.attention().getByRole('button', { name: /Mitigation OK is waiting for you/ })).toBeVisible({ timeout: 30_000 });
+    await expect(roboratory.attention().getByRole('button', { name: /Investigate stopped/ })).toHaveCount(0, { timeout: patience(30_000) });
+    await expect(roboratory.attention().getByRole('button', { name: /Mitigation OK is waiting for you/ })).toBeVisible({ timeout: patience(30_000) });
   });
 
   test('halts the line from the panel of the machine that stopped it', async ({ roboratory }) => {

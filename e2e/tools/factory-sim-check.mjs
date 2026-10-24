@@ -58,7 +58,7 @@ for (const s of f.sectors) for (const l of s.lines) {
   const looped = new Set();
   const t0 = Date.now();
   let status = 'running';
-  while (Date.now() - t0 < 20000) {
+  while (Date.now() - t0 < 90000) {
     status = (await call('runs')).find((r) => r.id === id).status;
     if (status === 'done' || status === 'stopped') break;
     const lv = (await call('state')).snapshot.lines[l.id];
