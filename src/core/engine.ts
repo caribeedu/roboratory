@@ -83,6 +83,9 @@ export class Engine extends EventEmitter {
   private signalTimeoutMs: number;
   private seq = 0;
   private simFailed = new Set<string>();
+  private paused = false;
+  /** Where the verb being called comes from ("cli"); audited next to the actor. Set by the server around a call. */
+  source?: string;
 
   constructor(factory: FactoryDef, opts: EngineOptions = {}) {
     super();
@@ -111,7 +114,8 @@ export class Engine extends EventEmitter {
   }
 
   private record(run: RunRt, ev: Record<string, unknown>) {
-    fs.appendFileSync(path.join(run.dir, 'run.jsonl'), JSON.stringify({ t: this.now(), ...ev }) + '\n');
+    const from = ev.type === 'verb' && this.source ? { source: this.source } : {};
+    fs.appendFileSync(path.join(run.dir, 'run.jsonl'), JSON.stringify({ t: this.now(), ...ev, ...from }) + '\n');
   }
 
   private sectorOf(line: LineDef) { return this.factory.sectors.find((s) => s.id === line.sectorId)!; }
@@ -122,6 +126,8 @@ export class Engine extends EventEmitter {
   runGuard?: (lineId: string) => string | undefined;
 
   async run(lineId: string, input: Payload, actor = 'you'): Promise<string> {
+    if (this.paused) throw new Error('The engine is restarting and starts no new runs. Try again in a moment.');
+    const source = this.source;
     const refused = this.runGuard?.(lineId);
     if (refused) throw new Error(refused);
     const line = this.lines.get(lineId);
@@ -140,8 +146,10 @@ export class Engine extends EventEmitter {
     run.summary.baseCommit = v.commit;
     run.summary.dirty = !!v.diff;
     if (v.diff) fs.writeFileSync(path.join(dir, 'factory.diff'), v.diff);
+    this.source = source;
     this.record(run, { type: 'run.start', input, actor, baseCommit: v.commit, dirty: !!v.diff });
     this.record(run, { type: 'verb', verb: 'run', actor });
+    this.source = undefined;
     this.log({ level: 'factory', sectorId: line.def.sectorId, lineId, runId: id, kind: 'info', text: `${line.def.name}: run started (${Object.values(input).join(', ') || 'no input'}) by ${actor}` });
     const box: Box = { id: `${id}:intake`, runId: id, payload: { ...input }, color: '#c8a46a' };
     this.finishPiece(run, '@intake', box);
@@ -244,7 +252,7 @@ export class Engine extends EventEmitter {
   audit(sectorId: string, entry: Record<string, unknown>) {
     const f = path.join(this.factory.root, RUNS_DIR, sectorId, 'audit.jsonl');
     fs.mkdirSync(path.dirname(f), { recursive: true });
-    fs.appendFileSync(f, JSON.stringify({ t: this.now(), ...entry }) + '\n');
+    fs.appendFileSync(f, JSON.stringify({ t: this.now(), ...entry, ...(this.source ? { source: this.source } : {}) }) + '\n');
   }
 
   private persistHalt(line: LineRt) {
@@ -431,6 +439,8 @@ export class Engine extends EventEmitter {
   /** Starts the next queued work on a piece; pieces handle one box at a time. */
   private pump(line: LineRt, p: PieceRt) {
     if (line.halted || p.current || !p.queue.length) return;
+    // while the engine waits to restart (D43), nothing new starts; gates still take boxes, they run no process
+    if (this.paused && p.def.kind !== 'gate') return;
     const work = p.queue.shift()!;
     const run = this.runs.get(work.runId);
     if (!run) return;
@@ -704,6 +714,21 @@ export class Engine extends EventEmitter {
     }
     return items.sort((a, b) => b.severity - a.severity || a.since - b.since);
   }
+
+  /** Stops starting machines and signals; the ones running finish. Queued work is rebuilt from the run files after a restart. */
+  pauseDispatch() { this.paused = true; this.changed(); }
+
+  resumeDispatch() {
+    if (!this.paused) return;
+    this.paused = false;
+    for (const l of this.lines.values()) for (const p of l.pieces.values()) this.pump(l, p);
+    this.changed();
+  }
+
+  get dispatchPaused() { return this.paused; }
+
+  /** Machines and signals running right now. */
+  runningCount() { let n = 0; for (const l of this.lines.values()) for (const p of l.pieces.values()) if (p.state === 'busy') n++; return n; }
 
   /** Lines with a run that has not ended (running, on fire, or halted). */
   activeLineIds(): Set<string> { return new Set([...this.runs.values()].filter((r) => !r.summary.endedAt).map((r) => r.summary.lineId)); }

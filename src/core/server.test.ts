@@ -94,4 +94,19 @@ describe('engine server', () => {
     expect(readLock(root)).toBeNull();
     await srv.close();
   });
+
+  it('leaves for a restart once nothing runs, telling its clients first', async () => {
+    const dir = tmp();
+    const root = createDemoFactory(path.join(dir, 'factory'), path.join(dir, 'repos'));
+    let restart: boolean | undefined;
+    const srv = await startServer(root, { version: '1.0.0', onExit: (r) => { restart = r; } });
+    const c = await connect(srv.socket);
+    expect(await c.call('status')).toMatchObject({ restarting: false, running: 0 });
+    await c.call('restartWhenIdle');
+    await new Promise((r) => setTimeout(r, 200));
+    expect(c.events.some((e) => e.event === 'restarting')).toBe(true);
+    expect(restart).toBe(true);
+    expect(readLock(root)).toBeNull();
+    await srv.close();
+  });
 });

@@ -635,3 +635,59 @@ pallet: { needs: [{ from: ok, when: "decision.choice == 'approve'" }] }
     ].join('\n'));
   });
 });
+
+describe('pausing dispatch for a restart (D43)', () => {
+  const twoSteps = () => factory(`intake: { kind: manual }
+pieces:
+  - { id: a, machine: a }
+  - { id: b, machine: b }
+  - { id: ok, label: OK, gate: {} }
+`, { a: { ...machine('{ ok: true }'), 'machine.yaml': 'agent: sim\nattempts: 2\nsim:\n  seconds: 40\n  output: { ok: true }\n' }, b: machine('{ ok: true }') }, {}, false);
+
+  it('lets the busy step finish, starts nothing new, and refuses new runs', async () => {
+    const { f } = twoSteps();
+    const e = make(f);
+    const id = await e.run('s/l', {});
+    await until(() => e.runningCount() === 1);
+    e.pauseDispatch();
+    await until(() => e.runningCount() === 0);
+    const starts = () => e.runEvents(id).filter((x) => x.type === 'piece.start').map((x) => x.piece);
+    expect(starts()).toEqual(['a']);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(starts()).toEqual(['a']);
+    expect(e.lineView('s/l').pieces.b.state).toBe('idle');
+    await expect(e.run('s/l', {})).rejects.toThrow(/restarting/);
+    e.resumeDispatch();
+    await until(() => e.lineView('s/l').pieces.ok.state === 'holding');
+    expect(starts()).toEqual(['a', 'b']);
+  });
+
+  it('comes back after a restart with the gate holding and no step on fire', async () => {
+    const { f } = twoSteps();
+    const e1 = make(f);
+    const id = await e1.run('s/l', {});
+    await until(() => e1.runningCount() === 1);
+    e1.pauseDispatch();
+    await until(() => e1.runningCount() === 0);
+    e1.dispose();
+    const e2 = make(loadFactory(f.root));
+    e2.restore();
+    await until(() => e2.lineView('s/l').pieces.ok.state === 'holding');
+    expect(Object.values(e2.lineView('s/l').pieces).some((p) => p.state === 'fire')).toBe(false);
+    e2.release('s/l', 'ok', 1);
+    await until(() => e2.runSummaries()[0].status === 'done');
+    expect(e2.runEvents(id).filter((x) => x.type === 'piece.start').map((x) => x.piece)).toEqual(['a', 'b']);
+  });
+
+  it('audits the source of a verb next to its actor', async () => {
+    const { f } = twoSteps();
+    const e = make(f);
+    e.source = 'cli';
+    const id = await e.run('s/l', {});
+    e.source = undefined;
+    await until(() => e.lineView('s/l').pieces.ok.state === 'holding');
+    expect(e.runEvents(id).find((x) => x.type === 'verb' && x.verb === 'run')).toMatchObject({ actor: 'you', source: 'cli' });
+    e.release('s/l', 'ok', 1);
+    expect(e.runEvents(id).find((x) => x.type === 'verb' && x.verb === 'release')).not.toHaveProperty('source');
+  });
+});

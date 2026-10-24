@@ -19,7 +19,8 @@ export interface ServerOptions {
   version: string;
   /** How long the engine stays up with no open run and no client, in ms. */
   idleGraceMs?: number;
-  onExit?: () => void;
+  /** `restart` is true when the engine left to be started again by a newer version. */
+  onExit?: (restart: boolean) => void;
 }
 
 export const lockPath = (root: string) => path.join(root, RUNS_DIR, LOCK_FILE);
@@ -103,6 +104,8 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
     build: (v) => push('build', v),
   });
   let closed = false;
+  let restarting = false;
+  const sources = new WeakMap<net.Socket, string>();
   let idleTimer: NodeJS.Timeout | null = null;
   let server: net.Server | null = null;
 
@@ -110,16 +113,22 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
     if (closed) return;
     closed = true;
     if (idleTimer) clearInterval(idleTimer);
-    for (const c of clients) c.destroy();
     service.close();
+    // closing a Windows pipe drops what the peer has not read yet, so give the last reply and events time to arrive
+    if (clients.size) await new Promise((r) => setTimeout(r, 120));
+    for (const c of clients) c.destroy();
     await new Promise<void>((r) => (server ? server.close(() => r()) : r()));
     fs.rmSync(socket, { force: true });
     fs.rmSync(lockPath(root), { force: true });
-    opts.onExit?.();
+    opts.onExit?.(restarting);
   };
 
   const methods: Record<string, (...a: any[]) => unknown> = {
-    hello: () => ({ version: opts.version, pid: process.pid, root, name: service.factory?.name ?? '' }),
+    hello: (c: net.Socket, opts2?: { client?: string }) => { if (opts2?.client === 'cli') sources.set(c, 'cli'); return { version: opts.version, pid: process.pid, root, name: service.factory?.name ?? '', restarting }; },
+    status: () => ({ version: opts.version, pid: process.pid, root, name: service.factory?.name ?? '', restarting, clients: clients.size, running: service.engine?.runningCount() ?? 0, runs: [...(service.engine?.activeLineIds() ?? [])] }),
+    // stop dispatching; once no machine or signal runs the engine leaves and its client starts it again (D43)
+    restartWhenIdle: () => { restarting = true; service.engine?.pauseDispatch(); push('restarting', {}); return true; },
+    cancelRestart: () => { restarting = false; service.engine?.resumeDispatch(); return true; },
     stop: () => { setImmediate(() => void close()); return true; },
   };
 
@@ -157,12 +166,20 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
       const own = msg.method ? methods[msg.method] : undefined;
       const call = msg.method ? calls[msg.method] : undefined;
       if (!own && !call) throw new Error(`Unknown method: ${msg.method}`);
-      const result = own ? await own(...params) : await call!(service, ...params);
+      const engine = service.engine;
+      if (engine) engine.source = sources.get(c);
+      let pending: unknown;
+      try { pending = own ? own(c, ...params) : call!(service, ...params); } finally { if (engine) engine.source = undefined; }
+      const result = await pending;
       reply({ result: result ?? null });
     } catch (e: any) {
       reply({ error: e?.message ?? String(e) });
     }
   }
+
+  // deferred so the reply to the call that caused it is written first
+  function drained() { setImmediate(() => { if (restarting && !closed && (service.engine?.runningCount() ?? 0) === 0) void close(); }); }
+  service.engine?.on('change', drained);
 
   // ends by itself once nothing is running and nobody is connected
   const grace = opts.idleGraceMs ?? 60_000;
