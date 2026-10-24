@@ -27,6 +27,8 @@ Code layout, conventions and platform notes are in [docs/DEVELOPMENT.md](docs/DE
 - When behavior changes, update `docs/` in the same change. A design decision goes into [docs/DECISIONS.md](docs/DECISIONS.md) with its reasoning, before the code.
 - Work on what the [roadmap](docs/ROADMAP.md) lists, or open an issue to discuss something else first.
 - Write code, comments and documentation in English.
+- The [pull request template](.github/pull_request_template.md) is filled in when you open a pull request: what and why, where to look, behavior changes, decisions, how you verified it.
+- A release's notes are its [changelog](CHANGELOG.md) entry, written from the [release template](.github/RELEASE_TEMPLATE.md); how a version is cut is in [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Reporting problems
 

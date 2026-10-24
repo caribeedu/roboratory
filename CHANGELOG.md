@@ -36,6 +36,15 @@ The engine moves out of the app. It runs as its own process, one per factory, an
 - **Coverage** is measured (`npm run test:coverage`) with a floor in `vitest.config.mts`, and the CI runs the specs on macOS, Windows and Linux.
 - The scripts that only screenshot or demo the app moved to `e2e/tools/`.
 
+### Upgrading
+- **An engine started by an older build keeps running** after you update the app, so its runs are not cut. The app shows a banner with "Restart when idle"; the engine comes back as the new build once nothing is running.
+
+### Known limits
+- Build mode stays in the app; the command does not edit lines.
+- The permissions, the checkers that prove their work and the manager's investigations come next ([docs/ROADMAP.md](docs/ROADMAP.md)).
+- The Codex agent is exercised against a fake CLI, not yet against a real run.
+- The archives are not signed or notarized.
+
 ## v0.7.0
 
 The first release. A factory is a git repository; Roboratory draws it as a pixel-art floor, runs its lines with headless agents and lets you build and change it from the Floor itself.

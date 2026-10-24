@@ -25,12 +25,17 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      - name: Check that the tag matches the package version
+      - name: Check that the tag matches the package version, and that the changelog has its entry
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
           if [[ "${{ github.ref_type }}" == "tag" && "${GITHUB_REF_NAME#v}" != "$VERSION" ]]; then
             echo "::error::tag ${GITHUB_REF_NAME} does not match the package version $VERSION"
+            exit 1
+          fi
+          # the entry is the body of the release (see docs/RELEASING.md)
+          if [[ "${{ github.ref_type }}" == "tag" ]] && ! grep -q "^## v${VERSION}\$" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no \"## v${VERSION}\" section to publish as the release notes"
             exit 1
           fi
 

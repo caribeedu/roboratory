@@ -113,6 +113,7 @@ Choose **Open the demo factory** on the welcome screen. It creates a factory in 
 | [Competitors](docs/COMPETITORS.md) | Other tools that orchestrate coding agents, and what Roboratory takes from each |
 | [Development](docs/DEVELOPMENT.md) | Setup, code layout, conventions and lessons about the agent CLIs |
 | [Changelog](CHANGELOG.md) | What is built |
+| [Releasing](docs/RELEASING.md) | How a version is cut, and the template for its notes |
 
 ## Status
 
