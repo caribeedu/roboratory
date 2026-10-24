@@ -18,7 +18,8 @@ const ajv = new Ajv({ allErrors: true, strict: false });
 const validators = new Map<string, ValidateFunction>();
 
 type Payload = Record<string, unknown>;
-interface Box { id: string; runId: string; payload: Payload; color: string }
+/** `gen`: which output of its piece this box is (1 for the first, 2 after a rework…), so a box that arrives late is known for what it is. */
+interface Box { id: string; runId: string; payload: Payload; color: string; gen?: number }
 interface Work { runId: string; box: Box; hint?: string; attempt?: number; /** stop this piece as soon as it picks the work up */ stop?: string;
   /** how many outputs each ancestor had made when this piece picked the work up: a different count later means the input is out of date */
   seen?: Record<string, number> }
@@ -323,11 +324,13 @@ export class Engine extends EventEmitter {
         continue;
       }
       taken++;
-      const belt: Belt = { box: { ...box, payload: { ...box.payload } }, from: pieceId, to: to.id, since: this.now(), ms: back ? this.beltMs * 2 : this.beltMs, back };
+      // the output of the target this box judges, if it goes back: a rework can replace that output while the box is on its way
+      const judged = back ? run.outputs.get(to.id) ?? 0 : undefined;
+      const belt: Belt = { box: { ...box, payload: { ...box.payload }, gen: run.outputs.get(pieceId) ?? 0 }, from: pieceId, to: to.id, since: this.now(), ms: back ? this.beltMs * 2 : this.beltMs, back };
       line.belts.push(belt);
       belt.timer = setTimeout(() => {
         line.belts = line.belts.filter((b) => b !== belt);
-        if (back) this.rework(run, to.id, pieceId, belt.box); else this.arrive(run, to.id, pieceId, belt.box);
+        if (back) this.rework(run, to.id, pieceId, belt.box, judged); else this.arrive(run, to.id, pieceId, belt.box);
       }, belt.ms);
     }
     // Skips go last, so a run with a live belt never looks stuck.
@@ -337,9 +340,22 @@ export class Engine extends EventEmitter {
   }
 
   /** A box came back along a return belt: reopen the stretch from `target` to `from` and run it again (D15). */
-  private rework(run: RunRt, target: string, from: string, box: Box) {
+  private rework(run: RunRt, target: string, from: string, box: Box, judged?: number) {
     const line = this.lines.get(run.summary.lineId)!;
-    if (line.halted) { line.deferred.push(() => this.rework(run, target, from, box)); return; }
+    if (line.halted) { line.deferred.push(() => this.rework(run, target, from, box, judged)); return; }
+    // The checker judged an output of the target that a rework has replaced since (two checkers sent it back, and the
+    // other one's rework came first): the target is not reworked again for it. The checker looks at the new output.
+    if (judged !== undefined && (run.outputs.get(target) ?? 0) !== judged) {
+      this.record(run, { type: 'piece.stale', piece: from, reason: 'its verdict was about an output that had been replaced' });
+      this.log({ level: 'sector', sectorId: run.line.sectorId, lineId: run.line.id, pieceId: from, runId: run.summary.id, kind: 'info', text: `${this.label(line, from)}: its verdict was about an output of ${this.label(line, target)} that had been replaced, so it looks at the new one` });
+      run.done.delete(from);
+      const arrival = run.arrivals.get(from)?.get(target);
+      // an older box from the target is not what it should look at; the newer one is kept if it is already here
+      if (arrival && (arrival.gen ?? 0) < (run.outputs.get(target) ?? 0)) run.arrivals.get(from)!.delete(target);
+      this.checkReady(run, from);
+      this.changed();
+      return;
+    }
     const need = line.def.model.pieces.find((p) => p.id === target)!.needs.find((n) => n.from === from && n.back)!;
     const key = `${from}>${target}`;
     const used = (run.laps.get(key) ?? 0) + 1;
@@ -399,6 +415,8 @@ export class Engine extends EventEmitter {
     const p = line.pieces.get(pieceId);
     if (!p) return;
     if (p.current?.runId === run.summary.id || p.queue.some((w) => w.runId === run.summary.id)) return;
+    // a box is on its way down from a piece that is still working (a rework): wait for it instead of working on the old one
+    if (this.upstreamPending(run, pieceId)) return;
     const arrived = run.arrivals.get(pieceId) ?? new Map<string, Box>();
     const fwdNeeds = p.def.needs.filter((n) => !n.back);
     const resolved = fwdNeeds.every((n) => arrived.has(n.from) || run.skipped.has(`${n.from}>${pieceId}`));
@@ -451,25 +469,39 @@ export class Engine extends EventEmitter {
     this.pump(line, p);
   }
 
-  /** The forward outputs made so far by every piece upstream of `pieceId`. */
-  private ancestorOutputs(run: RunRt, pieceId: string): Record<string, number> {
+  /** Every piece upstream of `pieceId`, following forward belts only. */
+  private ancestors(run: RunRt, pieceId: string): string[] {
     const byId = new Map(run.line.model.pieces.map((q) => [q.id, q]));
-    const seen: Record<string, number> = {};
+    const found = new Set<string>();
     const stack = [pieceId];
     while (stack.length) for (const n of byId.get(stack.pop()!)?.needs ?? []) {
-      if (n.back || n.from in seen) continue;
-      seen[n.from] = run.outputs.get(n.from) ?? 0;
+      if (n.back || found.has(n.from)) continue;
+      found.add(n.from);
       stack.push(n.from);
     }
-    return seen;
+    return [...found];
+  }
+
+  /** The forward outputs made so far by every piece upstream of `pieceId`. */
+  private ancestorOutputs(run: RunRt, pieceId: string): Record<string, number> {
+    return Object.fromEntries(this.ancestors(run, pieceId).map((id) => [id, run.outputs.get(id) ?? 0]));
+  }
+
+  /** A piece upstream of `pieceId` still has work of this run to do (a rework in progress, say), so a new box is on its way down. */
+  private upstreamPending(run: RunRt, pieceId: string): boolean {
+    const line = this.lines.get(run.summary.lineId)!;
+    return this.ancestors(run, pieceId).some((id) => {
+      const q = line.pieces.get(id);
+      return !!q && (q.current?.runId === run.summary.id || q.queue.some((w) => w.runId === run.summary.id));
+    });
   }
 
   /**
-   * A piece judged or built from an input that an upstream piece has since replaced (a rework made it again while
-   * this piece was still working): its result is about the old input and must not count.
+   * A piece judged or built from an input that an upstream piece has replaced, or is about to replace (a rework made
+   * it again while this piece was still working, or is making it now): its result is about the old input and must not count.
    */
-  private staleInput(run: RunRt, w: Work) {
-    return Object.entries(w.seen ?? {}).some(([id, n]) => (run.outputs.get(id) ?? 0) !== n);
+  private staleInput(run: RunRt, w: Work, pieceId: string) {
+    return Object.entries(w.seen ?? {}).some(([id, n]) => (run.outputs.get(id) ?? 0) !== n) || this.upstreamPending(run, pieceId);
   }
 
   /** Drops a result that came from an out-of-date input; the piece takes the new input as soon as it is free. */
@@ -620,7 +652,7 @@ export class Engine extends EventEmitter {
       p.abort = undefined;
       if (res.costUsd !== undefined) this.record(run, { type: 'cost', piece: def.id, usd: res.costUsd });
       // whatever came back (an answer, a question, a block, an error) is about an input that has since been replaced
-      if (this.staleInput(run, w)) { this.dropStale(line, run, p); return; }
+      if (this.staleInput(run, w, def.id)) { this.dropStale(line, run, p); return; }
       const ask = (res.output as { needs_human?: HumanQuestion } | undefined)?.needs_human;
       if (!res.error && ask && typeof ask.question === 'string') {
         p.state = 'asking';
@@ -712,7 +744,7 @@ export class Engine extends EventEmitter {
       child.on('close', (c) => { clearTimeout(timer); resolve(c); });
       child.on('exit', () => group('SIGTERM')); // nothing the script left behind outlives it
     });
-    if (!timedOut && this.staleInput(run, w)) { this.dropStale(line, run, p); return; }
+    if (!timedOut && this.staleInput(run, w, def.id)) { this.dropStale(line, run, p); return; }
     if (code === 0 && !timedOut) {
       this.log({ level: 'sector', sectorId: run.line.sectorId, lineId: run.line.id, pieceId: def.id, runId: run.summary.id, kind: 'ok', text: `${def.label} passed` });
       p.state = 'passed';

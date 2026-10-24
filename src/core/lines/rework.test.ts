@@ -76,6 +76,26 @@ describe('Rework', () => {
     });
   });
 
+  describe('when a checker finishes while the piece is already being reworked for another', () => {
+    // Belts are slow here, so a verdict is still on its way back when the rework it would join has come and gone.
+    // a is quick and sends t back; b finishes during t's second run, and its verdict reaches t after t is done.
+    it('does not rework the piece again for a verdict about the output that rework is replacing', async () => {
+      const { f } = buildFactory(
+        line(`  - { id: t, machine: slowdev, needs: ["@intake", { from: a, when: "verdict == 'fail'", back: true, laps: 3 }, { from: b, when: "verdict == 'fail'", back: true, laps: 3 }] }
+  - { id: a, machine: qa, needs: [t] }
+  - { id: b, machine: mid, needs: [t] }`, `pallet: { needs: [{ from: a, when: "verdict == 'pass'" }, { from: b, when: "verdict == 'pass'" }] }`),
+        { slowdev: simMachine({ output: { built: true }, seconds: 20 }), qa: checker(['fail', 'pass']), mid: checker(['fail', 'pass'], { seconds: 70 }) },
+      );
+      const e = startEngine(f, { beltMs: 300 });
+      const id = await e.run(LINE, {});
+      await whenDone(e, undefined, 30_000);
+
+      expect(eventsOf(e, id, 'piece.done', 't')).toHaveLength(2);
+      expect(eventsOf(e, id, 'rework')).toHaveLength(1);
+      expect(eventsOf(e, id, 'piece.done', 'b').filter((x) => !x.failed && (x.box as { verdict: string }).verdict === 'pass')).toHaveLength(1);
+    });
+  });
+
   describe('when a rework changes which branch the line takes', () => {
     it('keeps a join input that comes from outside the reworked stretch', async () => {
       const { f } = buildFactory(
