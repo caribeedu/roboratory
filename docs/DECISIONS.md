@@ -422,14 +422,14 @@ Machines use real agents, so every run costs money and you start each one.
 
 A rework drops the arrivals and skips that the last lap left downstream (D15).
 
-## D43. The engine runs without the app (planned)
+## D43. The engine runs without the app
 **Decision:**
 - The engine runs in its own process, one per factory, started on demand by the app or the `roboratory` command. It keeps running when the app quits, and ends with `roboratory stop` or when no run is open and no client is connected. A lock file in the factory allows one engine per factory.
-- Clients talk to it over a Unix socket at `.runs/engine.sock`, open to the user only, with one JSON message per line: the methods of `src/shared/api.ts`, and state updates pushed back. No network port is opened. The Electron main process relays between the interface and the socket.
+- Clients talk to it over a local socket open to the user only, with one JSON message per line: the methods of `src/shared/api.ts`, and state updates pushed back. On macOS and Linux it is a Unix socket at `.runs/engine.sock` (a hashed path in the temporary folder when that one is too long); on Windows, where Node does not give a file path to a socket, it is a named pipe, which Node creates for the creating user only. The lock file records which one. No network port is opened. A socket's permissions cannot be relied on everywhere, so the lock file (mode 0600, in your factory) also holds a random token, and the engine serves only connections that open with it. The Electron main process relays between the interface and the socket.
 - Everything in `FactoryService` moves into the engine: runs, build-mode sessions and their locks, managers and proposals, and reloading the factory. The app keeps only the interface.
 - The `roboratory` command offers `serve`, `stop`, `status`, `run`, `release`, `answer`, `retry`, `halt`, `resume` and `watch`. Every action is a verb, audited as `you` with the source `cli`. Build mode stays in the app.
 - The packaged app's binary runs the engine in Node mode (`ELECTRON_RUN_AS_NODE`), so the app and the command share one engine bundle and need no other runtime. The command is installed in `~/.local/bin` only when you ask, from the app's menu.
-- When the app finds an older engine, it offers to restart it when idle: the engine stops dispatching new work and restarts once no machine or signal is running.
+- When the app or the command finds an engine of an older version, or another build of the same version (a hash of its bundle), it offers to restart it when idle: the engine stops dispatching new work and restarts once no machine or signal is running.
 - Tests drive a real engine through the same client as the command.
 
 **Alternatives:** an always-on system service for every factory (installs something into the system and mixes factories); a process per run (lines share state such as halts, queues and managers); HTTP on loopback (an open port any local process can reach, which needs a token); the app starting the engine as its child over stdin and stdout (the engine dies with the app); a separate npm package on the system Node (the app and the command can drift apart).

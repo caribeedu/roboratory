@@ -6,8 +6,9 @@ on:
   pull_request:
 
 jobs:
+  # unit and integration tests: the engine, the loader, the interface panels in jsdom
   test:
-    name: ${{ matrix.os }}
+    name: unit ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -21,4 +22,45 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - run: npm test
+      - run: npm run test:coverage
+      - name: Coverage summary
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          {
+            echo '### Coverage'
+            node -e "const t=require('./coverage/coverage-summary.json').total;for(const k of ['lines','statements','functions','branches'])console.log('- '+k+': '+t[k].pct+'%')"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # the packaged app, driven the way a person drives it, with its engine and its command
+  e2e:
+    name: e2e ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run package
+      - name: Run the specs (Linux needs a display)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:e2e
+      - name: Run the specs
+        if: runner.os != 'Linux'
+        run: npm run test:e2e
+      - name: Keep the report and the traces of a failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ matrix.os }}
+          path: |
+            e2e/.report
+            e2e/.results
+          retention-days: 7

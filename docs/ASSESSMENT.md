@@ -22,12 +22,12 @@ An assessment of Roboratory as a development tool, measured against its goal: a 
 3. **Human supervision is heavy, and the best value came from outside the line.** A supervisor beside the run checked the dependency alerts, found that the fix had already been released in an internal library, and spotted the denied commands. Without that, the plan would have been approved on a shallow review, and the implement step's question would have been answered without knowing the fix existed.
 4. **The information that matters is not yet on screen.** The pixel art is a strength, but what a run is missing, why, and what it has cost so far are read in panels and transcripts, not on the Floor. A signal's checks show only once it runs.
 5. **The engine grows one incident at a time.** D19, D20, D22 and D26 came from real problems and were good decisions. But `line.yaml` now has rules, laps, return belts, joins, signals that send boxes back, answer alternatives and time limits, and build mode has 12 known gaps. For one maintainer, the number of concepts is high.
-6. **The simulation gives false confidence.** `e2e/factory-sim-check.mjs` replaces signals with `true` and builds outputs from the contracts. None of the defects found in the run (permissions, an ambiguous role, a wrong plan) would show there. Today only a real run, which costs money, finds them.
-7. **The app must stay open.** Quitting it interrupts runs, and a rebuilt app takes effect only after ⌘Q. The engine also depends on details of the Claude Code CLI (no combinator at the schema root, deferred tools, `dontAsk`) that were found only by paying for runs.
+6. **The simulation gives false confidence.** `e2e/tools/factory-sim-check.mjs` replaces signals with `true` and builds outputs from the contracts. None of the defects found in the run (permissions, an ambiguous role, a wrong plan) would show there. Today only a real run, which costs money, finds them.
+7. **The engine depends on details of the Claude Code CLI** (no combinator at the schema root, deferred tools, `dontAsk`) that were found only by paying for runs. (The app no longer has to stay open: the engine runs apart from it, D43.)
 
 ## Suggestions
 
-The order of work is the roadmap in [ROADMAP.md](ROADMAP.md) §1: the headless runner (6) comes first, because permission requests and the manager's investigations depend on where the engine lives.
+The order of work is the roadmap in [ROADMAP.md](ROADMAP.md) §1. The engine already runs without the app (D43), which permission requests and the manager's investigations needed first; permissions and checkers that prove their work (1, 2) come next.
 
 1. **Permissions as a first-class feature.**
    - Permission requests at run time: a command outside the list waits for you to allow it once or deny it, instead of failing.
@@ -35,9 +35,8 @@ The order of work is the roadmap in [ROADMAP.md](ROADMAP.md) §1: the headless r
    - Read-only machines get no file edits and no `git push`.
 2. **Checkers prove their work, deterministically.** The validator's and code reviewer's contracts require what was verified: each item with the command and its result, or a link. A signal after each checker confirms the list is not empty and the links exist. A `pass` without evidence fails the check itself. It is D18 (publish, record, verify) applied to checkers.
 3. **The manager investigates questions and gates.** With a read-only shell, the Sector Manager does what the supervisor did in this run and writes a recommended answer or choice, with the cause it verified. You still decide.
-4. **A cheap rehearsal with real permissions.** A dry run that keeps the real roles, signals and permissions and only swaps the model for a cheap one, to find role and permission defects for cents before an expensive run.
+4. **A cheap rehearsal with real permissions.** A dry run that keeps the real roles, signals and permissions and only swaps the model for a cheap one, to find role and permission defects for cents before an expensive run. The engine now being its own process makes it easier to drive.
 5. **Metrics per machine from `run.jsonl`:** cost, duration, laps, denied commands, and passes later proved wrong. With these, model, effort and roles are tuned on data.
-6. **A headless runner.** Runs continue without the app, and the app becomes a window onto them. This also makes suggestions 4 and 5 easier.
-7. **Freeze the core.** A short specification of `line.yaml`. New needs are solved in the factory (roles, scripts, conventions) before a new concept goes into the engine.
+6. **Freeze the core.** A short specification of `line.yaml`. New needs are solved in the factory (roles, scripts, conventions) before a new concept goes into the engine.
 
 **Not before suggestions 1 and 2:** more automation, such as Slack intakes or a manager that acts. More automatic intakes with weak checkers only multiply the passes that cannot be trusted.

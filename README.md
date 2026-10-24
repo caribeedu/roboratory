@@ -113,10 +113,11 @@ Choose **Open the demo factory** on the welcome screen. It creates a factory in 
 | [Competitors](docs/COMPETITORS.md) | Other tools that orchestrate coding agents, and what Roboratory takes from each |
 | [Development](docs/DEVELOPMENT.md) | Setup, code layout, conventions and lessons about the agent CLIs |
 | [Changelog](CHANGELOG.md) | What is built |
+| [Releasing](docs/RELEASING.md) | How a version is cut, and the template for its notes |
 
 ## Status
 
-Roboratory is an early release (v0.7): the factory, the Floor, headless machines, managers and build mode are built; a headless engine, permission requests and automatic intakes are planned ([docs/ROADMAP.md](docs/ROADMAP.md)).
+Roboratory is an early release (v0.8): the factory, the Floor, headless machines, managers, build mode and an engine that runs without the app (with a `roboratory` command) are built; permission requests and automatic intakes are planned ([docs/ROADMAP.md](docs/ROADMAP.md)).
 
 ## Contributing and security
 

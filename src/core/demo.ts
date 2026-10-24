@@ -25,7 +25,7 @@ function prefix(dir: string, files: Files): Files {
 }
 
 function git(cwd: string, ...args: string[]) {
-  execFileSync('git', args, { cwd, stdio: 'ignore', env: { ...process.env, GIT_AUTHOR_NAME: 'Roboratory', GIT_AUTHOR_EMAIL: 'demo@roboratory.local', GIT_COMMITTER_NAME: 'Roboratory', GIT_COMMITTER_EMAIL: 'demo@roboratory.local' } });
+  execFileSync('git', args, { cwd, stdio: 'ignore', windowsHide: true, env: { ...process.env, GIT_AUTHOR_NAME: 'Roboratory', GIT_AUTHOR_EMAIL: 'demo@roboratory.local', GIT_COMMITTER_NAME: 'Roboratory', GIT_COMMITTER_EMAIL: 'demo@roboratory.local' } });
 }
 
 export function createTargetRepo(dir: string, name: string) {

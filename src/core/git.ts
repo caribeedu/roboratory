@@ -8,7 +8,7 @@ const IDENTITY = { GIT_AUTHOR_NAME: 'Roboratory', GIT_AUTHOR_EMAIL: 'machine@rob
 
 export function git(cwd: string, args: string[], opts: { allowFail?: boolean } = {}): Promise<{ code: number; out: string; err: string }> {
   return new Promise((resolve, reject) => {
-    execFile('git', args, { cwd, env: { ...process.env, ...IDENTITY }, maxBuffer: 32 * 1024 * 1024 }, (error, stdout, stderr) => {
+    execFile('git', args, { cwd, env: { ...process.env, ...IDENTITY }, maxBuffer: 32 * 1024 * 1024, windowsHide: true }, (error, stdout, stderr) => {
       const code = error ? (typeof (error as NodeJS.ErrnoException & { code?: unknown }).code === 'number' ? (error as unknown as { code: number }).code : 1) : 0;
       if (error && !opts.allowFail) reject(new Error(`git ${args.join(' ')}: ${stderr.trim() || error.message}`));
       else resolve({ code, out: stdout, err: stderr });

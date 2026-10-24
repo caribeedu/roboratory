@@ -1,5 +1,5 @@
 // Launches the packaged app against a throwaway demo factory and takes screenshots.
-// Usage: node e2e/shoot.mjs <out-dir>
+// Usage: node e2e/tools/shoot.mjs <out-dir>
 import { appExecutable } from './exe.mjs';
 import { _electron as electron } from 'playwright';
 import fs from 'node:fs';

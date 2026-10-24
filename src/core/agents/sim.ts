@@ -35,8 +35,8 @@ export async function runSim(req: AgentRequest): Promise<AgentResult> {
   if (!req.readOnly && sim.commit && fs.existsSync(path.join(req.cwd, '.git'))) {
     try {
       const env = { ...process.env, GIT_AUTHOR_NAME: 'Roboratory', GIT_AUTHOR_EMAIL: 'machine@roboratory.local', GIT_COMMITTER_NAME: 'Roboratory', GIT_COMMITTER_EMAIL: 'machine@roboratory.local' };
-      execFileSync('git', ['add', '-A'], { cwd: req.cwd, env });
-      execFileSync('git', ['commit', '-q', '-m', String(render(String(sim.commit), ctx))], { cwd: req.cwd, env });
+      execFileSync('git', ['add', '-A'], { cwd: req.cwd, env, windowsHide: true });
+      execFileSync('git', ['commit', '-q', '-m', String(render(String(sim.commit), ctx))], { cwd: req.cwd, env, windowsHide: true });
     } catch { /* nothing to commit */ }
   }
   const box = (ctx.box ?? {}) as Record<string, unknown>;
