@@ -24,8 +24,12 @@ async function insertOn(page: Page, from: string, to: string, kind: string) {
 
 /** Names the piece whose panel is open, and waits until the floor shows the name. */
 async function rename(page: Page, name: string) {
-  await field(page, 'Name', name);
-  await expect(page.locator('.piece-label', { hasText: name }).first()).toBeVisible();
+  // The panel re-reads the draft when the engine reloads files that changed on disk, which can land while a field is
+  // being typed in; the typing is then lost, as it is meant to be. A person types again, so the test does too.
+  await expect(async () => {
+    await field(page, 'Name', name);
+    await expect(page.locator('.piece-label', { hasText: name }).first()).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 20_000 });
 }
 
 async function startBuilding(page: Page) {

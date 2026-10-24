@@ -619,6 +619,8 @@ export class Engine extends EventEmitter {
       });
       p.abort = undefined;
       if (res.costUsd !== undefined) this.record(run, { type: 'cost', piece: def.id, usd: res.costUsd });
+      // whatever came back (an answer, a question, a block, an error) is about an input that has since been replaced
+      if (this.staleInput(run, w)) { this.dropStale(line, run, p); return; }
       const ask = (res.output as { needs_human?: HumanQuestion } | undefined)?.needs_human;
       if (!res.error && ask && typeof ask.question === 'string') {
         p.state = 'asking';
@@ -638,7 +640,6 @@ export class Engine extends EventEmitter {
       }
       if (res.error) { lastError = res.error; }
       else if (!validate(res.output)) { lastError = ajv.errorsText(validate.errors, { dataVar: 'output' }); }
-      else if (this.staleInput(run, w)) { this.dropStale(line, run, p); return; }
       else {
         if (branch) {
           const c = await commitLeftovers(dir, `${def.label}: work left uncommitted by the agent (${run.summary.id})`);

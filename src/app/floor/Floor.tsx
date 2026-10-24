@@ -90,17 +90,19 @@ export function Floor(props: FloorProps) {
   // ---------- app lifecycle ----------
   useEffect(() => {
     let disposed = false;
+    // React clears the ref when the component unmounts, before this effect's cleanup runs; the element is kept here
+    const el = host.current!;
     const app = new Application();
-    void app.init({ background: '#0f0d0a', resizeTo: host.current!, antialias: false, resolution: window.devicePixelRatio || 1, autoDensity: true, roundPixels: true }).then(() => {
-      if (disposed) { app.destroy(true); return; }
-      host.current!.prepend(app.canvas);
+    void app.init({ background: '#0f0d0a', resizeTo: el, antialias: false, resolution: window.devicePixelRatio || 1, autoDensity: true, roundPixels: true }).then(() => {
+      if (disposed || !el.isConnected) { app.destroy(true); return; }
+      el.prepend(app.canvas);
       app.canvas.style.imageRendering = 'pixelated';
       appRef.current = app;
       app.ticker.add((t) => frame(t.deltaMS));
       setReady(true);
     });
     const ro = new ResizeObserver(() => setCamTick((n) => n + 1));
-    ro.observe(host.current!);
+    ro.observe(el);
     return () => { disposed = true; ro.disconnect(); if (appRef.current) { appRef.current.destroy(true, { children: true }); appRef.current = null; } };
   }, []);
 

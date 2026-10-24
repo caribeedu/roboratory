@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { appExecutable } from '../tools/exe.mjs';
+import type { Snapshot } from '../../src/shared/types';
 
 export { expect };
 
@@ -76,7 +77,8 @@ export async function launch(sandbox: Sandbox, args: string[] = []): Promise<Lau
  * Playwright waits on, so `close()` may never return; the app is gone once its process has exited.
  */
 export async function quit(app: ElectronApplication) {
-  const proc = app.process();
+  let proc;
+  try { proc = app.process(); } catch { return; } // a test that quit the app itself leaves nothing to close
   await Promise.race([app.close().catch(() => undefined), wait(6000)]);
   await until(() => proc.exitCode !== null || proc.signalCode !== null, 10_000);
 }
@@ -123,7 +125,11 @@ export class Roboratory {
   /** Opens a folder the way the app does, and gives back what it complained about, if anything. */
   tryOpenAt(folder: string) { return this.page.evaluate((p) => window.roboratory.openFactoryAt(p).then(() => '', (e: Error) => e.message), folder); }
 
-  async lineState(lineId: string) { return (await this.state()).snapshot.lines[lineId]; }
+  /** A line as the floor sees it, or nothing while the engine is between two lives. */
+  async lineState(lineId: string): Promise<Snapshot['lines'][string] | undefined> { return (await this.state()).snapshot.lines[lineId]; }
+
+  /** The state of one station ("holding", "fire"…), or nothing while the line is not on the floor. */
+  async pieceState(lineId: string, pieceId: string) { return (await this.lineState(lineId))?.pieces[pieceId]?.state; }
 
   attention() { return this.page.getByRole('region', { name: 'Needs you' }); }
 

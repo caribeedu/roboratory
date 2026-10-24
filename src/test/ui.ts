@@ -1,6 +1,7 @@
 // What the interface tests share: a small factory to look at, and a stand-in for the bridge to the main process
 // (`window.roboratory`). The bridge is the one boundary the renderer has, so it is the one thing faked; the
 // components under test are the real ones.
+import { act } from '@testing-library/react';
 import type { RoboratoryApi } from '../shared/api';
 import type { LineView, PieceView, Snapshot } from '../shared/types';
 
@@ -106,3 +107,6 @@ import type { BuildView } from '../shared/build';
 export function buildView(over: Partial<BuildView> = {}): BuildView {
   return { sectorId: 'releases', factory: makeFactory(), issues: [], changes: [], affected: [], roles: [], canUndo: false, canRedo: false, blocked: [], ...over };
 }
+
+/** Lets what the bridge answered reach the screen, so no state update lands after the test has moved on. */
+export const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); await new Promise((r) => setTimeout(r, 0)); });

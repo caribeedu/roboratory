@@ -25,11 +25,13 @@ The engine moves out of the app. It runs as its own process, one per factory, an
 - **A checker's verdict on an old output reworked a piece again.** When two checkers judge the same output and one is slow, its "fail" could arrive after the piece had already been reworked for the other's finding, and the piece ran a third time. A result about an input that an upstream piece has since replaced is now dropped and the piece looks again at the new one. Found by a CI failure and reproduced with a deliberately slow checker.
 - **Cancelling a confirmation of a manager's suggestion rejected it.** "Cancel" now only steps back.
 - **Opening the app told you about items that were already waiting** (a toast and a sound for each). Only what arrives afterwards is news.
+- **Stopping the engine with `roboratory stop` sent the window back to the welcome screen.** The engine pushed an empty snapshot while closing, which the window took for a closed factory; it now shows the floor with the "Engine stopped" banner and a Start button. (A forced kill never showed it, which is why it went unseen on one platform.)
 - **With the engine away, the window logged an error** each time it refreshed a conversation or the Ledger. Those reads now come back empty and the banner says what is wrong.
 
 ### Tests
 - **Three layers, written as behavior.** The engine's specs moved from one file to `src/core/lines/`, one per thing a line does, on a shared harness (`src/test/harness.ts`) that describes a factory, runs it with simulated agents and reads the floor and the run files. The ones that read private state or called internal functions now watch what an agent receives instead. The interface has 180 tests in jsdom (Testing Library, the bridge to the main process as the only fake), and `e2e/specs/` is a Playwright Test suite on the packaged app, each test in a sandbox of its own: welcome, Floor, work, managers, build mode, the engine and the command, the app shell.
 - **A real engine backs the new tests.** Server, client and command are tested against a real engine, in-process and as a separate process; `e2e/tools/factory-sim-check.mjs` drives the engine over the socket.
+- **The CI found what a single machine could not:** the graceful-stop bug above, two tests that relied on timing, and a security check that Playwright's own debugging port fooled on Linux. A socket on the shared temporary folder moved to a private folder of the user.
 - **Coverage** is measured (`npm run test:coverage`) with a floor in `vitest.config.mts`, and the CI runs the specs on macOS, Windows and Linux.
 - The scripts that only screenshot or demo the app moved to `e2e/tools/`.
 

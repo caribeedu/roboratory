@@ -46,7 +46,33 @@ export function socketPathFor(root: string): string {
   const hash = crypto.createHash('sha1').update(`${path.resolve(root)}\n${user}`).digest('hex').slice(0, 12);
   if (process.platform === 'win32') return `\\\\.\\pipe\\roboratory-${user}-${hash}`;
   const own = path.join(root, RUNS_DIR, SOCKET_FILE);
-  return Buffer.byteLength(own) <= MAX_SOCKET_PATH ? own : path.join(os.tmpdir(), `roboratory-${user}-${hash}.sock`);
+  // outside the factory the socket goes in a folder of the user's own, so nobody else can take its name
+  return Buffer.byteLength(own) <= MAX_SOCKET_PATH ? own : path.join(os.tmpdir(), `roboratory-${user}`, `${hash}.sock`);
+}
+
+const inFactory = (socket: string) => path.basename(path.dirname(socket)) === RUNS_DIR;
+
+/** Whether the folder that holds the socket can be trusted: the factory's own, or a folder of this user that only this user can enter. */
+export function socketDirIsOurs(socket: string): boolean {
+  if (process.platform === 'win32' || inFactory(socket)) return true;
+  try {
+    const st = fs.lstatSync(path.dirname(socket));
+    return st.isDirectory() && (process.getuid ? st.uid === process.getuid() : true) && (st.mode & 0o077) === 0;
+  } catch { return false; }
+}
+
+/** Makes the folder for a socket that is not in the factory, closed to everyone else; throws if it is not ours. */
+function prepareSocketDir(socket: string) {
+  if (process.platform === 'win32' || inFactory(socket)) return;
+  fs.mkdirSync(path.dirname(socket), { recursive: true, mode: 0o700 });
+  if (!socketDirIsOurs(socket)) throw new Error(`${path.dirname(socket)} belongs to someone else or is open to others, so the engine will not listen there.`);
+}
+
+/** Compares tokens in constant time. */
+function sameToken(given: unknown, token: string): boolean {
+  if (typeof given !== 'string') return false;
+  const a = Buffer.from(given), b = Buffer.from(token);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 /** An engine is given this long to start listening before a lock whose pid is alive is doubted. */
@@ -138,10 +164,13 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
   root = path.resolve(root);
   const socket = socketPathFor(root);
   const token = await acquire(root, socket, opts.version);
+  try { prepareSocketDir(socket); } catch (e) { fs.rmSync(lockPath(root), { force: true }); throw e; }
   const clients = new Set<net.Socket>();
   // a connection is trusted once its hello carried the lock's token; events go to trusted connections only
   const authed = new Set<net.Socket>();
   const push = (event: string, data: unknown) => {
+    // closing the service pushes an empty snapshot; a client must see the connection end, not "no factory"
+    if (closed) return;
     const line = JSON.stringify({ event, data }) + '\n';
     for (const c of authed) c.write(line);
   };
@@ -176,9 +205,9 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
 
   const methods: Record<string, (...a: any[]) => unknown> = {
     hello: (c: net.Socket, who?: { client?: string; token?: string }) => {
-      if (who?.token !== token) throw new Error("Not allowed to use this engine.");
+      if (!sameToken(who?.token, token)) throw new Error("Not allowed to use this engine.");
       authed.add(c);
-      if (who.client === 'cli') sources.set(c, 'cli');
+      if (who?.client === 'cli') sources.set(c, 'cli');
       return { version: opts.version, build: opts.build, pid: process.pid, root, name: service.factory?.name ?? '', restarting };
     },
     status: () => ({ version: opts.version, build: opts.build, pid: process.pid, root, name: service.factory?.name ?? '', restarting, clients: clients.size, running: service.engine?.runningCount() ?? 0, runs: [...(service.engine?.activeLineIds() ?? [])] }),

@@ -3,7 +3,8 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { createDemoFactory } from './demo';
-import { liveLock, lockPath, readLock, socketPathFor, startServer } from './server';
+import { until } from '../test/harness';
+import { liveLock, lockPath, readLock, socketDirIsOurs, socketPathFor, startServer } from './server';
 
 process.env.ROBORATORY_SIM_SPEED = '200';
 
@@ -61,8 +62,9 @@ describe('engine server', () => {
 
       await c.call('buildStart', snapshot.factory.sectors[0].id);
       await c.call('buildDiscard');
-      await new Promise((r) => setTimeout(r, 150));
-      expect(c.events.some((e) => e.event === 'snapshot')).toBe(true);
+      // a change on the floor is pushed to every client that said hello
+      await c.call('halt', 'releases/orders-api');
+      await until(() => c.events.some((e) => e.event === 'snapshot' && e.data.lines['releases/orders-api']?.halted === true));
       expect(c.events.some((e) => e.event === 'build' && e.data === null)).toBe(true);
 
       await c.call('stop');
@@ -70,6 +72,17 @@ describe('engine server', () => {
       expect(readLock(root)).toBeNull();
       expect(fs.existsSync(lockPath(root))).toBe(false);
     } finally { await srv.close(); }
+  });
+
+  it('tells its clients nothing more when it shuts down, so they see the connection end and not an empty factory', async () => {
+    const { root } = factory();
+    const srv = await startServer(root, { version: '1.0.0' });
+    const c = await connect(srv.socket, srv.token);
+    await c.call('state');
+    const before = c.events.length;
+    await c.call('stop');
+    await new Promise((r) => setTimeout(r, 400));
+    expect(c.events.slice(before).filter((e) => e.event === 'snapshot')).toEqual([]);
   });
 
   it('replaces a stale lock without touching the file the lock names', async () => {
@@ -128,6 +141,18 @@ describe('engine server', () => {
     await expect(startServer(root, { version: '1.0.0', onExit: () => { exited = true; } })).rejects.toThrow();
     expect(exited).toBe(false);
     expect(fs.existsSync(lockPath(root))).toBe(false);
+  });
+
+  it.skipIf(process.platform === 'win32')("trusts a socket folder only when it is the user's own and closed to others", () => {
+    const base = fs.mkdtempSync(path.join(os.tmpdir(), 'roboratory-sock-'));
+    const dir = path.join(base, 'mine');
+    fs.mkdirSync(dir, { mode: 0o700 });
+    fs.chmodSync(dir, 0o700);
+    expect(socketDirIsOurs(path.join(dir, 'x.sock'))).toBe(true);
+    fs.chmodSync(dir, 0o755);
+    expect(socketDirIsOurs(path.join(dir, 'x.sock'))).toBe(false);
+    expect(socketDirIsOurs(path.join(base, 'missing', 'x.sock'))).toBe(false);
+    expect(socketDirIsOurs(path.join(base, 'f', '.runs', 'engine.sock'))).toBe(true); // the factory's own folder
   });
 
   it('falls back to a short path when the factory path is long', () => {

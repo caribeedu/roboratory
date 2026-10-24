@@ -59,7 +59,8 @@ async function open(root: string) {
   send('snapshot', EMPTY);
   const c = await EngineClient.connect(root, { client: 'app', start: true, launch: launchFor(engineScript()) });
   client = c;
-  c.on('snapshot', (s) => send('snapshot', s));
+  // an engine serves one factory for as long as it runs, so a snapshot with none is it shutting down, not a closed factory
+  c.on('snapshot', (s: Snapshot) => { if (s.factory) send('snapshot', s); });
   c.on('logs', (l) => send('logs', l));
   c.on('messages', (k) => send('messages', k));
   c.on('build', (v) => send('build', v));

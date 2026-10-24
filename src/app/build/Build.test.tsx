@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { Commit, GoalField, ListField, slug } from './forms';
 import { fromRule, RuleBuilder, toRule } from './RuleBuilder';
 import { SaveDialog } from './SaveDialog';
-import { installBridge, LINE_ID, makeFactory, type FakeBridge } from '../../test/ui';
+import { installBridge, LINE_ID, makeFactory, settle, type FakeBridge } from '../../test/ui';
 import type { BuildView, FieldInfo } from '../../shared/build';
 import { GOAL_MAX } from '../../shared/types';
 
@@ -122,21 +122,22 @@ describe('The rule builder', () => {
   const fields: FieldInfo[] = [{ path: 'verdict', type: 'string', values: ['pass', 'fail'] }, { path: 'confidence', type: 'number' }];
   let bridge: FakeBridge;
 
-  function open(over: { value?: string; required?: boolean; open?: boolean } = {}) {
+  async function open(over: { value?: string; required?: boolean; open?: boolean } = {}) {
     bridge = installBridge({ buildFields: vi.fn(async () => ({ fields, open: over.open ?? false })) });
     const onSave = vi.fn(), onCancel = vi.fn();
     render(<RuleBuilder lineId={LINE_ID} from="qa" value={over.value} required={over.required} onSave={onSave} onCancel={onCancel} />);
+    await settle();
     return { onSave, onCancel, user: userEvent.setup() };
   }
 
   it('asks the engine which fields the box really has, for the belt it is about', async () => {
-    open();
+    await open();
     await waitFor(() => expect(bridge.api.buildFields).toHaveBeenCalledWith(LINE_ID, 'qa', undefined));
     expect(await screen.findByRole('option', { name: 'verdict' })).toBeInTheDocument();
   });
 
   it('builds a rule from a field, a comparison and one of the values the field can take', async () => {
-    const { user, onSave } = open();
+    const { user, onSave } = await open();
     await screen.findByRole('option', { name: 'verdict' });
     await user.selectOptions(screen.getByLabelText('Field'), 'verdict');
     await user.selectOptions(screen.getByLabelText('Value'), 'pass');
@@ -146,7 +147,7 @@ describe('The rule builder', () => {
   });
 
   it('combines two conditions, all must hold or any may', async () => {
-    const { user, onSave } = open();
+    const { user, onSave } = await open();
     await screen.findByRole('option', { name: 'verdict' });
     await user.selectOptions(screen.getByLabelText('Field'), 'confidence');
     await user.type(screen.getByLabelText('Value'), '0.5');
@@ -160,14 +161,14 @@ describe('The rule builder', () => {
   });
 
   it('shows an existing rule in rows', async () => {
-    open({ value: "verdict == 'fail'" });
+    await open({ value: "verdict == 'fail'" });
     await screen.findByRole('option', { name: 'verdict' });
     expect(screen.getByLabelText('Field')).toHaveValue('verdict');
     expect(screen.getByLabelText('Value')).toHaveValue('fail');
   });
 
   it('takes a rule written as text, and refuses one that does not parse', async () => {
-    const { user, onSave } = open({ value: "a == 1 && b == 2 || c == 3" });
+    const { user, onSave } = await open({ value: "a == 1 && b == 2 || c == 3" });
     const text = await screen.findByLabelText('Rule');
     expect(text).toHaveValue('a == 1 && b == 2 || c == 3');
     await user.clear(text);
@@ -179,24 +180,24 @@ describe('The rule builder', () => {
   });
 
   it('saves no rule when none is written, unless the belt needs one', async () => {
-    const { user, onSave } = open();
+    const { user, onSave } = await open();
     await user.click(screen.getByRole('button', { name: 'Save rule' }));
     expect(onSave).toHaveBeenCalledWith(null);
   });
 
   it('will not save an empty rule for a return belt, and says it needs one', async () => {
-    open({ required: true });
+    await open({ required: true });
     expect(screen.getByText('A return belt needs a rule.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save rule' })).toBeDisabled();
   });
 
   it('says any field is accepted when the box before the belt has no declared shape', async () => {
-    open({ open: true });
+    await open({ open: true });
     expect(await screen.findByText(/has no declared shape/)).toBeInTheDocument();
   });
 
   it('cancels', async () => {
-    const { user, onCancel } = open();
+    const { user, onCancel } = await open();
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onCancel).toHaveBeenCalled();
   });

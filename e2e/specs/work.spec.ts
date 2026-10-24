@@ -98,6 +98,6 @@ test.describe('A machine on fire', () => {
     await panel.getByRole('button', { name: 'Halt line' }).click();
     await expect(panel).toContainText('Line halted');
     await expect(panel.getByRole('button', { name: 'Halt line' })).toHaveCount(0);
-    expect((await roboratory.lineState('incidents/orders-api')).halted).toBe(true);
+    expect((await roboratory.lineState('incidents/orders-api'))?.halted).toBe(true);
   });
 });

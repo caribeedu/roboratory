@@ -19,7 +19,7 @@ test.describe('When the app quits', () => {
 
   test('the engine keeps running, in a process of its own', async ({ app, roboratory, sandbox }) => {
     await roboratory.run(LINE, { tag: 'v1' });
-    await expect.poll(async () => (await roboratory.lineState(LINE)).pieces.launch.state, { timeout: 30_000 }).toBe('holding');
+    await expect.poll(() => roboratory.pieceState(LINE, 'launch'), { timeout: 30_000 }).toBe('holding');
     const lock = readEngineLock(sandbox.demo)!;
     expect(lock.pid).not.toBe(app.process().pid);
 
@@ -29,7 +29,7 @@ test.describe('When the app quits', () => {
 
   test('a simulated line reaches its pallet with the app closed, released from the command', async ({ app, roboratory, sandbox, cli }) => {
     const id = await roboratory.run(LINE, { tag: 'v2' });
-    await expect.poll(async () => (await roboratory.lineState(LINE)).pieces.launch.state, { timeout: 30_000 }).toBe('holding');
+    await expect.poll(() => roboratory.pieceState(LINE, 'launch'), { timeout: 30_000 }).toBe('holding');
     await quit(app);
 
     expect(cli('release', LINE, 'launch', '--confirm', '2').code).toBe(0);
@@ -38,7 +38,7 @@ test.describe('When the app quits', () => {
 
   test('a reopened app shows the run where it is, on the same engine, and the run goes on', async ({ app, roboratory, sandbox }) => {
     const id = await roboratory.run(LINE, { tag: 'v3' });
-    await expect.poll(async () => (await roboratory.lineState(LINE)).pieces.launch.state, { timeout: 30_000 }).toBe('holding');
+    await expect.poll(() => roboratory.pieceState(LINE, 'launch'), { timeout: 30_000 }).toBe('holding');
     const pid = readEngineLock(sandbox.demo)!.pid;
     await quit(app);
 
@@ -117,11 +117,11 @@ test.describe('The command line', () => {
   test('asks for each confirmation of a gate that wants several, instead of giving them for you', async ({ roboratory, cli }) => {
     await roboratory.openDemo();
     await roboratory.run(LINE, { tag: 'v5' });
-    await expect.poll(async () => (await roboratory.lineState(LINE)).pieces.launch.state, { timeout: 30_000 }).toBe('holding');
+    await expect.poll(() => roboratory.pieceState(LINE, 'launch'), { timeout: 30_000 }).toBe('holding');
     const refused = cli('release', LINE, 'launch');
     expect(refused.code).toBe(1);
     expect(refused.err).toContain('--confirm 2');
-    expect((await roboratory.lineState(LINE)).pieces.launch.state).toBe('holding');
+    expect(await roboratory.pieceState(LINE, 'launch')).toBe('holding');
   });
 });
 
@@ -146,9 +146,9 @@ test.describe('An engine older than the app', () => {
     await window.getByRole('button', { name: 'Restart when idle' }).click();
     await expect.poll(() => readEngineLock(sandbox.demo)?.pid, { timeout: 45_000 }).not.toBe(oldPid);
     await expect(window.getByRole('status').filter({ hasText: /engine/ })).toHaveCount(0, { timeout: 30_000 });
-    await expect.poll(async () => (await roboratory.lineState(LINE)).pieces.launch.state, { timeout: 45_000 }).toBe('holding');
+    await expect.poll(() => roboratory.pieceState(LINE, 'launch'), { timeout: 45_000 }).toBe('holding');
 
-    const pieces = Object.values((await roboratory.lineState(LINE)).pieces);
+    const pieces = Object.values((await roboratory.lineState(LINE))?.pieces ?? {});
     expect(pieces.some((p) => p.state === 'fire')).toBe(false);
     expect(events(sandbox.demo, LINE, id).some((e) => e.type === 'piece.fire')).toBe(false);
   });
@@ -172,7 +172,7 @@ test.describe('Build mode and the command', () => {
 });
 
 test.describe('Who may talk to the engine', () => {
-  test('answers nothing to a connection without the token, and opens no network port', async ({ roboratory, sandbox }) => {
+  test('answers nothing to a connection without the token, and opens no network port', async ({ app, roboratory, sandbox }) => {
     await roboratory.openDemo();
     const lock = readEngineLock(sandbox.demo)!;
     expect(lock.socket).toContain(process.platform === 'win32' ? '\\\\.\\pipe\\' : '.sock');
@@ -190,9 +190,14 @@ test.describe('Who may talk to the engine', () => {
     if (process.platform === 'win32') {
       listening = execFileSync('netstat', ['-ano', '-p', 'TCP'], { encoding: 'utf8', windowsHide: true }).split('\n').filter((l) => /LISTENING/.test(l) && new RegExp(`\\s${lock.pid}\\s*$`).test(l.trim())).join('');
     } else {
-      const r = spawnSync('lsof', ['-nP', '-iTCP', '-sTCP:LISTEN', '-a', '-p', String(lock.pid)], { encoding: 'utf8' });
-      test.skip(r.error !== undefined, 'lsof is not installed');
-      listening = r.stdout.trim();
+      // The app under test is started by Playwright with a remote-debugging port, and a child can inherit that
+      // listening socket. What counts is a port the engine opened itself, so the app's own ports are left out.
+      const listeners = (pid: number) => spawnSync('lsof', ['-nP', '-iTCP', '-sTCP:LISTEN', '-a', '-p', String(pid)], { encoding: 'utf8' });
+      const address = (row: string) => /\S+:\d+/.exec(row)?.[0] ?? row;
+      const mine = listeners(lock.pid);
+      test.skip(mine.error !== undefined, 'lsof is not installed');
+      const theApps = new Set(listeners(app.process().pid!).stdout.split('\n').slice(1).filter(Boolean).map(address));
+      listening = mine.stdout.split('\n').slice(1).filter((row) => row.trim() && !theApps.has(address(row))).join('\n');
     }
     expect(listening.trim()).toBe('');
     if (process.platform !== 'win32') expect(fs.statSync(lock.socket).mode & 0o077).toBe(0);

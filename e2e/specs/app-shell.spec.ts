@@ -53,7 +53,19 @@ test.describe('The engine banner', () => {
     expect(await until(() => { const l = readEngineLock(sandbox.demo); return !!l && l.pid !== old.pid && alive(l.pid); })).toBe(true);
     // and the floor is live again
     await roboratory.run('releases/orders-api', { tag: 'v1' });
-    await expect.poll(async () => (await roboratory.lineState('releases/orders-api')).pieces.launch.state, { timeout: 30_000 }).toBe('holding');
+    await expect.poll(() => roboratory.pieceState('releases/orders-api', 'launch'), { timeout: 30_000 }).toBe('holding');
+  });
+});
+
+test.describe('The engine stopped with the command', () => {
+  test('keeps the floor on screen with the banner, instead of going back to the welcome screen', async ({ window, roboratory, cli }) => {
+    await roboratory.openDemo();
+    expect(cli('stop').code).toBe(0);
+    await expect(window.getByRole('status')).toContainText('Engine stopped. Runs are paused until it starts again.', { timeout: 30_000 });
+    await expect(window.locator('.factory-name')).toHaveText('Demo Factory');
+    await expect(window.getByRole('button', { name: 'Open the demo factory' })).toHaveCount(0);
+    await window.getByRole('button', { name: 'Start' }).click();
+    await expect(window.getByRole('status')).toHaveCount(0);
   });
 });
 

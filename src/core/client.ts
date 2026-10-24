@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { RUNS_DIR } from './engine';
-import { liveLock, readLock, socketPathFor, type EngineLock } from './server';
+import { liveLock, readLock, socketDirIsOurs, socketPathFor, type EngineLock } from './server';
 
 export interface LaunchSpec { command: string; args: string[]; env?: Record<string, string> }
 export interface EngineInfo { version: string; build?: string; pid: number; root: string; name: string; restarting: boolean }
@@ -59,7 +59,10 @@ export class EngineClient extends EventEmitter {
       lock = await this.startEngine();
     }
     // the path is worked out here, never read from the lock, so a lock cannot send a client elsewhere
-    const sock = await open(socketPathFor(this.root), 5000);
+    const where = socketPathFor(this.root);
+    // the token is only handed to a socket whose folder nobody else could have made
+    if (!socketDirIsOurs(where)) throw new Error(`${path.dirname(where)} is not a private folder of yours, so the engine there is not trusted.`);
+    const sock = await open(where, 5000);
     this.bind(sock);
     try {
       this.info = await this.call<EngineInfo>('hello', { client: this.opts.client ?? 'app', token: lock.token });
@@ -157,7 +160,8 @@ export class EngineClient extends EventEmitter {
       if (lock) {
         try { (await open(socketPathFor(this.root), 300)).destroy(); return lock; } catch { /* not listening yet */ }
       }
-      if (exited !== undefined) break;
+      // our engine can exit because another starter won the lock a moment ago; that one is on its way up
+      if (exited !== undefined && !readLock(this.root)) break;
       await sleep(50);
     }
     const tail = fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8').trim().split('\n').slice(-5).join('\n') : '';

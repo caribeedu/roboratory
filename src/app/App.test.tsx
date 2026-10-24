@@ -2,7 +2,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
-import { buildView, installBridge, LINE_ID, snapshot, type FakeBridge } from '../test/ui';
+import { buildView, installBridge, LINE_ID, settle, snapshot, type FakeBridge } from '../test/ui';
 import type { AttentionItem, Snapshot } from '../shared/types';
 
 vi.mock('./floor/Floor', () => ({
@@ -24,6 +24,7 @@ async function open(over: Record<string, unknown> = {}) {
   bridge = installBridge(over);
   const user = userEvent.setup();
   render(<App />);
+  await settle();
   return user;
 }
 const floor = () => screen.getByTestId('floor');

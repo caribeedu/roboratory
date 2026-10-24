@@ -55,6 +55,16 @@ test.describe('The Floor', () => {
     await expect.poll(transform).toBe(start);
   });
 
+  test('can be closed right after it opened, over and over, without an error', async ({ window, roboratory, sandbox }) => {
+    // the canvas takes a moment to start; leaving before it has is what a hurried person does
+    for (let i = 0; i < 6; i++) {
+      await window.getByRole('button', { name: 'Close', exact: true }).click();
+      await window.getByRole('button', { name: sandbox.demo }).click();
+      await expect(window.getByRole('button', { name: 'Close', exact: true })).toBeVisible();
+    }
+    await expect(roboratory.piece('Triage')).toBeVisible();
+  });
+
   test('keeps the keyboard shortcuts: 2 for the Ledger and 1 back to the Floor', async ({ window }) => {
     await window.keyboard.press('2');
     await expect(window.getByRole('tab', { name: /Ledger/ })).toHaveAttribute('aria-selected', 'true');

@@ -8,8 +8,12 @@ describe('the roboratory launcher', () => {
     expect(launcher({ execPath: '/Apps/Roboratory.app/Contents/MacOS/Roboratory', script: '/Apps/Roboratory.app/Contents/Resources/app.asar/.vite/build/engine.js', platform: 'darwin' }))
       .toBe(`#!/bin/sh\nELECTRON_RUN_AS_NODE=1 exec '/Apps/Roboratory.app/Contents/MacOS/Roboratory' '/Apps/Roboratory.app/Contents/Resources/app.asar/.vite/build/engine.js' "$@"\n`);
     expect(launcher({ execPath: "/o'neil/app", script: '/s.js', platform: 'linux' })).toContain(`'/o'\\''neil/app'`);
-    expect(launcher({ execPath: 'C:\Roboratory\Roboratory.exe', script: 'C:\Roboratory\resources\app.asar\.vite\build\engine.js', platform: 'win32' }))
-      .toBe('@echo off\r\nsetlocal\r\nset ELECTRON_RUN_AS_NODE=1\r\n"C:\Roboratory\Roboratory.exe" "C:\Roboratory\resources\app.asar\.vite\build\engine.js" %*\r\n');
+    const exe = String.raw`C:\Roboratory\Roboratory.exe`;
+    const script = String.raw`C:\Roboratory\resources\app.asar\.vite\build\engine.js`;
+    expect(launcher({ execPath: exe, script, platform: 'win32' }))
+      .toBe(`@echo off\r\nsetlocal\r\nset ELECTRON_RUN_AS_NODE=1\r\n"${exe}" "${script}" %*\r\n`);
+    // a "%" in a path would be read by cmd as a variable
+    expect(launcher({ execPath: String.raw`C:\100%\app.exe`, script, platform: 'win32' })).toContain(String.raw`"C:\100%%\app.exe"`);
   });
 
   it('tells whether the launcher is missing, installed, or outdated because the app moved', () => {

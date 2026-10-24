@@ -2,7 +2,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Megaphone } from './Megaphone';
-import { installBridge, LINE_ID, makeFactory, type FakeBridge } from '../../test/ui';
+import { installBridge, LINE_ID, makeFactory, settle, type FakeBridge } from '../../test/ui';
 import type { ManagerMessage, Proposal } from '../../shared/types';
 
 const factory = makeFactory();
@@ -18,6 +18,7 @@ async function setup(messages: ManagerMessage[] = []) {
   const onEvidence = vi.fn();
   render(<Megaphone factory={factory} sector={sector} msgTick={{}} notify={notify} onThinking={onThinking} onEvidence={onEvidence} />);
   const user = userEvent.setup();
+  await settle();
   if (messages.length) await user.click(screen.getByRole('button', { name: 'Show conversation' }));
   return { notify, onThinking, onEvidence, user };
 }
