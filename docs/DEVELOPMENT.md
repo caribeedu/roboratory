@@ -114,7 +114,7 @@ The CI (`.github/workflows/tests.yml`) runs the Vitest layers and the e2e suite 
 
 ## Real agents cost money
 
-Tests, the demo and dry runs use `agent: sim`. Do not run a line with `agent: claude` or `codex`, or `e2e/real-agent-check.mjs`, without a cost estimate and approval. To keep an unavoidable real call to cents, use `--model haiku --tools "" --strict-mcp-config --mcp-config '{"mcpServers":{}}'`.
+Tests, the demo and dry runs use `agent: sim`. Do not run a line with `agent: claude` or `codex`, or `e2e/tools/real-agent-check.mjs`, without a cost estimate and approval. To keep an unavoidable real call to cents, use `--model haiku --tools "" --strict-mcp-config --mcp-config '{"mcpServers":{}}'`.
 
 ## Lessons about the agent CLIs
 
