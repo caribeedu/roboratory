@@ -121,6 +121,19 @@ describe('the roboratory command and the engine as a process', () => {
     } finally { stopEngine(root); }
   }, 90_000);
 
+  it('tells an engine of another build of the same version from the command that asks', async () => {
+    const root = factoryDir();
+    try {
+      expect(cli(root, 'run', LINE, '--input', 'tag=v6').code).toBe(0);
+      expect(cli(root, 'status').out).not.toMatch(/not this command's build/);
+      // the same bundle plus a byte: the version is the same, the build is not
+      const rebuilt = path.join(path.dirname(bundle), 'rebuilt.cjs');
+      fs.writeFileSync(rebuilt, fs.readFileSync(bundle, 'utf8') + '\n// rebuilt\n');
+      const status = spawnSync(process.execPath, [rebuilt, 'status', '--factory', root], { encoding: 'utf8', env: process.env, windowsHide: true });
+      expect(status.stdout).toMatch(/not this command's build/);
+    } finally { stopEngine(root); }
+  }, 60_000);
+
   it('prints what needs you with `watch`', async () => {
     const root = factoryDir();
     try {

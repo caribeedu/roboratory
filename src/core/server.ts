@@ -18,6 +18,8 @@ const MAX_SOCKET_PATH = 100;
 export interface EngineLock { pid: number; version: string; socket: string; root: string; token: string; t: number }
 export interface ServerOptions {
   version: string;
+  /** Which build of the bundle this is (see buildid.ts), told to clients so they can spot an older one. */
+  build?: string;
   /** How long the engine stays up with no open run and no client, in ms. */
   idleGraceMs?: number;
   /** `restart` is true when the engine left to be started again by a newer version. */
@@ -177,9 +179,9 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
       if (who?.token !== token) throw new Error("Not allowed to use this engine.");
       authed.add(c);
       if (who.client === 'cli') sources.set(c, 'cli');
-      return { version: opts.version, pid: process.pid, root, name: service.factory?.name ?? '', restarting };
+      return { version: opts.version, build: opts.build, pid: process.pid, root, name: service.factory?.name ?? '', restarting };
     },
-    status: () => ({ version: opts.version, pid: process.pid, root, name: service.factory?.name ?? '', restarting, clients: clients.size, running: service.engine?.runningCount() ?? 0, runs: [...(service.engine?.activeLineIds() ?? [])] }),
+    status: () => ({ version: opts.version, build: opts.build, pid: process.pid, root, name: service.factory?.name ?? '', restarting, clients: clients.size, running: service.engine?.runningCount() ?? 0, runs: [...(service.engine?.activeLineIds() ?? [])] }),
     // stop dispatching; once no machine or signal runs the engine leaves and its client starts it again (D43)
     restartWhenIdle: () => {
       if (service.buildOpen) throw new Error('Build mode has a draft open. Save or discard it first: a restart would lose it.');

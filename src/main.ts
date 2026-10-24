@@ -5,6 +5,7 @@ import path from 'node:path';
 import { EngineClient, launchFor } from './core/client';
 import { createDemoFactory } from './core/demo';
 import { appLog } from './core/applog';
+import { buildIdOf, engineIsOlder } from './core/buildid';
 import { defaultBinDir, installCommand, installStatus, type InstallState } from './core/install';
 import type { EngineStatus } from './shared/api';
 import type { Snapshot } from './shared/types';
@@ -39,7 +40,12 @@ function setEngine(next: Partial<EngineStatus>) {
   send('engine', engine);
 }
 
-const statusOf = (c: EngineClient): EngineStatus['state'] => (c.info.restarting ? 'restarting' : c.info.version !== app.getVersion() ? 'older' : 'running');
+// the engine counts as older when its version differs or it runs another build of the bundle than the one this app would start
+let appBuild: string | null = null;
+const statusOf = (c: EngineClient): EngineStatus['state'] => {
+  appBuild ??= buildIdOf(engineScript());
+  return c.info.restarting ? 'restarting' : engineIsOlder(c.info, { version: app.getVersion(), build: appBuild }) ? 'older' : 'running';
+};
 
 function disconnect() {
   client?.close();

@@ -9,7 +9,7 @@ import { RUNS_DIR } from './engine';
 import { liveLock, readLock, socketPathFor, type EngineLock } from './server';
 
 export interface LaunchSpec { command: string; args: string[]; env?: Record<string, string> }
-export interface EngineInfo { version: string; pid: number; root: string; name: string; restarting: boolean }
+export interface EngineInfo { version: string; build?: string; pid: number; root: string; name: string; restarting: boolean }
 export interface ConnectOptions {
   /** Who is calling, for the audit: the command line's verbs are recorded with the source "cli". */
   client?: 'app' | 'cli';

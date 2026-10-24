@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { EngineClient, launchFor } from './core/client';
+import { engineIsOlder } from './core/buildid';
 import { liveLock, startServer } from './core/server';
 import type { Snapshot } from './shared/types';
 
@@ -24,7 +25,7 @@ The factory is --factory <dir>, the ROBORATORY_FACTORY variable, or the folder y
 <line> is a line id as shown by \`status\`, or its last part when that is unambiguous.
 `;
 
-export interface CliEnv { version: string; script: string; out: (s: string) => void; err: (s: string) => void }
+export interface CliEnv { version: string; build?: string; script: string; out: (s: string) => void; err: (s: string) => void }
 
 interface Parsed { cmd: string; pos: string[]; flags: Record<string, string[]> }
 
@@ -89,7 +90,7 @@ export async function main(argv: string[], env: CliEnv): Promise<number> {
       if (!lock) { env.out(`No engine is running for ${root}.\n`); return 0; }
       const c = await EngineClient.connect(root, { client: 'cli' });
       try {
-        const st = await c.call<{ version: string; pid: number; name: string; restarting: boolean; running: number; runs: string[] }>('status');
+        const st = await c.call<{ version: string; build?: string; pid: number; name: string; restarting: boolean; running: number; runs: string[] }>('status');
         env.out(`Engine ${st.version} (pid ${st.pid}) for ${st.name || root}${st.restarting ? ', restarting when idle' : ''}\n`);
         env.out(`${st.running} machine or signal running\n`);
         const { snapshot } = await c.call<{ snapshot: Snapshot }>('state');
@@ -97,7 +98,7 @@ export async function main(argv: string[], env: CliEnv): Promise<number> {
         const runs = await c.call<{ id: string; lineId: string; status: string }[]>('runs');
         for (const r of runs.filter((x) => st.runs.includes(x.lineId) && x.status !== 'done')) env.out(`  run ${r.id} on ${r.lineId}: ${r.status}\n`);
         for (const a of snapshot.attention) env.out(`  needs you: ${a.title} (${a.lineId}) ${a.detail}\n`);
-        if (env.version !== st.version) env.out(`The engine is older than this command (${env.version}). Run \`roboratory restart --when-idle\`.\n`);
+        if (engineIsOlder(st, { version: env.version, build: env.build ?? '' })) env.out(`The engine is not this command's build (${env.version}). Run \`roboratory restart --when-idle\`.\n`);
       } finally { c.close(); }
       return 0;
     }
@@ -174,6 +175,7 @@ async function serve(p: Parsed, env: CliEnv): Promise<number> {
   try {
     srv = await startServer(root, {
       version: env.version,
+      build: env.build,
       onExit: (restart) => { env.out(`${stamp()} engine stopped${restart ? ' (restart)' : ''}\n`); process.exit(0); },
     });
   } catch (e) {
