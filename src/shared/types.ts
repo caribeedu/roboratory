@@ -66,8 +66,12 @@ export interface MachineDef {
   timeoutMs: number;
   /** MCP tool names, e.g. mcp__new-relic__run_nrql_query */
   tools: string[];
-  /** extra permission rules for the agent, e.g. Bash(npm test) */
+  /** commands the machine may run besides the defaults, as prefixes (`npm test`) or tool names (`Edit`) (D44) */
   allow: string[];
+  /** commands it must never run; adds to the factory's, the sector's and the line's (D44) */
+  deny: string[];
+  /** no file-editing tools and no `git push` (D44) */
+  readOnly: boolean;
   /** extra directories the agent may use, e.g. ~/repos */
   dirs: string[];
   /** Claude Code effort level (low, medium, high, max) */
@@ -86,6 +90,8 @@ export interface LineModel {
   intake: { kind: IntakeKind; inputs: InputField[]; label?: string };
   pieces: PieceDef[]; // includes intake (id '@intake') and pallet (id '@pallet')
   machines: Record<string, MachineDef>;
+  /** commands no machine of the line may run, added to the sector's and the factory's (D44) */
+  deny: string[];
 }
 
 export interface LineDef {
@@ -119,6 +125,8 @@ export interface SectorDef {
   /** sectors/<id>/culture.md, appended after the factory culture (D23) */
   culture: string;
   policy: Policy;
+  /** commands no machine of the sector may run, added to the factory's (D44) */
+  deny: string[];
   manager: ManagerDef;
   lines: LineDef[];
 }
@@ -127,6 +135,8 @@ export interface FactoryDef {
   root: string;
   name: string;
   ceiling: Policy;
+  /** commands no machine may run (D44); the template starts a factory with a list */
+  deny: string[];
   generalManager: ManagerDef;
   /** culture.md at the root, appended to every agent's role (D23) */
   culture: string;

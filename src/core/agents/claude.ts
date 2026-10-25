@@ -1,6 +1,7 @@
 // Claude Code adapter (D8): `claude -p` headless with a JSON schema, its stream turned into
 // transcript lines, and its MCP naming. Everything specific to Claude Code lives here.
 import { spawn } from 'node:child_process';
+import { isToolName, READ_TOOLS } from '../permissions';
 import { extractJson, launch, short, spawnCollect } from './process';
 import type { AgentRequest, AgentResult } from './types';
 
@@ -27,9 +28,8 @@ export function unwrapClaude(output: unknown): unknown {
  * What the agent may run in the shell, in words, from its allowed tools. Without it, agents try a
  * compound command, get it denied and conclude the whole shell is off.
  */
-export function shellRules(allowed: string[]): string {
-  if (allowed.includes('Bash')) return '';
-  const prefixes = allowed.map((a) => /^Bash\((.+?)(?::\*)?\)$/.exec(a)?.[1]).filter((x): x is string => !!x);
+export function shellRules(prefixes: string[], open: boolean): string {
+  if (open) return '';
   if (!prefixes.length) return 'Shell: you have no shell. Read files with the Read, Grep and Glob tools.';
   return [
     `Shell: you may run only commands that start with ${prefixes.map((x) => `\`${x}\``).join(', ')}. Anything else is denied.`,
@@ -39,12 +39,15 @@ export function shellRules(allowed: string[]): string {
 }
 
 export function claudeArgs(req: AgentRequest): string[] {
-  const reading = ['Read', 'Grep', 'Glob'];
-  const allowed = req.readOnly ? [...reading, ...req.tools] : [...reading, 'Edit', 'Write', 'Bash(git:*)', ...req.allow, ...req.tools];
-  const rules = req.readOnly ? '' : shellRules(allowed);
+  // the rules are the engine's (D44); the CLI gets them as its own tool names and `Bash(<prefix>:*)` rules
+  const commands = req.shell ? req.allow.filter((a) => !isToolName(a)) : [];
+  const bash = (c: string) => `Bash(${c}:*)`;
+  const allowed = req.shell ? [...req.allow.filter(isToolName), ...commands.map(bash), ...req.tools] : [...READ_TOOLS, ...req.tools];
+  const disallowed = ['Agent', ...req.deny.map((d) => (isToolName(d) ? d : bash(d)))];
+  const rules = req.shell ? shellRules(commands, req.allow.includes('Bash')) : '';
   // no sub-agents: a step's work stays in one clean context, one folder and one transcript (D9)
-  const args = ['-p', rules ? `${req.prompt}\n\n${rules}` : req.prompt, '--output-format', 'stream-json', '--verbose', '--json-schema', JSON.stringify(req.schema), '--permission-mode', 'dontAsk', '--allowedTools', allowed.join(','), '--disallowedTools', 'Agent', '--append-system-prompt', req.role];
-  if (req.readOnly) args.push('--tools', reading.join(','));
+  const args = ['-p', rules ? `${req.prompt}\n\n${rules}` : req.prompt, '--output-format', 'stream-json', '--verbose', '--json-schema', JSON.stringify(req.schema), '--permission-mode', 'dontAsk', '--allowedTools', allowed.join(','), '--disallowedTools', [...new Set(disallowed)].join(','), '--append-system-prompt', req.role];
+  if (req.readOnly) args.push('--tools', [...READ_TOOLS, ...(req.shell ? ['Bash'] : [])].join(','));
   if (req.model) args.push('--model', req.model);
   if (req.effort) args.push('--effort', req.effort);
   for (const d of req.addDirs) args.push('--add-dir', d);

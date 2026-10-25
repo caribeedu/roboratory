@@ -53,6 +53,7 @@ export function createDemoFactory(root: string, reposDir = path.join(root, '..',
     'You triage a ticket. Read the ticket id from the box, decide whether it is a bug or a question, and rate its severity.\n',
     { type: 'object', required: ['ticket', 'type', 'severity'], properties: { ticket: { type: 'string' }, type: { enum: ['bug', 'question'] }, severity: { enum: ['low', 'medium', 'high'] }, summary: { type: 'string' } } },
     `agent: sim
+read_only: true
 attempts: 3
 timeout: 5m
 sim:
@@ -91,7 +92,7 @@ sim:
     `agent: sim
 attempts: 3
 timeout: 15m
-allow: ["Bash(git:*)", "Bash(sh test.sh)"]
+allow: ["sh test.sh"]
 sim:
   seconds: 8
   write:
@@ -115,7 +116,7 @@ sim:
     'You publish the change: push the branch and open a draft pull request. Leave a note of what you published in your output (pr_url, branch, title).\n',
     { type: 'object', required: ['pr_url', 'branch', 'title'], properties: { pr_url: { type: 'string', pattern: '^(https://github\\.com/.+/pull/\\d+|local://pr/.+)$' }, branch: { type: 'string' }, title: { type: 'string' } } },
     `agent: sim
-allow: ["Bash(git:*)", "Bash(gh pr create:*)"]
+allow: ["git push", "gh pr create"]
 sim:
   seconds: 4
   write:
@@ -149,6 +150,7 @@ sim:
     'You correlate an alert with recent signals: error rate, deploys, traces.\n',
     { type: 'object', required: ['service', 'error_rate'], properties: { service: { type: 'string' }, error_rate: { type: 'number' }, baseline: { type: 'number' }, deploys_in_window: { type: 'array' } } },
     `agent: sim
+read_only: true
 tools: ["mcp__new-relic__run_nrql_query"]
 sim:
   seconds: 4
@@ -167,6 +169,7 @@ sim:
     'You find the most likely cause. Your answer must name the suspected cause and your confidence between 0 and 1.\n',
     { type: 'object', required: ['service', 'suspected_cause', 'confidence'], properties: { service: { type: 'string' }, suspected_cause: { type: 'string' }, confidence: { type: 'number', minimum: 0, maximum: 1 }, evidence: { type: 'integer' } } },
     `agent: sim
+read_only: true
 attempts: 3
 tools: ["mcp__new-relic__run_nrql_query", "mcp__incident-io__alert_show"]
 sim:
@@ -222,6 +225,16 @@ sim:
     '.gitignore': '.runs/\n',
     'README.md': '# Demo Factory\n\nA Roboratory factory. Open this folder in Roboratory.\n',
     'factory.yaml': `name: Demo Factory
+# Commands no machine of this factory may run. A sector, a line or a machine can add to the list, never remove from it.
+deny:
+  - git push --force
+  - git push -f
+  - git reset --hard
+  - rm -rf
+  - sudo
+  - gh pr merge
+  - gh repo delete
+  - npm publish
 # What any sector may let its manager do alone. Releasing gates and applying
 # changes can never be automatic.
 ceiling:

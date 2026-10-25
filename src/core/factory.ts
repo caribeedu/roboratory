@@ -32,6 +32,8 @@ function readYaml(io: LoadIo, file: string): Obj {
   if (!isObj(parsed)) throw new Error(`${file}: expected a mapping at the top level`);
   return parsed;
 }
+/** A list of strings, as the files write it: a missing key is an empty list, and a lone string is a list of one. */
+const strList = (v: unknown): string[] => (Array.isArray(v) ? v : v === undefined || v === null ? [] : [v]).map((x) => str(x).trim()).filter(Boolean);
 const readText = (io: LoadIo, file: string, d = '') => (io.fs.exists(file) ? io.fs.read(file) : d);
 const titleCase = (id: string) => id.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -121,7 +123,9 @@ function loadMachine(io: LoadIo, name: string, dirs: { dir: string; shared: bool
       attempts: Math.max(1, Number(conf.attempts ?? 3)),
       timeoutMs: parseDuration(conf.timeout, 10 * 60000),
       tools: Array.isArray(conf.tools) ? conf.tools.map((t) => str(t)) : [],
-      allow: Array.isArray(conf.allow) ? conf.allow.map((t) => str(t)) : [],
+      allow: strList(conf.allow),
+      deny: strList(conf.deny),
+      readOnly: conf.read_only === true,
       sim: isObj(conf.sim) ? conf.sim : undefined,
     };
   }
@@ -177,7 +181,7 @@ export function loadModel(dir: string, shared: boolean, machineDirs: { dir: stri
   }
   for (const p of pieces) if (p.needs.length && p.needs.every((n) => n.back)) problem(io, `piece "${p.id}" has only return belts; it also needs a forward belt`, dir, p.id);
   columnsAndLanes(pieces); // throws on loops
-  return { name: path.basename(dir), dir, shared, intake: { kind, inputs, label: intakeConf.label ? str(intakeConf.label) : undefined }, pieces, machines };
+  return { name: path.basename(dir), dir, shared, intake: { kind, inputs, label: intakeConf.label ? str(intakeConf.label) : undefined }, pieces, machines, deny: strList(conf.deny) };
 }
 
 /** Loads from disk, or from a draft overlay. A tolerant load keeps structural problems in `problems` instead of failing. */
@@ -202,6 +206,7 @@ export function loadFactory(root: string, opts: { fs?: Vfs; tolerant?: boolean }
         name: str(sconf.name, titleCase(sid)),
         color: str(sconf.color, SECTOR_COLORS[i % SECTOR_COLORS.length]),
         policy: parsePolicy(sconf.policy),
+        deny: strList(sconf.deny),
         manager: parseManager(io, sconf.manager, path.join(sdir, 'manager', 'role.md'), 'claude'),
         lines: [],
       };
@@ -234,7 +239,7 @@ export function loadFactory(root: string, opts: { fs?: Vfs; tolerant?: boolean }
     } catch (e) { warnings.push(`sectors/${sid}: ${(e as Error).message}`); }
   });
   const gm = parseManager(io, fconf.general_manager, path.join(root, 'general-manager', 'role.md'), 'claude');
-  return { root, name: str(fconf.name, titleCase(path.basename(root))), ceiling: parsePolicy(fconf.ceiling), generalManager: gm, culture: readText(io, path.join(root, 'culture.md')), lineContext: fconf.line_context !== false, sectors, warnings, problems: io.problems };
+  return { root, name: str(fconf.name, titleCase(path.basename(root))), ceiling: parsePolicy(fconf.ceiling), deny: strList(fconf.deny), generalManager: gm, culture: readText(io, path.join(root, 'culture.md')), lineContext: fconf.line_context !== false, sectors, warnings, problems: io.problems };
 }
 
 /** How many lines and sectors use each model folder and machine folder. */

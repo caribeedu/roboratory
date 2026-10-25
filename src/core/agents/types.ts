@@ -18,9 +18,16 @@ export interface AgentRequest {
   question?: Record<string, unknown>;
   cwd: string;
   addDirs: string[];
+  /** what it may run, as the engine worked it out (D44): command prefixes (`git status`) and tool names (`Edit`, `Bash`) */
   allow: string[];
+  /** commands and tools it must never use */
+  deny: string[];
+  /** MCP tools, by name */
   tools: string[];
+  /** no file-editing tools */
   readOnly: boolean;
+  /** has a shell; a manager has none */
+  shell: boolean;
   timeoutMs: number;
   sim?: Record<string, unknown>;
   simCtx?: Record<string, unknown>;

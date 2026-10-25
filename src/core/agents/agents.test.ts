@@ -3,11 +3,18 @@ import os from 'node:os';
 import path from 'node:path';
 import { claudeSchema, mcpServerOf, resultLine, shellRules, toolArgs, toolLabel, unwrapClaude } from './claude';
 import { runAgent, type AgentEvent, type AgentRequest } from './index';
+import { effectiveRules } from '../permissions';
 import { extractJson } from './process';
 
+/** What the engine hands an adapter for a machine: its lists and the defaults, worked out (D44). */
+const machineRules = (o: { allow?: string[]; deny?: string[]; readOnly?: boolean } = {}) => {
+  const readOnly = o.readOnly ?? false;
+  return { ...effectiveRules({ allow: o.allow ?? [], deny: o.deny ?? [], readOnly, shell: true }), readOnly, shell: true };
+};
+
 const base = (over: Partial<AgentRequest> = {}): AgentRequest => ({
-  agent: 'claude', role: 'role', prompt: 'do it', schema: { type: 'object' }, cwd: os.tmpdir(), addDirs: [], allow: [], tools: [],
-  readOnly: false, timeoutMs: 10000, onEvent: () => {}, ...over,
+  agent: 'claude', role: 'role', prompt: 'do it', schema: { type: 'object' }, cwd: os.tmpdir(), addDirs: [], tools: [],
+  ...machineRules(), timeoutMs: 10000, onEvent: () => {}, ...over,
 });
 
 function fakeClaude(script: string) {
@@ -63,19 +70,20 @@ console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false
   }
 
   it('tells a machine which shell commands it may run, and nothing when its shell is open', async () => {
-    const { prompt } = await startedWith({ allow: ['Bash(gh pr view:*)', 'Bash(curl:*)'] });
-    expect(prompt).toContain('Shell: you may run only commands that start with `git`, `gh pr view`, `curl`. Anything else is denied.');
+    const { prompt } = await startedWith(machineRules({ allow: ['Bash(gh pr view:*)', 'Bash(curl:*)'] }));
+    expect(prompt).toMatch(/Shell: you may run only commands that start with `git status`.*`git commit`.*`gh pr view`, `curl`. Anything else is denied./);
+    expect(prompt).not.toContain('`git push`');
     expect(prompt).toContain('A denied command does not mean the others are denied.');
-    expect((await startedWith({ allow: ['Bash'] })).prompt).toBe('do it');
-    expect((await startedWith({ readOnly: true })).prompt).toBe('do it');
+    expect((await startedWith(machineRules({ allow: ['Bash'] }))).prompt).toBe('do it');
+    expect((await startedWith({ readOnly: true, shell: false, allow: [], deny: [] })).prompt).toBe('do it');
   });
 
   it('says a shell is off when no command is allowed at all', () => {
-    expect(shellRules(['Read', 'Grep'])).toMatch(/you have no shell/);
+    expect(shellRules([], false)).toMatch(/you have no shell/);
   });
 
   it('starts managers read-only, so no write tools exist in their session', async () => {
-    const manager = await startedWith({ readOnly: true, tools: ['mcp__nr__q'] });
+    const manager = await startedWith({ readOnly: true, shell: false, allow: [], deny: [], tools: ['mcp__nr__q'] });
     expect(manager.value('--tools')).toBe('Read,Grep,Glob');
     expect(manager.value('--allowedTools')).toBe('Read,Grep,Glob,mcp__nr__q');
     expect(manager.value('--permission-mode')).toBe('dontAsk');
@@ -83,13 +91,36 @@ console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false
   });
 
   it('starts machines with file edits, the chosen model and effort, the extra folders, and no sub-agents', async () => {
-    const machine = await startedWith({ allow: ['Bash(sh test.sh)'], addDirs: ['/x'], effort: 'high', model: 'opus' });
+    const machine = await startedWith({ ...machineRules({ allow: ['Bash(sh test.sh)'] }), addDirs: ['/x'], effort: 'high', model: 'opus' });
     expect(machine.value('--effort')).toBe('high');
     expect(machine.value('--model')).toBe('opus');
     expect(machine.args).not.toContain('--tools');
     expect(machine.value('--allowedTools')).toContain('Edit');
     expect(machine.args).toContain('/x');
     expect(machine.value('--disallowedTools')).toBe('Agent');
+  });
+
+  it('gives a machine the local git commands as rules of their own, never git push or all of git', async () => {
+    const allowed = (await startedWith(machineRules())).value('--allowedTools').split(',');
+    expect(allowed).toEqual(expect.arrayContaining(['Edit', 'Write', 'Bash(git commit:*)', 'Bash(git status:*)']));
+    expect(allowed).not.toContain('Bash(git:*)');
+    expect(allowed).not.toContain('Bash(git push:*)');
+    expect((await startedWith(machineRules({ allow: ['git push'] }))).value('--allowedTools').split(',')).toContain('Bash(git push:*)');
+  });
+
+  it('hands the hard denials to the CLI as deny rules, and the tools too', async () => {
+    const machine = await startedWith(machineRules({ deny: ['rm -rf', 'git push --force', 'WebFetch'] }));
+    expect(machine.value('--disallowedTools')).toBe('Agent,Bash(rm -rf:*),Bash(git push --force:*),WebFetch');
+  });
+
+  it('starts a read-only machine with no file tools but its shell, and git push denied', async () => {
+    const machine = await startedWith(machineRules({ readOnly: true, allow: ['gh pr view'] }));
+    expect(machine.value('--tools')).toBe('Read,Grep,Glob,Bash');
+    const allowed = machine.value('--allowedTools').split(',');
+    expect(allowed).toEqual(expect.arrayContaining(['Bash(gh pr view:*)', 'Bash(git diff:*)']));
+    expect(allowed).not.toContain('Edit');
+    expect(allowed).not.toContain('Bash(git commit:*)');
+    expect(machine.value('--disallowedTools')).toContain('Bash(git push:*)');
   });
 
   it('runs the simulated agent and writes its files', async () => {

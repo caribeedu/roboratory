@@ -7,10 +7,11 @@ import path from 'node:path';
 import Ajv, { type ValidateFunction } from 'ajv';
 import { describe, evaluate } from '../shared/expr';
 import type {
-  AttentionItem, BoxView, FactoryDef, HumanQuestion, LineDef, LineView, LogEntry, PieceDef, PieceState, PieceView, RunStatus, RunSummary, VerbName,
+  AttentionItem, BoxView, FactoryDef, HumanQuestion, LineDef, LineView, LogEntry, MachineDef, PieceDef, PieceState, PieceView, RunStatus, RunSummary, VerbName,
 } from '../shared/types';
 import { runAgent, type AgentEvent } from './agents';
 import { addWorktree, commitLeftovers, factoryVersion, git, headOf, mergeInto, removeWorktree } from './git';
+import { effectiveRules } from './permissions';
 import { renderCommand } from './template';
 
 export const RUNS_DIR = '.runs';
@@ -126,6 +127,15 @@ export class Engine extends EventEmitter {
   }
 
   private sectorOf(line: LineDef) { return this.factory.sectors.find((s) => s.id === line.sectorId)!; }
+
+  /** What a machine may run (D44): its own lists and the defaults, with every level's hard denials added. */
+  private rulesFor(line: LineDef, machine: MachineDef) {
+    const rules = effectiveRules({
+      allow: machine.allow, readOnly: machine.readOnly, shell: true,
+      deny: [...this.factory.deny, ...(this.sectorOf(line)?.deny ?? []), ...line.model.deny, ...machine.deny],
+    });
+    return { ...rules, readOnly: machine.readOnly, shell: true };
+  }
 
   // ---------- verbs (D30): every action goes through here and is audited ----------
 
@@ -640,7 +650,7 @@ export class Engine extends EventEmitter {
       p.abort = abort;
       const res = await runAgent({
         agent: machine.agent, model: machine.model, effort: machine.effort, role, schema: machine.contract, question: ALTERNATIVES, cwd: dir, addDirs,
-        allow: machine.allow, tools: machine.tools, readOnly: false, timeoutMs: machine.timeoutMs, sim: machine.sim, simFail,
+        ...this.rulesFor(run.line, machine), tools: machine.tools, timeoutMs: machine.timeoutMs, sim: machine.sim, simFail,
         simCtx: { box: w.box.payload, params: run.line.params, run: { id: run.summary.id }, git: { branch }, call },
         prompt: machinePrompt(run, this.factory.lineContext ? def.id : undefined, def.label, w.box.payload, machine.contract, siblings, lastError, w.hint, boxFile),
         signal: abort.signal,

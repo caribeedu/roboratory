@@ -49,6 +49,9 @@ function LineSettings({ view, line, op, onClose }: { view: BuildView; line?: Lin
     setParamError('');
     void op({ op: 'setLine', lineId: line.id, params: Object.fromEntries(p) });
   };
+  const modelRaw = useDraftFile(`${modelDir(line)}/line.yaml`, view);
+  let modelConf: Record<string, unknown> = {};
+  try { modelConf = YAML.parse(modelRaw ?? '') ?? {}; } catch { /* shown by the checks */ }
   const copies = view.factory.sectors.flatMap((s) => s.lines).filter((l) => l.model === line.model && l.sharedModel === line.sharedModel);
   return (
     <>
@@ -62,6 +65,7 @@ function LineSettings({ view, line, op, onClose }: { view: BuildView; line?: Lin
         <Commit label="Target repository" value={line.repo ?? ''} placeholder="~/repos/my-service" onCommit={(v) => void op({ op: 'setLine', lineId: line.id, repo: v || null })} />
       </Row>
       <Row label="Model" hint={copies.length > 1 ? `Shared with ${copies.filter((c) => c.id !== line.id).map((c) => c.name).join(', ')}. Select a piece to separate it.` : undefined}><code>{modelDir(line)}</code></Row>
+      <Row label="Never allowed" hint="Commands no machine of this line's model may run, added to the sector's and the factory's."><ListField label="Line never allowed" value={listOf(modelConf.deny)} onCommit={(deny) => void op({ op: 'setModel', lineId: line.id, deny })} /></Row>
       {fresh(<Section title="Parameters">
         <ul className="b-list">
           {params.map(([k, v], i) => (
@@ -123,6 +127,7 @@ function SectorSettings({ view, sector, op }: { view: BuildView; sector: Factory
       <Row label="Color">
         <span className="swatches">{COLORS.map((c) => <button key={c} className={`swatch-btn${c === sector.color ? ' on' : ''}`} style={{ background: c }} aria-label={`Color ${c}`} onClick={() => void op({ op: 'setSector', sectorId: sector.id, color: c })} />)}</span>
       </Row>
+      <Row label="Never allowed" hint="Commands no machine of this sector may run, added to the factory's."><ListField label="Sector never allowed" value={listOf(conf.deny)} onCommit={(deny) => void op({ op: 'setSector', sectorId: sector.id, deny })} /></Row>
       <Section title="Sector Manager"><ManagerForm value={(conf.manager as Record<string, unknown>) ?? {}} onCommit={(m) => void op({ op: 'setSector', sectorId: sector.id, manager: m })} /></Section>
       <Section title="Policy" collapsed><PolicyForm value={sector.policy} ceiling={parsePolicy(fconf.ceiling)} onCommit={(policy) => void op({ op: 'setSector', sectorId: sector.id, policy })} /></Section>
       <Section title="Culture" collapsed>
@@ -142,6 +147,8 @@ function SectorSettings({ view, sector, op }: { view: BuildView; sector: Factory
   );
 }
 
+const listOf = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
+
 function parsePolicy(v: unknown): Policy {
   const out: Policy = {};
   if (v && typeof v === 'object') for (const [k, r] of Object.entries(v as Record<string, unknown>)) out[k as VerbName] = { auto: Number((r as { auto?: number })?.auto ?? r) || 0 };
@@ -159,6 +166,7 @@ function FactorySettings({ view, op }: { view: BuildView; op: Op }) {
       <Row label="Line context" hint="Machines are told their place in the line: the line in order, their goal, where their box comes from and goes, and what comes after them, with each piece's goal. Goals are sent to the model, which can cost a little more.">
         <label className="chk"><input type="checkbox" checked={view.factory.lineContext} onChange={(e) => void op({ op: 'setFactory', lineContext: e.target.checked })} /> on for every machine</label>
       </Row>
+      <Row label="Never allowed" hint="Commands no machine may run. A sector, a line and a machine can add to this list, never remove from it."><ListField label="Factory never allowed" value={listOf(conf.deny)} onCommit={(deny) => void op({ op: 'setFactory', deny })} /></Row>
       <Section title="General Manager"><ManagerForm value={(conf.general_manager as Record<string, unknown>) ?? {}} onCommit={(m) => void op({ op: 'setFactory', generalManager: m })} /></Section>
       <Section title="Ceiling" collapsed><PolicyForm value={parsePolicy(conf.ceiling)} onCommit={(ceiling) => void op({ op: 'setFactory', ceiling })} /></Section>
       <Section title="Culture" collapsed>

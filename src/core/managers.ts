@@ -83,7 +83,7 @@ export class Managers {
     const res = def.agent === 'sim'
       ? { output: simManager(f, this.engine(), scope, question) }
       : await runAgent({
-        agent: def.agent, model: def.model, readOnly: true, tools: def.tools, allow: [], addDirs: [],
+        agent: def.agent, model: def.model, readOnly: true, shell: false, tools: def.tools, allow: [], deny: [], addDirs: [],
         cwd: sector ? sector.dir : f.root, timeoutMs: 5 * 60000, schema: MANAGER_CONTRACT,
         role: [def.role || (sector ? `You are the Sector Manager of "${sector.name}".` : 'You are the General Manager of this factory.'), f.culture, sector?.culture].filter((x) => x && x.trim()).join('\n\n'),
         prompt: managerPrompt(scope, sector, brief, question, this.messages(scope).slice(-8, -2)), onEvent: () => {},
