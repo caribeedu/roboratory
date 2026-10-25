@@ -203,7 +203,7 @@ function setMachine(d: Draft, l: LineDef, op: Extract<BuildOp, { op: 'setMachine
   if (!m) fail(`"${op.pieceId}" is not a machine.`);
   const conf: MachineConf = op.conf;
   // an empty list and an off switch are the defaults, so the key is removed rather than written
-  const set: Record<string, unknown> = { ...conf, deny: conf.deny && !conf.deny.length ? null : conf.deny, read_only: conf.read_only === false ? null : conf.read_only };
+  const set: Record<string, unknown> = { ...conf, deny: denyValue(conf.deny), read_only: conf.read_only === false ? null : conf.read_only };
   d.editYaml(path.join(m!.dir, 'machine.yaml'), (doc) => setMap(doc, doc.contents as YAMLMap, set));
 }
 

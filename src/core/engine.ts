@@ -101,7 +101,7 @@ export class Engine extends EventEmitter {
   private paused = false;
   private permissionTool?: PermissionAccess['tool'];
   /** the permission requests of the machines running now, by the session each one was started with */
-  private sessions = new Map<string, (call: PermissionCall) => Promise<PermissionDecision>>();
+  private sessions = new Map<string, (call: PermissionCall, gone?: AbortSignal) => Promise<PermissionDecision>>();
   private asks = new Map<string, AskRt>();
   /** Where the verb being called comes from ("cli"); audited next to the actor. Set by the server around a call. */
   source?: string;
@@ -145,12 +145,12 @@ export class Engine extends EventEmitter {
   // ---------- permission requests (D44) ----------
 
   /** The engine's decision on a tool call of the machine started with `session`; the permission tool process asks it over the socket. */
-  permitSession(session: string, call: PermissionCall): Promise<PermissionDecision> {
+  permitSession(session: string, call: PermissionCall, gone?: AbortSignal): Promise<PermissionDecision> {
     const decide = this.sessions.get(session);
-    return decide ? decide(call) : Promise.resolve({ behavior: 'deny', message: 'No machine of this engine is running under this session; the call was not made.' });
+    return decide ? decide(call, gone) : Promise.resolve({ behavior: 'deny', message: 'No machine of this engine is running under this session; the call was not made.' });
   }
 
-  private permit(run: RunRt, def: PieceDef, rules: Rules, waits: Waits, call: PermissionCall): Promise<PermissionDecision> {
+  private permit(run: RunRt, def: PieceDef, rules: Rules, waits: Waits, call: PermissionCall, gone?: AbortSignal): Promise<PermissionDecision> {
     const v = decideTool(call.tool, call.input, rules);
     if (v.verdict === 'allow') return Promise.resolve({ behavior: 'allow', updatedInput: call.input });
     const summary = call.tool === 'Bash' ? String(call.input.command ?? '') : `${call.tool} ${JSON.stringify(call.input).slice(0, 200)}`;
@@ -165,8 +165,10 @@ export class Engine extends EventEmitter {
       waits.add(1);
       const ask: AskRt = {
         id, runId: run.summary.id, lineId: run.line.id, pieceId: def.id, tool: call.tool, summary, input: call.input, since: this.now(),
-        settle: (d) => { this.asks.delete(id); waits.add(-1); resolve(d); this.changed(); },
+        settle: (d) => { if (!this.asks.delete(id)) return; waits.add(-1); resolve(d); this.changed(); },
       };
+      // the permission tool's connection ended: nobody is left to hear an answer
+      gone?.addEventListener('abort', () => ask.settle({ behavior: 'deny', message: 'The permission tool lost its connection to the engine; the call was not made.' }), { once: true });
       this.asks.set(id, ask);
       this.record(run, { type: 'permission.request', id, piece: def.id, tool: call.tool, summary, why: v.why });
       this.log({ level: 'sector', ...where, kind: 'warn', text: `${def.label} asks to run: ${summary}` });
@@ -728,9 +730,11 @@ export class Engine extends EventEmitter {
       const rules = this.rulesFor(run.line, machine);
       const waits = new Waits();
       const session = crypto.randomUUID();
-      const decide = (call: PermissionCall) => this.permit(run, def, rules, waits, call);
+      const decide = (call: PermissionCall, gone?: AbortSignal) => this.permit(run, def, rules, waits, call, gone);
       this.sessions.set(session, decide);
-      const res = await runAgent({
+      let res;
+      try {
+      res = await runAgent({
         agent: machine.agent, model: machine.model, effort: machine.effort, role, schema: machine.contract, question: ALTERNATIVES, cwd: dir, addDirs,
         ...rules, tools: machine.tools, timeoutMs: machine.timeoutMs, sim: machine.sim, simFail,
         simCtx: { box: w.box.payload, params: run.line.params, run: { id: run.summary.id }, git: { branch }, call },
@@ -742,9 +746,11 @@ export class Engine extends EventEmitter {
           this.log({ level: 'machine', sectorId: run.line.sectorId, lineId: run.line.id, pieceId: def.id, runId: run.summary.id, kind: e.kind === 'ret' ? 'text' : e.kind === 'tool' ? 'tool' : 'text', text: e.kind === 'ret' ? `◂ ${e.text}` : e.kind === 'tool' ? `▸ ${e.text}` : e.text });
         },
       });
+      } finally {
+        this.sessions.delete(session);
+        this.settleAsks(run.summary.id, def.id, 'The machine stopped before an answer came.');
+      }
       p.abort = undefined;
-      this.sessions.delete(session);
-      this.settleAsks(run.summary.id, def.id, 'The machine stopped before an answer came.');
       if (res.costUsd !== undefined) this.record(run, { type: 'cost', piece: def.id, usd: res.costUsd });
       // whatever came back (an answer, a question, a block, an error) is about an input that has since been replaced
       if (this.staleInput(run, w, def.id)) { this.dropStale(line, run, p); return; }
@@ -1064,6 +1070,7 @@ export class Engine extends EventEmitter {
       for (const b of l.belts) clearTimeout(b.timer);
       for (const p of l.pieces.values()) p.abort?.abort();
     }
+    for (const a of [...this.asks.values()]) a.settle({ behavior: 'deny', message: 'The engine stopped.' });
   }
 }
 

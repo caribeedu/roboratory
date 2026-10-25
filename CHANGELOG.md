@@ -34,10 +34,11 @@ A machine now asks before it runs a command outside its list, and what the facto
 ### Upgrading
 - **Add `schema_version: 1` as the first key of every `line.yaml` and `machine.yaml`.** Without it the file fails to load and says what to write; a key the schema does not know fails the same way.
 - **Write `allow` and `deny` as prefixes:** `Bash(gh pr view:*)` becomes `gh pr view`. A machine no longer gets `Bash(git:*)` by default, so a `git push` it used to run on its own now asks you; list `git push` in its `allow` to keep it.
+- **`agent:` must be `claude` or `sim`,** and each key must hold the type the schema lists (a number where a string is wanted is an error now).
 - **An engine started by v0.8 keeps running** until you use the banner's "Restart when idle".
 
 ### Known limits
-- **The engine reads commands, not what they do.** A script a listed program runs, and the read-only commands Claude Code allows by itself, are out of its reach, and `read_only` is not a sandbox. Containers would close this (docs/ROADMAP.md §3).
+- **The engine reads commands, not what they do.** A script a listed program runs, and the read-only commands Claude Code allows by itself, are out of its reach, and `read_only` is not a sandbox. With an open shell (`Bash` in `allow`) the denials are a best effort. A flag spelled another way is another word (list `git push -f` as well as `git push --force`). Containers would close this (docs/ROADMAP.md §3).
 - **A permission is for one call.** Whether a wider allowance is worth having is measured first (docs/ROADMAP.md, v0.10).
 - **The checkers that prove their work and the manager's investigations come next** (docs/ROADMAP.md).
 - The archives are not signed or notarized.

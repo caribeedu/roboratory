@@ -224,7 +224,12 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
       return true;
     },
     // an agent's permission tool asks whether a machine may make a call; the reply comes when a person has decided (D44)
-    permission: (_c: net.Socket, session: string, call: { tool: string; input: Record<string, unknown> }) => service.permit(session, call),
+    // (a request is given up if the connection that asked ends before a person answers)
+    permission: (c: net.Socket, session: string, call: { tool: string; input: Record<string, unknown> }) => {
+      const ended = new AbortController();
+      c.once('close', () => ended.abort());
+      return service.permit(session, call, ended.signal);
+    },
     // a stream of what is worth acting on, for `roboratory watch`
     watch: (c: net.Socket) => { watchers.add(c); return true; },
     cancelRestart: () => { restarting = false; service.engine?.resumeDispatch(); return true; },

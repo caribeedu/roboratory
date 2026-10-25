@@ -32,7 +32,7 @@ A machine runs one agent for one step. A machine folder with no `machine.yaml` r
 | `dirs` | list of strings | Extra folders the agent may use. |
 | `tools` | list of strings | MCP servers or tools: `mcp__server` or `mcp__server__tool`. |
 | `allow` | list of strings | Commands it may run besides the defaults, as prefixes (`npm test`), or tool names (`Edit`, `Bash`). Anything else is asked of a person. |
-| `deny` | list of strings | Commands it must never run, added to the factory's, the sector's and the line's. |
+| `deny` | list of strings | Commands it must never run, added to the factory's, the sector's and the line's. Its flags may stand anywhere (`rm -rf` is also `rm -fr`), but a flag spelled another way is another word: list `git push -f` as well as `git push --force`. |
 | `read_only` | boolean | No file edits and no `git push`. The commands in `allow` still run. |
 | `sim` | mapping | How the simulated agent behaves. Free-form. |
 

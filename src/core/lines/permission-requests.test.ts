@@ -113,6 +113,13 @@ describe('A command outside the list', () => {
     await whenDone(again, runId);
   });
 
+  it('is given up when the engine is stopped, so the machine is not left waiting', async () => {
+    const { e } = await runWith({ stopIfDenied: true });
+    await until(() => asks(e).length === 1);
+    e.dispose();
+    expect(asks(e)).toEqual([]);
+  });
+
   it('is unknown once it has been answered', async () => {
     const { e } = await runWith({});
     await until(() => asks(e).length === 1);

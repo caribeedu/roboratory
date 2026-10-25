@@ -175,6 +175,34 @@ function on(m) {
     };
     const runEvents = (root: string, runId: string) => fs.readFileSync(path.join(root, '.runs', 's', 'l', runId, 'run.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
 
+    it('gives a request up when the tool that carried it goes away', async () => {
+      const bin = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'fake-vanish-')), 'claude');
+      fs.writeFileSync(bin, `#!/usr/bin/env node
+const { spawn } = require('child_process');
+const args = process.argv.slice(2);
+const cfg = JSON.parse(args[args.indexOf('--mcp-config') + 1]).mcpServers.roboratory;
+const tool = spawn(cfg.command, cfg.args, { env: { ...process.env, ...cfg.env }, stdio: ['pipe', 'pipe', 'inherit'] });
+const send = (m) => tool.stdin.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\\n');
+let buf = '';
+tool.stdout.on('data', (d) => { buf += d; let i; while ((i = buf.indexOf('\\n')) >= 0) { const m = JSON.parse(buf.slice(0, i)); buf = buf.slice(i + 1); if (m.id === 1) { send({ method: 'notifications/initialized' }); send({ id: 2, method: 'tools/call', params: { name: 'approve', arguments: { tool_name: 'Bash', input: { command: 'npm test' } } } }); setTimeout(() => tool.kill(), 800); } } });
+send({ id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } });
+setTimeout(() => console.log(JSON.stringify({ type: 'result', subtype: 'success', result: '', structured_output: { result: { decision: 'went on' } } })), 20000);
+`);
+      fs.chmodSync(bin, 0o755);
+      const before = process.env.ROBORATORY_CLAUDE_BIN;
+      process.env.ROBORATORY_CLAUDE_BIN = bin;
+      const { root } = buildFactory(line('  - { id: a, machine: a }'), { a: claudeMachine({ 'contract.json': '{"type":"object","required":["decision"],"properties":{"decision":{"type":"string"}}}' }) });
+      try {
+        cli(root, 'run', 's/l');
+        await until(() => /\[request \w+\]/.test(cli(root, 'status').out));
+        // the tool is killed after 800 ms; the request must not outlive it, while the agent is still running
+        await until(() => !/\[request \w+\]/.test(cli(root, 'status').out) && /1 machine or signal running/.test(cli(root, 'status').out), 15_000);
+      } finally {
+        if (before === undefined) delete process.env.ROBORATORY_CLAUDE_BIN; else process.env.ROBORATORY_CLAUDE_BIN = before;
+        stopEngine(root);
+      }
+    }, 60_000);
+
     it('carries a command from the agent to you and your answer back, as the command line', async () => {
       const before = process.env.ROBORATORY_CLAUDE_BIN;
       process.env.ROBORATORY_CLAUDE_BIN = asker();

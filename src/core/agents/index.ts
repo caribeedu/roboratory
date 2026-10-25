@@ -15,8 +15,6 @@ const runners: Record<AgentName, AgentRunner> = {
   sim: { run: runSim },
 };
 
-export const SUPPORTED_AGENTS: readonly string[] = AGENTS;
-
 export const isAgent = (name: string): name is AgentName => Object.prototype.hasOwnProperty.call(runners, name);
 
 export async function runAgent(req: AgentRequest): Promise<AgentResult> {

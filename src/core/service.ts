@@ -128,7 +128,7 @@ export class FactoryService {
   /** Refuses it; the reason goes back to the agent. */
   deny(requestId: string, reason = '') { this.need().e.deny(requestId, reason); }
   /** The decision on a call of the machine started with `session`; asked by an agent's permission tool. */
-  permit(session: string, call: PermissionCall) { return this.need().e.permitSession(session, call); }
+  permit(session: string, call: PermissionCall, gone?: AbortSignal) { return this.need().e.permitSession(session, call, gone); }
   halt(lineId: string) { this.need().e.halt(lineId); }
   resume(lineId: string) { this.need().e.resume(lineId); }
   runs() { return this.engine?.runSummaries() ?? []; }

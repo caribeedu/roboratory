@@ -1,4 +1,4 @@
-import { decideShell, effectiveRules, parseCommand, type Rules } from './permissions';
+import { decideShell, effectiveRules, isToolName, parseCommand, type Rules } from './permissions';
 
 const rules = (allow: string[], deny: string[] = []): Rules => ({ allow, deny });
 
@@ -71,6 +71,88 @@ describe('Deciding a shell command', () => {
   it('does not look inside a wrapper: it counts only if it is listed', () => {
     expect(decideShell('sh -c "git push"', rules(['git'], ['git push']))).toMatchObject({ verdict: 'ask' });
     expect(decideShell('xargs git push', rules(['git'], ['git push']))).toMatchObject({ verdict: 'ask' });
+  });
+});
+
+describe('Walking around a hard denial', () => {
+  const DENY = ['git push --force', 'sudo', 'gh pr merge', 'rm -rf'];
+  const closed = effectiveRules({ allow: ['npm test', 'git push'], deny: DENY, readOnly: false, shell: true });
+  const open = effectiveRules({ allow: ['Bash'], deny: DENY, readOnly: false, shell: true });
+  const verdict = (cmd: string, r: Rules) => decideShell(cmd, r).verdict;
+
+  it.each([
+    ['a quote in a comment that hides the next line', "git status # it's\ngit push --force # '"],
+    ['a quote after a hash, over three lines', 'ls #"\ngit push --force\n#"'],
+    ['a line continuation inside a command', 'git \\\npush --force'],
+    ['a continuation with a carriage return', 'git \\\r\npush --force'],
+    ['a git option that points somewhere', 'git -C ../other push --force'],
+    ['a git option that sets configuration', 'git -c core.pager=x push --force'],
+    ['a folder in front of the command', '/usr/bin/git push --force'],
+    ['env in front', 'env GIT_X=1 git push --force'],
+    ['command in front', 'command git push --force'],
+    ['time in front', 'time git push --force'],
+    ['a block', '{ git push --force; }'],
+    ['an if', 'if true; then git push --force; fi'],
+    ['a negation', '! git push --force'],
+    ['flags in another order', 'git push origin --force'],
+    ['flags in another form', 'git push --force=yes origin'],
+    ['rm with the letters apart', 'rm -r -f x'],
+    ['rm with the letters swapped', 'rm -fr x'],
+    ['gh with a repository option', 'gh -R acme/app pr merge 12'],
+  ])('is refused whatever the shell, through %s', (_, cmd) => {
+    expect(decideShell(cmd, closed), cmd).toMatchObject({ verdict: 'deny' });
+    expect(decideShell(cmd, open), cmd).toMatchObject({ verdict: 'deny' });
+  });
+
+  it.each([
+    ['a word built by the shell', "git $'push' --force"],
+    ['a variable as the subcommand', 'git ${x} --force'],
+    ['a brace expansion as the command', '{git,push} --force'],
+    ['a glob as the command', 'g*t push --force'],
+    ['a glob as the subcommand', 'git pu* origin'],
+    ['a variable as the command', '${CMD} push'],
+  ])('is asked about, not allowed, even with an open shell, through %s', (_, cmd) => {
+    expect(verdict(cmd, open), cmd).toBe('ask');
+  });
+
+  it('asks about a command whose redirect might write a file', () => {
+    expect(verdict('npm test >&2evil', closed)).toBe('ask');
+    expect(verdict('npm test 2>&1', closed)).toBe('allow');
+  });
+
+  it('asks about a comment, which is the shell\'s to read and not ours', () => {
+    expect(verdict('npm test # then more', closed)).toBe('ask');
+  });
+
+  it('is not fooled by a flag spelled another way only when it is listed that way', () => {
+    // -f is not --force to the engine: both are listed where both matter
+    expect(verdict('git push -f', closed)).toBe('allow');
+    expect(verdict('git push -f', effectiveRules({ allow: ['git push'], deny: ['git push -f'], readOnly: false, shell: true }))).toBe('deny');
+  });
+
+  it('asks about a git option that runs a program or writes a file, in a command the defaults would allow', () => {
+    const rules = effectiveRules({ allow: [], deny: [], readOnly: false, shell: true });
+    for (const cmd of ['git diff --output=out.txt', 'git log --output out.txt', 'git grep -O sh pattern', 'git fetch --upload-pack="touch x" .', 'git show --ext-diff HEAD']) expect(verdict(cmd, rules), cmd).toBe('ask');
+    expect(verdict('git diff main', rules)).toBe('allow');
+  });
+
+  it('does not let a read-only machine delete branches or change remotes, which only the local commands may', () => {
+    const rules = effectiveRules({ allow: [], deny: [], readOnly: true, shell: true });
+    for (const cmd of ['git branch -D main', 'git remote set-url origin x', 'git rebase -x "git push" main']) expect(verdict(cmd, rules), cmd).toBe('ask');
+    expect(verdict('git log --oneline', rules)).toBe('allow');
+  });
+
+  it('treats a capitalised word as a command, and a tool only when it is one', () => {
+    expect(isToolName('Edit')).toBe(true);
+    expect(isToolName('mcp__slack__post')).toBe(true);
+    expect(isToolName('Rscript')).toBe(false);
+    expect(isToolName('Remove-Item')).toBe(false);
+    expect(verdict('Rscript analysis.R', effectiveRules({ allow: ['Rscript'], deny: [], readOnly: false, shell: true }))).toBe('allow');
+    expect(verdict('Remove-Item -Recurse build', effectiveRules({ allow: ['Remove-Item'], deny: ['Remove-Item -Recurse'], readOnly: false, shell: true }))).toBe('deny');
+  });
+
+  it('still lets a wrapper that runs a string through, because it cannot look inside (D44)', () => {
+    expect(verdict('xargs sudo ls', open)).toBe('allow');
   });
 });
 

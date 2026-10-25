@@ -154,17 +154,20 @@ console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false
     });
 
     it('stops the time limit while a request waits for a person, and runs it again after', async () => {
-      process.env.ROBORATORY_CLAUDE_BIN = fakeClaude(`setTimeout(() => console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: '', structured_output: { ok: true } })), 900);`);
+      process.env.ROBORATORY_CLAUDE_BIN = fakeClaude(`setTimeout(() => console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: '', structured_output: { ok: true } })), 500);`);
       const waits = new Waits();
-      setTimeout(() => waits.add(1), 150);
-      setTimeout(() => waits.add(-1), 800);
-      // 900 ms of work against a 500 ms limit: only the 650 ms spent waiting lets it finish
-      expect((await runAgent(base({ timeoutMs: 500, permission: access(waits) }))).output).toEqual({ ok: true });
+      setTimeout(() => waits.add(1), 100);
+      setTimeout(() => waits.add(-1), 900);
+      // 500 ms of work against a 400 ms limit: only the 800 ms spent waiting lets it finish
+      expect((await runAgent(base({ timeoutMs: 400, permission: access(waits) }))).output).toEqual({ ok: true });
       process.env.ROBORATORY_CLAUDE_BIN = fakeClaude(`setTimeout(() => {}, 5000);`);
       const again = new Waits();
       setTimeout(() => again.add(1), 100);
       setTimeout(() => again.add(-1), 400);
+      const t0 = Date.now();
       expect((await runAgent(base({ timeoutMs: 300, permission: access(again) }))).error).toMatch(/timed out after/);
+      // 300 ms of work and 300 ms of waiting: without the pause it would have ended at 300 ms
+      expect(Date.now() - t0).toBeGreaterThanOrEqual(550);
     });
   });
 

@@ -8,9 +8,9 @@
   "required": ["schema_version"],
   "properties": {
     "schema_version": { "const": 1, "description": "The version of this format, not of the product." },
-    "deny": { "type": "array", "items": { "type": "string" }, "description": "Commands no machine of this line may run, added to the sector's and the factory's." },
+    "deny": { "type": ["array", "null"], "items": { "type": "string" }, "description": "Commands no machine of this line may run, added to the sector's and the factory's." },
     "intake": {
-      "type": "object",
+      "type": ["object", "null"],
       "additionalProperties": false,
       "description": "Where work enters the line.",
       "properties": {
@@ -34,7 +34,7 @@
       }
     },
     "pieces": {
-      "type": "array",
+      "type": ["array", "null"],
       "description": "The machines, signals and gates, in the order a box meets them unless needs says otherwise.",
       "items": {
         "type": "object",
@@ -66,7 +66,7 @@
       }
     },
     "pallet": {
-      "type": "object",
+      "type": ["object", "null"],
       "additionalProperties": false,
       "description": "Where finished work lands.",
       "properties": { "label": { "type": "string" }, "needs": { "$ref": "#/definitions/needs" } }
@@ -74,7 +74,7 @@
   },
   "definitions": {
     "needs": {
-      "type": ["string", "object", "array"],
+      "type": ["string", "object", "array", "null"],
       "description": "Where the box comes from: a piece id, { from, when, back, laps }, or a list of those.",
       "additionalProperties": false,
       "properties": {

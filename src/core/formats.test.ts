@@ -31,6 +31,10 @@ read_only: true
       expect(check('machine', 'schema_version: 1\nagent: sim\ntimeout: 90\nsim: { seconds: 2, anything: [1, 2], at: { all: true } }\n')).toEqual([]);
     });
 
+    it('reads an empty value as none, as the loader always has', () => {
+      expect(check('machine', 'schema_version: 1\nallow:\ndeny:\ntools:\nroles:\ndirs:\nmodel:\ngoal:\nsim:\n')).toEqual([]);
+    });
+
     it('needs its version, and says what to write', () => {
       expect(check('machine', 'agent: claude\n')).toEqual([expect.stringContaining('schema_version is missing: write "schema_version: 1"')]);
     });
@@ -51,7 +55,7 @@ read_only: true
     it('refuses an agent that has no adapter, and a value of the wrong kind', () => {
       expect(check('machine', 'schema_version: 1\nagent: codex\n')).toEqual(['agent must be claude or sim']);
       expect(check('machine', 'schema_version: 1\nattempts: 0\n')).toEqual([expect.stringContaining('attempts')]);
-      expect(check('machine', 'schema_version: 1\nallow: npm test\n')).toEqual(['allow must be array']);
+      expect(check('machine', 'schema_version: 1\nallow: npm test\n')).toEqual(['allow must be array or null']);
       expect(check('machine', 'schema_version: 1\nread_only: yes please\n')).toEqual(['read_only must be boolean']);
     });
 
@@ -94,6 +98,11 @@ pallet:
 
     it('accepts every key a line uses', () => {
       expect(check('line', LINE)).toEqual([]);
+    });
+
+    it('reads an empty section as none', () => {
+      expect(check('line', 'schema_version: 1\ndeny:\nintake:\npieces:\npallet:\n')).toEqual([]);
+      expect(check('line', 'schema_version: 1\npieces:\n  - { id: a, needs: }\n')).toEqual([]);
     });
 
     it('needs its version', () => {

@@ -16,7 +16,7 @@ export interface PermissionAccess {
   /** how to start `roboratory permission-tool`; without it an agent that asks through a tool of its own is not given one */
   tool?: { command: string; args: string[]; env: Record<string, string> };
   /** for an agent that asks in process */
-  decide(call: PermissionCall): Promise<PermissionDecision>;
+  decide(call: PermissionCall, gone?: AbortSignal): Promise<PermissionDecision>;
   /** counts the requests waiting on a person; the machine's time limit stops while any does */
   waits: Waits;
 }

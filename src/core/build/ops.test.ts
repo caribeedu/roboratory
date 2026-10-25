@@ -163,6 +163,18 @@ describe('build-mode edits', () => {
     expect(read('factory.yaml')).toBe('name: T\n');
   });
 
+  it('gives a machine.yaml or line.yaml it edits the version of the format when it has none', () => {
+    const root = factory(LINE, { build: { ...machine(), 'machine.yaml': 'agent: sim\n' }, check: machine() });
+    const d = new Draft(root);
+    const line = path.join(root, 'sectors/s/models/m/line.yaml');
+    fs.writeFileSync(line, fs.readFileSync(line, 'utf8').replace('schema_version: 1\n', ''));
+    apply(d, { op: 'setMachine', lineId: 's/a', pieceId: 'build', conf: { model: 'haiku' } });
+    apply(d, { op: 'setModel', lineId: 's/a', deny: ['make clean'] });
+    expect(d.read(path.join(root, 'sectors/s/models/m/machines/build/machine.yaml'))).toBe('schema_version: 1\nagent: sim\nmodel: haiku\n');
+    expect(lineOf(d)).toMatch(/^schema_version: 1\n/m);
+    expect(d.load().problems?.filter((p) => /schema_version/.test(p.message))).toEqual([]);
+  });
+
   it('writing back what the disk holds drops the change', () => {
     const root = factory(LINE, { build: machine(), check: machine() });
     const d = new Draft(root);
