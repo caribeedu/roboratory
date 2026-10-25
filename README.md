@@ -23,7 +23,7 @@ Running several AI agents on real work today means either free-form chat between
 
 - **Deterministic lines.** Routing, checks and gates are defined in files, so the same input takes the same path every time.
 - **Contracts at every step.** An output that does not match its JSON Schema runs the step again; when attempts run out, the machine catches fire and the line stops behind it.
-- **Humans hold the gates that matter.** Releasing a gate or applying a change is never automatic. Managers answer questions and propose, and you decide.
+- **Humans hold the gates that matter.** Releasing a gate or applying a change is never automatic, and a machine that wants to run a command outside its list waits for you to allow it. Managers answer questions and propose, and you decide.
 - **Everything visible.** If something is running, waiting or burning, it shows on the floor, on the minimap and in the log.
 - **Git is the source of truth.** The factory is a repository. Changing it means a reviewed diff, never improvisation at runtime.
 - **Local.** No telemetry, open file formats, and your own agent CLIs and subscriptions.
@@ -107,7 +107,8 @@ Choose **Open the demo factory** on the welcome screen. It creates a factory in 
 |---|---|
 | [Product](docs/PRODUCT.md) | What Roboratory is, entity by entity, and how you use it |
 | [Architecture](docs/ARCHITECTURE.md) | File layout, runtime and scope |
-| [Decisions](docs/DECISIONS.md) | Every design decision, with its reasoning (D1–D43) |
+| [Decisions](docs/DECISIONS.md) | Every design decision, with its reasoning (D1–D46) |
+| [File formats](docs/FORMATS.md) | `line.yaml` and `machine.yaml`: every key, with JSON Schemas for your editor |
 | [Roadmap](docs/ROADMAP.md) | What is planned and what is still open |
 | [Assessment](docs/ASSESSMENT.md) | An honest assessment after the first real run |
 | [Competitors](docs/COMPETITORS.md) | Other tools that orchestrate coding agents, and what Roboratory takes from each |
@@ -117,7 +118,7 @@ Choose **Open the demo factory** on the welcome screen. It creates a factory in 
 
 ## Status
 
-Roboratory is an early release (v0.8): the factory, the Floor, headless machines, managers, build mode and an engine that runs without the app (with a `roboratory` command) are built; permission requests and automatic intakes are planned ([docs/ROADMAP.md](docs/ROADMAP.md)).
+Roboratory is an early release (v0.9): the factory, the Floor, headless machines that ask before they run a command outside their list, managers, build mode, versioned file formats and an engine that runs without the app (with a `roboratory` command) are built; checkers that prove their work and automatic intakes are planned ([docs/ROADMAP.md](docs/ROADMAP.md)).
 
 ## Contributing and security
 

@@ -2,6 +2,46 @@
 
 What Roboratory delivers. The reasoning behind each choice is in [docs/DECISIONS.md](docs/DECISIONS.md), and what is still open is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
+## v0.9.0
+
+A machine now asks before it runs a command outside its list, and what the factory never allows is refused without asking. The two files that define a line and a machine are versioned and strict, with JSON Schemas for your editor.
+
+### Permissions (D44)
+- **A command outside a machine's list waits for you.** The machine pauses, an item joins the attention queue with the exact command, and the machine shows the exclamation balloon in the gate's color, without catching fire. You answer **Allow once**, or **Deny** with a reason that goes back to the agent as the refusal. Nothing is allowed for good. The wait has no limit and does not count against the machine's `timeout`.
+- **What the factory never allows.** `deny:` in `factory.yaml` lists commands that are refused at once, without asking; a sector, a line and a machine can add to the list and never remove from it. The app carries no list of its own: the demo factory starts with one.
+- **Commands as prefixes.** `allow` and `deny` hold command prefixes (`npm test`, `git push --force`) or tool names (`Edit`). The engine reads a shell command by its parts and drops git's global options, so `git -C dir push` is `git push`. A command it cannot account for (a substitution, a subshell, a redirect to a file) is asked about.
+- **Read-only machines.** `read_only: true` takes the file tools away and denies `git push`; the commands in `allow` still run. The demo's triage, correlator and investigator are read-only.
+- **Local git by default, not `git push`.** Every machine starts with the file tools and the local git commands. A `git push` is a request, and a machine that should always push lists `git push` in its `allow`.
+- **In the window and in the command.** The card in the machine's panel, the Ledger (what was asked, how long it waited, what you answered) and the minimap, which shows the sector as waiting, not as on fire. `roboratory allow <request>`, `deny <request> --reason …`, and `watch` and `status` print each request with its id. Both verbs are audited as you and are never automatic: a manager cannot propose them and no policy grants them.
+- **The prompt says so.** A machine is told what it may run without asking, that the rest is asked of a person, and not to repeat a refused command.
+- **The Claude adapter asks through `--permission-prompt-tool`.** The tool is a small process of the `roboratory` command that Claude Code starts and that passes each call to the engine; the engine hosts no server. The CLI is given no shell rules, since its own deny rules do not catch `git -C . push`.
+
+### The core formats (D46)
+- **`schema_version: 1` is required** in `line.yaml` and `machine.yaml`: the version of the format, not of the product.
+- **A key the schema does not know is an error,** named with its place and the key it looks like (`unknown key "alow" in the file (did you mean "allow"?)`). A `Bash(...)` command in `allow` or `deny` is refused with the prefix to write instead.
+- **The JSON Schemas** are in `schemas/`, shared by the loader, build mode and any editor, and [docs/FORMATS.md](docs/FORMATS.md) specifies every key.
+
+### Agents behind a port (D45)
+- **The engine and the managers call one `AgentRunner` port;** Claude Code and the simulated agent are adapters behind it. An `agent:` the app has no adapter for is an error when the factory loads.
+
+### Build mode
+- **Forms for `deny` and `read_only`:** allowed commands, commands never allowed and read-only on a machine; commands never allowed on a line, a sector and the factory.
+
+### Tests
+- **A fake agent CLI that speaks MCP** drives the whole chain in the process-level tests: the adapter's flags, the permission tool, the engine, the command's `allow` and `deny`, and the reason reaching the agent. `src/core/permissions.test.ts` covers how commands are read; an end-to-end spec covers the card, the queue and the Ledger on the packaged app.
+- **`e2e/tools/permission-check.mjs`** checks the mechanism with the real Claude Code on Haiku, for cents.
+
+### Upgrading
+- **Add `schema_version: 1` as the first key of every `line.yaml` and `machine.yaml`.** Without it the file fails to load and says what to write; a key the schema does not know fails the same way.
+- **Write `allow` and `deny` as prefixes:** `Bash(gh pr view:*)` becomes `gh pr view`. A machine no longer gets `Bash(git:*)` by default, so a `git push` it used to run on its own now asks you; list `git push` in its `allow` to keep it.
+- **An engine started by v0.8 keeps running** until you use the banner's "Restart when idle".
+
+### Known limits
+- **The engine reads commands, not what they do.** A script a listed program runs, and the read-only commands Claude Code allows by itself, are out of its reach, and `read_only` is not a sandbox. Containers would close this (docs/ROADMAP.md §3).
+- **A permission is for one call.** Whether a wider allowance is worth having is measured first (docs/ROADMAP.md, v0.10).
+- **The checkers that prove their work and the manager's investigations come next** (docs/ROADMAP.md).
+- The archives are not signed or notarized.
+
 ## v0.8.0
 
 The engine moves out of the app. It runs as its own process, one per factory, and the app and a new `roboratory` command are clients of it: runs go on when the app quits or is rebuilt, and every verb can be driven from a terminal (D43).

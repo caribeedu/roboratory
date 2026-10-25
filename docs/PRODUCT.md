@@ -54,6 +54,7 @@ One step of a line, and the only place where an agent works.
 - If the output does not match the contract, or the agent times out, the machine runs the step again with a fresh agent and the validation errors, up to its attempt budget. When the attempts run out, the machine **catches fire** and the line stops behind it.
 - Instead of its contract, a machine may answer that it **needs you**: a question, options and its recommendation. It shows the exclamation balloon and joins the attention queue; your answer runs it again in the same folder without spending an attempt.
 - A machine may also answer that it is **blocked** by something outside its work, such as a broken shared environment. It catches fire at once with its reason, without spending an attempt, and you retry it once the cause is fixed.
+- A machine runs only the commands its list covers: the file tools, the local git commands (not `git push`) and what its `allow` adds. Any other command is a **permission request**: the machine waits, an item joins the attention queue, and you allow it once or refuse it with a reason that goes back to the agent. What the factory never allows (`deny`, from the factory, sector, line and machine, only ever added to) is refused at once without asking. A `read_only` machine can neither edit files nor push (D44).
 - Every machine's role is followed by the factory's culture and its sector's culture, if any.
 - Machines, signals and gates have a goal: what the piece is for, in at most 250 characters. A machine has a default goal that a line can replace for its own piece.
 - A machine is told its place in the line: the line in order, its goal, where its box comes from and goes, and every piece after it with its goal, so it does only its own step. It is also told what you decided in the run so far: gate choices and notes, retry hints and answers to questions. The factory can turn this off.
@@ -119,11 +120,12 @@ The director's view: the whole factory building, with every sector as a room sid
 Always visible. It shows every sector, and a sector that needs you (a fire, or a gate waiting on you) changes color and plays a sound. Clicking a sector opens it on the Floor.
 
 ### 3.4 Attention queue
-One list for the whole factory of everything that needs you, ordered by severity: fires first, then gates, each by how long it has waited. Picking an item switches to its sector, flies the camera to the piece and opens its panel. A shortcut jumps to the next item. The minimap shows where attention is needed; the queue shows what and in which order.
+One list for the whole factory of everything that needs you, ordered by severity: fires and permission requests first, then gates and questions, each by how long it has waited. A permission request shows the exclamation balloon in the gate's color; the machine is working and waiting, not on fire. Picking an item switches to its sector, flies the camera to the piece and opens its panel. A shortcut jumps to the next item. The minimap shows where attention is needed; the queue shows what and in which order.
 
 ### 3.5 Situations are entity panels
 There are no special modes. Each situation is the panel of the entity it concerns:
 - **A machine on fire** opens the fire panel: the contract error, the agent's last tool calls and a hint field for the retry. While the fire panel is open, the sector's other lines dim, an alarm pulses at the edges and the boxes stalled behind the fire are highlighted. Closing the panel restores the floor.
+- **A machine asking to run a command** opens a card with the command and two answers: **Allow once**, or **Deny** with a reason the agent reads. The machine is paused until you answer, and the time it waits does not count against its time limit.
 - **A gate waiting on you** opens the gate panel: the status of the signals before it, and the release button with its confirmations. A production deploy is a gate that asks twice, with signals in front of it.
 - **A manual intake** opens a work-order form, with fields taken from the model's inputs, and a dispatch button.
 
@@ -160,7 +162,7 @@ Where you build and change the factory, on the Floor itself, one sector at a tim
 - **Undo and redo** step by step within the session.
 
 **Piece settings.**
-- **Machine:** `machine.yaml` as a form (agent, model, effort, attempts, timeout, shared roles, folders, and tools picked from the MCP servers configured in the agent CLI), `role.md` as Markdown with a preview, and the contract as a list of fields (name, type, allowed values, required, description), with a JSON view for nested fields.
+- **Machine:** `machine.yaml` as a form (agent, model, effort, attempts, timeout, shared roles, folders, tools picked from the MCP servers configured in the agent CLI, allowed commands, commands never allowed, read-only), `role.md` as Markdown with a preview, and the contract as a list of fields (name, type, allowed values, required, description), with a JSON view for nested fields.
 - **Intake:** the dispatch form's fields and the label. The kind stays manual until the other intakes start runs.
 - **Gate:** a release with confirmations, a decision with its choices, or an automatic rule built with the rule builder. Renaming or removing a choice turns the belt rules that used it red.
 - **Signal:** the command, its time limit, with suggestions for `{{box.…}}` from the previous piece's contract, and an editor for scripts in `signals/`. New scripts are written executable.
@@ -195,12 +197,12 @@ A floating radio log with three levels:
 | Machine | The detailed transcript of one machine's agent |
 
 ### 3.12 Actions and audit
-Every action is a verb: run, retry, release, answer, halt, resume, and accepting a change. Buttons, manager proposals and the `roboratory` command call the same verbs. Every verb lands in the audit log with who triggered it and when, for example "you approved the gate *Mitigation OK* at 14:02"; verbs from the command also record the source `cli`.
+Every action is a verb: run, retry, release, answer, allow, deny, halt, resume, and accepting a change. `allow` and `deny` are never automatic and a manager cannot propose them. Buttons, manager proposals and the `roboratory` command call the same verbs. Every verb lands in the audit log with who triggered it and when, for example "you approved the gate *Mitigation OK* at 14:02"; verbs from the command also record the source `cli`.
 
 ### 3.14 The engine and the command line
 The app is a window onto the factory's engine, a separate process that keeps your runs going when you quit or rebuild the app (D43). It starts when you open a factory and ends by itself a minute after the last run and the last window are gone.
 - **`roboratory serve | stop | status`** start, stop and inspect the engine of the factory you are in (or `--factory <dir>`).
-- **`roboratory run <line> --input k=v`, `release <line> <gate>`, `answer`, `retry`, `halt`, `resume`** are the buttons of the Floor, for a terminal or a script. A gate that asks for several confirmations is released with `--confirm <n>`, so each "are you sure?" is still yours to give. A line that the open build-mode draft changes is refused here too.
+- **`roboratory run <line> --input k=v`, `release <line> <gate>`, `answer`, `allow <request>`, `deny <request> --reason …`, `retry`, `halt`, `resume`** are the buttons of the Floor, for a terminal or a script. A gate that asks for several confirmations is released with `--confirm <n>`, so each "are you sure?" is still yours to give. A line that the open build-mode draft changes is refused here too.
 - **`roboratory watch`** prints what needs you: gates waiting, questions, fires, reworks and the end of each run, with the cost so far.
 - **`roboratory restart --when-idle`**, or the banner when the app is newer than the engine: no new work starts, the running machines and signals finish, and the engine comes back as the new version with every gate, question and fire where it was.
 - **File → Install command-line tool** puts `roboratory` in `~/.local/bin` when you confirm. The menu shows whether it is installed, outdated (the app moved or updated) or missing, and when it is not installed the top bar shows an Install CLI (or Update CLI) button. Build mode stays in the app.

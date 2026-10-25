@@ -4,49 +4,12 @@ Everything that is planned, open or accepted as a limit, checked against the cod
 
 ## 1. Roadmap by version
 
-From the assessment of the first real ticket run ([ASSESSMENT.md](ASSESSMENT.md)): trust before automation. Each version below is planned; each change of design needs its decision in DECISIONS.md before code. Real-agent runs stay limited to checks until these versions are built, because checkers and permissions are the weak points the assessment found. The engine already runs without the app (D43), which the permission requests of v0.9 and the manager's investigations of v0.12 depend on. What a version delivered moves to [CHANGELOG.md](../CHANGELOG.md). Items with no version are in §2 and after.
-
-### v0.9 — Permissions, and a frozen core
-
-1. **Permissions as a first-class feature** (D44). A command or MCP tool outside a machine's list waits for you in the attention queue, to allow once or deny with a reason that goes back to the agent, instead of failing. Hard denials come from the factory's files, and a sector, line or machine can only add to them. Read-only machines get no file edits and no `git push`, and the default for other machines no longer includes `git push` either. This closes §5.5.
-2. **Agents behind a port** (D45). The Claude adapter and the simulated agent implement one `AgentRunner` port; nothing in the engine knows a CLI.
-3. **Freeze the core** (D46). A short specification of `line.yaml` and `machine.yaml`, with a JSON Schema the loader, build mode and editors share, `schema_version: 1`, and unknown keys as errors.
-
-#### The plan
-
-Each step ends with the type check and the unit tests green, and with its docs written. A step that changes a behavior has its test first, at the lowest layer that can see it ([DEVELOPMENT.md](DEVELOPMENT.md#tests)). Real agents are used only where a step says so, with a cost ceiling approved first (AGENTS.md, invariant 8).
-
-1. [done] **Documents.** D44 to D46 and the Codex removal from the decisions; this plan; the v0.10 and §3 expectations below.
-2. [done] **A throwaway check with the real agent** (`e2e/tools/permission-check.mjs`, Claude Haiku, a temporary folder, US$ 0.02 spent of a US$ 0.50 ceiling). Done: the mechanism works, and the check showed that the CLI's own deny rules miss `git -C . push`, so the engine decides every shell command. The findings are in D44 ("Checked with a real agent").
-3. [done] **Remove Codex and add the port.** `codex.ts` and `codex.test.ts` go; `src/core/agents/index.ts` becomes the registry of the `AgentRunner` port (the Claude and simulated adapters implement it; the engine and `managers.ts` call only the port); an unknown `agent:` is a load problem. Every mention of Codex goes with it, as if it had never existed: the agent lists in the build forms (`PieceEditor.tsx`, `Settings.tsx`) and their tests, `demo.ts`, `package.json`, README, ARCHITECTURE, DEVELOPMENT, PRODUCT and CHANGELOG, and the environment variable for its executable. Tests: the existing ones stay green; one for the registry and for a machine that names an agent that does not exist.
-4. [done] **Commands as prefixes, `deny`, `read_only` and the default for `git`.**
-   - The loader reads `allow` and `deny` as prefixes (`machine.yaml`; `deny` also in `factory.yaml`, `sector.yaml` and `line.yaml`, combined by union) and the legacy `Bash(...)` form until step 7; `read_only` is read from `machine.yaml`. The effective lists are computed once, in the engine, and handed to the adapter.
-   - The engine decides every shell command (D44): a command parser in `src/core/permissions.ts` (parts, git's global options, substitutions and wrappers as requests) and the effective lists. The Claude adapter passes no shell rules: it runs in the default permission mode, gives the file and MCP tools by name, `--tools` without `Edit`/`Write` for a read-only machine, and `--disallowedTools Agent`. The default allow is the local `git` subcommands in place of `Bash(git:*)`. `shellRules` (D27) is rewritten from the same prefixes, and no longer tells the agent that `cat`, `ls` and the like are denied: the CLI runs them by itself.
-   - The build forms edit `allow`, `deny` and `read_only`; the build checks keep `deny` entries valid and a line or machine from loosening the factory's.
-   - The factory template (`template.ts`) and the reference factory (D42) start with a `deny` list, and their validators and reviewers become `read_only`.
-   - Tests: the parser (compound commands, `git -C`, `-c`, substitutions, wrappers, quoting) and the effective lists by level (factory, sector, line, machine); the arguments the Claude adapter builds, observed through a fake CLI; the prompt a machine receives; the form.
-5. [done] **The permission request.**
-   - The `PermissionGate` in the engine: given a machine's effective rules, a request is denied by a hard denial, denied by `read_only`, allowed because the list covers it, or becomes a `permission` attention item. `allow` resolves it for this call and `deny` with a reason resolves it with the refusal; a halt, a stop or the end of the machine's process resolves what is left.
-   - The Claude adapter asks through `--permission-prompt-tool` and a `--mcp-config` that starts `roboratory permission-tool` (a subcommand of `src/cli.ts`, serving only that tool), which passes each request to the engine with the socket and token the lock file holds.
-   - The `AgentRunner` request carries a way to pause the machine's clock while a request waits, so `timeout` counts agent time only (`spawnCollect` in `process.ts`).
-   - `AttentionItem` gets the kind `permission`; `VerbName` gets `allow` and `deny`; `Policy` and the managers' proposals refuse both (D34). Events `permission.request` and `permission.decision` go to `run.jsonl`, the Ledger shows them, and `roboratory allow`/`deny` and `watch` handle them, audited as `you` with the source.
-   - The prompt of a machine says how requests work (D27 extended). The denial the agent sees is the reason you wrote.
-   - The simulated agent can ask: a `sim:` entry lists commands it requests, so every layer can test the flow without a model.
-   - Tests: in `src/core/lines/` (a request waits and the line goes on elsewhere; allow once; deny with a reason the agent receives; a hard denial never reaches the queue; `read_only`; the clock stops while waiting; a halt resolves it; a restart that waits for idle does not cut a request), for the new command with a real engine, and for the permission tool against a real engine.
-6. [done] **The interface.** The `permission` item in the attention queue (icon, text, priority of a fire, sound), the exclamation balloon in the gate's color on the machine, which stays working, and a panel with the command and the machine's reason, **Allow once** and **Deny** with a reason. The Ledger shows requests and the wait. Tests: the panel in jsdom with the bridge faked; an end-to-end spec on the packaged app with a simulated agent that asks, covering allow, deny and the queue.
-7. [done] **Freeze the core.** The JSON Schemas of `line.yaml` and `machine.yaml` in `src/shared/`, the loader and build mode checking against them, `schema_version: 1` required, unknown keys as errors with the file and key named, and the legacy `Bash(...)` form refused with the prefix to write instead. The demo factory, the template and the reference factory move to the format. The two formats are specified in a document of their own. Tests: valid and invalid files per field, the messages, and the demo and reference factories loading clean.
-8. **Verification and release preparation.**
-   - The suite: `npm run typecheck`, `npm run test:coverage` (the floor holds), `npm run package` and `npm run test:e2e`, then the CI on the three systems.
-   - A real run, with a cost estimate approved first (invariant 8): a short line on Claude Haiku in a temporary folder, with one request waiting and answered, one denial whose reason the agent repeats, and one hard denial.
-   - `package.json` and `package-lock.json` go to 0.9.0 and the README's status line names it ([RELEASING.md](RELEASING.md)).
-   - The docs match the code: README, PRODUCT, ARCHITECTURE (§2.2, §3.4, §3.6, §3.7), DEVELOPMENT, AGENTS.md (invariants 5 and 6), ASSESSMENT (item 2 closed), a CHANGELOG entry from the template, and this section and §5.5 removed.
-
-Open risks the steps decide: whether the permission tool's `--mcp-config` works together with the user's own MCP servers (step 5; the check used `--strict-mcp-config`, and machines with `tools:` need both); Windows, where the tool's process is started by Claude with the same executable rule as the engine's (step 5); how a machine that has no shell answers a command in the default mode (step 5).
+From the assessment of the first real ticket run ([ASSESSMENT.md](ASSESSMENT.md)): trust before automation. Each version below is planned; each change of design needs its decision in DECISIONS.md before code. Real-agent runs stay limited to checks until checkers prove their work (v0.11), because that is the weak point the assessment found. The engine already runs without the app (D43), and permission requests are built (D44), which the manager's investigations of v0.12 depend on. What a version delivered moves to [CHANGELOG.md](../CHANGELOG.md). Items with no version are in §2 and after.
 
 ### v0.10 — Metrics and a cheap rehearsal
 
 1. **Metrics per machine** from `run.jsonl` (`roboratory stats`): cost, duration, attempts, laps, denied commands, questions, blocks, and checker passes later proved wrong (a pass followed by a question or rework further down the line). Costs say whether they are estimates.
-2. **The need to allow for the rest of the run.** v0.9 allows one call at a time (D44). The metrics above decide whether a wider allowance is worth having, from `run.jsonl`: requests per run and per machine; how many allows repeat a command already allowed in the same run, and their share of all allows; the wait before each answer, and how many requests were denied. If repeated allows are a large share, an allowance limited to a command prefix and one run is designed with its own decision; if not, it stays out. The threshold is set from the first runs' numbers, not before them.
+2. **The need to allow for the rest of the run.** A permission is for one call (D44). The metrics above decide whether a wider allowance is worth having, from `run.jsonl`: requests per run and per machine; how many allows repeat a command already allowed in the same run, and their share of all allows; the wait before each answer, and how many requests were denied. If repeated allows are a large share, an allowance limited to a command prefix and one run is designed with its own decision; if not, it stays out. The threshold is set from the first runs' numbers, not before them.
 3. **A cheap rehearsal with real permissions** (`roboratory rehearse`): the real roles, signals and permissions, a cheap model, and every outward action denied, to find role and permission defects for cents. It finds defects of roles and permissions, not of quality. `e2e/tools/factory-sim-check.mjs` keeps checking the flow for free.
 
 ### v0.11 — Checkers prove their work
@@ -96,10 +59,9 @@ Besides the real ticket run (US$ 8.03), the only other real run is a two-machine
 2. Machines are kept to their folders by instruction only (D9, D32).
 3. A Sector Manager stays inside its sector by instruction only, and your review is the guard (D29).
 4. Gemini CLI and OpenCode are not supported, as machines or as managers.
-5. Every machine gets file edits and `Bash(git:*)` from the Claude adapter (`src/core/agents/claude.ts`), so a step that should only read could still `git push`. Some steps also keep `gh api` or full `Bash`. Gates before outward actions are enforced by the roles, not by tool permissions. A per-machine read-only mode or deny rules would close this.
-6. A run that stops on a fire never reaches the PR review line's cleanup signal, so its worktree stays in `~/repos/<repo>` until removed by hand.
-7. During an incident, the line writes status updates as paste-ready drafts that you post yourself. It writes to the incident tool only at close-out, because the engine has no timer to follow the update cadence.
-8. The postmortem leaves some fields as TBD for you to fill in.
+5. A run that stops on a fire never reaches the PR review line's cleanup signal, so its worktree stays in `~/repos/<repo>` until removed by hand.
+6. During an incident, the line writes status updates as paste-ready drafts that you post yourself. It writes to the incident tool only at close-out, because the engine has no timer to follow the update cadence.
+7. The postmortem leaves some fields as TBD for you to fill in.
 
 ## 6. Build mode: known gaps (D41)
 
