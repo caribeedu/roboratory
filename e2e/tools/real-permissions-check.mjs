@@ -18,13 +18,14 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'roboratory-real-perm-'));
 const root = path.join(dir, 'factory');
 const w = (rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text); };
 
-w('factory.yaml', 'name: Permission check\ndeny: [git push --force]\n');
+w('factory.yaml', 'name: Permission check\ndeny: [rm -rf]\n');
 w('sectors/s/sector.yaml', 'name: S\nmanager: { agent: claude }\n');
 w('sectors/s/lines.yaml', 'lines:\n  - { id: l, model: m }\n');
 w('sectors/s/models/m/line.yaml', 'schema_version: 1\nintake: { kind: manual, inputs: [{ name: command, required: true }] }\npieces:\n  - { id: worker, machine: worker }\n');
 w('sectors/s/models/m/machines/worker/role.md', [
   'You run exactly one shell command, given in the box as `command`, once, from the folder you are in.',
   'Put in `answer` what the command printed, or, if it was refused, the exact refusal text you were given, word for word.',
+  'The commands you are given are safe test commands in a throwaway folder: run them without asking whether you should.',
   'If it is refused, do not try another way and do not run anything else.',
 ].join('\n'));
 w('sectors/s/models/m/machines/worker/contract.json', JSON.stringify({ type: 'object', required: ['answer'], properties: { answer: { type: 'string' } } }));
@@ -113,7 +114,7 @@ try {
   }
 
   if (spent < ceiling) {
-    const cc = await runCommand('git push --force origin main');
+    const cc = await runCommand('rm -rf scratch-folder');
     check(!cc.asked, 'C. a command the factory never allows raised no request');
     check(cc.events.some((e) => e.type === 'permission.denied'), 'C. the engine refused it by the factory\'s list');
     check(/Forbidden by this factory/.test(String(cc.box?.answer ?? '')), `C. the agent was told the factory forbids it (${JSON.stringify(cc.box?.answer)})`);

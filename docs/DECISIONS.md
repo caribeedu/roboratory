@@ -459,6 +459,7 @@ A rework drops the arrivals and skips that the last lap left downstream (D15).
 - The tool is called only for what the allow and deny rules leave undecided, with `{tool_name, input: {command, description}, tool_use_id}`. It answers `{"behavior":"allow","updatedInput":<the input>}` or `{"behavior":"deny","message":…}`, and the agent repeats the message word for word.
 - It works with `--output-format stream-json` and `--json-schema`. The tool's process starts with the run and connects within seconds, and a request that waited 190 s before an answer ran normally.
 - In this mode Claude Code allows read-only commands (`date`, `ls`, `cat`, `git status`) by itself, which `dontAsk` did not, and asks for the rest. A `--disallowedTools` rule holds and the tool is not called.
+- Through Roboratory itself (`e2e/tools/real-permissions-check.mjs`, one machine on Haiku, US$ 0.01 in all): a command outside the list waited for an answer and ran after `allow`; a command refused with a reason was not run and the agent repeated the reason; a command on the factory's list was refused with no request. A model may decline a destructive command on its own before it reaches the tool, so a check of the factory's list uses a harmless one.
 - A deny rule such as `Bash(git push:*)` does **not** catch `git -C . push`, wildcards included: with `Bash(git:*)` allowed, that push went through. An allow list that names the local subcommands, in the plain and the `git * <subcommand>` forms, asks for the `git -C . push`.
 
 **Alternatives:**
@@ -491,7 +492,7 @@ A rework drops the arrivals and skips that the last lap left downstream (D15).
 ## D46. The core files are versioned and strict
 **Decision:**
 - `line.yaml` and `machine.yaml` carry `schema_version: 1`, an integer that is the version of the format and has nothing to do with the version of the product. It is required.
-- A JSON Schema describes each file. The loader, build mode and its forms check against the same schema, and the specification of the two formats is written from it.
+- A JSON Schema describes each file (`schemas/`). The loader checks every file against it, build mode loads its drafts through the same loader, and any editor can read the same files; [FORMATS.md](FORMATS.md) specifies the two formats.
 - A key the schema does not know is an error, not a warning. A mistyped `alow:` would otherwise be ignored without a word.
 - A file without `schema_version`, or with one the app does not know, fails with a message that says what to change. A format that changes later gets the next number and a note on how to migrate.
 - A new need is first solved in the factory (roles, scripts, conventions); a new field goes into the schema only when the factory cannot solve it.
