@@ -85,7 +85,7 @@ function RunView({ d, line, notify, onPiece }: { d: RunDetail; line?: Factory['s
   const { steps, verbs, end } = useMemo(() => {
     const steps = new Map<string, Step>();
     const get = (p: string) => { let s = steps.get(p); if (!s) { s = { piece: p, status: 'running', attempts: [], events: [], cost: 0 }; steps.set(p, s); } return s; };
-    const verbs: { t: number; verb: string; actor: string; piece?: string; hint?: string; confirmations?: number; choice?: string; note?: string; answer?: string; question?: string }[] = [];
+    const verbs: { t: number; verb: string; actor: string; piece?: string; hint?: string; confirmations?: number; choice?: string; note?: string; answer?: string; question?: string; command?: string; reason?: string }[] = [];
     let end: Record<string, any> | undefined;
     for (const e of d.events) {
       if (e.type === 'piece.start') { const s = get(e.piece); s.start ??= e.t; s.status = 'running'; if (e.attempt) s.attempts.push({ n: e.attempt }); }
@@ -98,6 +98,9 @@ function RunView({ d, line, notify, onPiece }: { d: RunDetail; line?: Factory['s
       if (e.type === 'cost') get(e.piece).cost += e.usd;
       if (e.type === 'rework') { get(e.to).events.push({ t: e.t, kind: 'warn', text: `Sent back by ${e.from} (lap ${e.lap} of ${e.laps})` }); get(e.to).status = 'running'; }
       if (e.type === 'piece.ask') get(e.piece).events.push({ t: e.t, kind: 'warn', text: `Asked you: ${e.question?.question}` });
+      if (e.type === 'permission.request') get(e.piece).events.push({ t: e.t, kind: 'warn', text: `Asked to run: ${e.summary}` });
+      if (e.type === 'permission.denied') get(e.piece).events.push({ t: e.t, kind: 'warn', text: `Refused, never allowed here (${e.by}): ${e.summary}` });
+      if (e.type === 'permission.decision') get(e.piece).events.push({ t: e.t, kind: e.decision === 'allow' ? 'ok' : 'warn', text: `${e.decision === 'allow' ? 'Allowed' : 'Denied'} after ${fmtDur(e.waitedMs)}` });
       if (e.type === 'verb') verbs.push(e as any);
       if (e.type === 'run.end') end = e;
     }
@@ -170,7 +173,7 @@ function RunView({ d, line, notify, onPiece }: { d: RunDetail; line?: Factory['s
       <h3 className="h">Who did what</h3>
       <ul className="verbs">
         {verbs.map((v, i) => (
-          <li key={i}><time>{new Date(v.t).toLocaleTimeString([], { hour12: false })}</time><b>{v.actor}</b> {v.verb === 'release' && v.choice ? `chose ${v.choice} at ${labelOf(v.piece!)}${v.note ? ` — "${v.note}"` : ''}` : v.verb === 'answer' ? `answered ${labelOf(v.piece!)}: "${v.answer}"` : v.verb === 'release' ? `released ${labelOf(v.piece!)}${v.confirmations ? ` after ${v.confirmations} confirmation${v.confirmations === 1 ? '' : 's'}` : ''}` : v.verb === 'retry' ? `retried ${labelOf(v.piece!)}${v.hint ? ` with hint "${v.hint}"` : ''}` : `${v.verb === 'run' ? 'started the run' : v.verb === 'halt' ? 'halted the line' : 'resumed the line'}`}</li>
+          <li key={i}><time>{new Date(v.t).toLocaleTimeString([], { hour12: false })}</time><b>{v.actor}</b> {v.verb === 'release' && v.choice ? `chose ${v.choice} at ${labelOf(v.piece!)}${v.note ? ` — "${v.note}"` : ''}` : v.verb === 'answer' ? `answered ${labelOf(v.piece!)}: "${v.answer}"` : v.verb === 'release' ? `released ${labelOf(v.piece!)}${v.confirmations ? ` after ${v.confirmations} confirmation${v.confirmations === 1 ? '' : 's'}` : ''}` : v.verb === 'retry' ? `retried ${labelOf(v.piece!)}${v.hint ? ` with hint "${v.hint}"` : ''}` : v.verb === 'allow' ? `allowed ${labelOf(v.piece!)} to run "${v.command}"` : v.verb === 'deny' ? `denied ${labelOf(v.piece!)} "${v.command}"${v.reason ? ` — "${v.reason}"` : ''}` : `${v.verb === 'run' ? 'started the run' : v.verb === 'halt' ? 'halted the line' : 'resumed the line'}`}</li>
         ))}
       </ul>
 

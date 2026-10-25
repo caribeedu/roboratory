@@ -243,6 +243,9 @@ export interface AttentionItem {
   detail: string;
 }
 
+/** A stopped machine or signal. A permission request ranks with it in the queue but is not one. */
+export const isBurning = (i: AttentionItem) => i.kind === 'fire' || i.kind === 'signal';
+
 export interface Proposal {
   id: string;
   kind: 'verb' | 'patch';

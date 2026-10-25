@@ -279,7 +279,8 @@ export function Floor(props: FloorProps) {
       }
       // balloons: anything waiting on you, or stopped
       const asking = pv.state === 'asking';
-      const needs = hold || fire || asking;
+      const permits = !!pv.permissions?.length; // a request waits for you: the machine is at work, not on fire (D44)
+      const needs = hold || fire || asking || permits;
       g.balloon.visible = needs;
       if (needs) {
         g.balloon.texture = asking ? tex('q', 14, 18, drawQuestion) : tex(`b|${fire}`, 14, 18, (c) => drawBalloon(c, fire ? PAL.fail : '#c9473a'));

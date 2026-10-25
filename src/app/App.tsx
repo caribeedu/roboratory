@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BuildOp, BuildView, Slot } from '../shared/build';
-import type { AttentionItem } from '../shared/types';
+import { isBurning, type AttentionItem } from '../shared/types';
 import { DraftRev } from './build/forms';
 import { PieceEditor } from './build/PieceEditor';
 import { SaveDialog } from './build/SaveDialog';
@@ -104,9 +104,9 @@ export function App() {
     if (known.current) {
       const fresh = items.filter((i) => !known.current!.has(`${i.id}@${i.runId}`));
       if (fresh.length) {
-        chirp(fresh.some((f) => f.severity >= 3) ? 'fire' : 'gate');
+        chirp(fresh.some(isBurning) ? 'fire' : 'gate');
         const f = fresh[0];
-        notify(`${factory?.sectors.find((s) => s.id === f.sectorId)?.name}: ${f.title}`, f.severity >= 3 ? 'fail' : 'info');
+        notify(`${factory?.sectors.find((s) => s.id === f.sectorId)?.name}: ${f.title}`, isBurning(f) ? 'fail' : 'info');
       }
     }
     known.current = ids;
