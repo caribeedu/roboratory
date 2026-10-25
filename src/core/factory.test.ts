@@ -46,6 +46,18 @@ describe('factory loader', () => {
     expect(f.sectors[2].lines).toHaveLength(1);
   });
 
+  it('refuses a machine or a manager whose agent has no adapter, naming the one at fault', () => {
+    const dir = tmp();
+    const root = createDemoFactory(path.join(dir, 'factory'), path.join(dir, 'repos'));
+    const machine = path.join(root, 'shared/machines/triager/machine.yaml');
+    fs.writeFileSync(machine, fs.readFileSync(machine, 'utf8').replace(/^agent: .*$/m, 'agent: gemini'));
+    expect(loadFactory(root).warnings.join('\n')).toMatch(/machine.yaml: agent must be claude or sim/);
+    fs.writeFileSync(machine, fs.readFileSync(machine, 'utf8').replace('agent: gemini', 'agent: sim'));
+    const sector = path.join(root, 'sectors/releases/sector.yaml');
+    fs.writeFileSync(sector, fs.readFileSync(sector, 'utf8').replace('manager:\n  agent: sim', 'manager:\n  agent: opencode'));
+    expect(loadFactory(root).warnings.join('\n')).toMatch(/agent "opencode" is not one of claude, sim/);
+  });
+
   it('rejects unknown needs and bad rules with the piece named', () => {
     const dir = tmp();
     const root = createDemoFactory(path.join(dir, 'factory'), path.join(dir, 'repos'));

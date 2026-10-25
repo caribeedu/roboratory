@@ -5,8 +5,8 @@ import path from 'node:path';
 import type { ScopeArg, RunDetail } from '../shared/api';
 import type { BuildOp, BuildView } from '../shared/build';
 import type { FactoryDef, LogEntry, Snapshot } from '../shared/types';
-import { claudeMcpServers, mcpServerOf } from './agents';
-import { Engine } from './engine';
+import { claudeMcpServers, mcpServerOf, type PermissionCall } from './agents';
+import { Engine, type EngineOptions } from './engine';
 import { loadFactory } from './factory';
 import { BuildSession } from './build/session';
 import { Managers } from './managers';
@@ -24,13 +24,16 @@ export class FactoryService {
   private session: BuildSession | null = null;
   private mcpServers: Promise<string[] | null> | null = null;
 
-  constructor(private out: { snapshot(s: Snapshot): void; logs(l: LogEntry[]): void; messages(key: string): void; build?(v: BuildView | null): void }) {}
+  constructor(
+    private out: { snapshot(s: Snapshot): void; logs(l: LogEntry[]): void; messages(key: string): void; build?(v: BuildView | null): void },
+    private opts: Pick<EngineOptions, 'permissionTool'> = {},
+  ) {}
 
   open(root: string) {
     this.close();
     if (!fs.existsSync(path.join(root, 'factory.yaml')) && !fs.existsSync(path.join(root, 'sectors'))) throw new Error(`${root} is not a Roboratory factory (no factory.yaml or sectors/ folder).`);
     this.factory = loadFactory(root);
-    const engine = new Engine(this.factory);
+    const engine = new Engine(this.factory, { permissionTool: this.opts.permissionTool });
     this.engine = engine;
     // every dispatch (yours, a manager's proposal, a policy auto-run) passes the build-mode lock
     engine.runGuard = (lineId) => (this.session && this.factory && this.session.affected(this.factory, this.session.draft.load()).some((l) => l.id === lineId)
@@ -120,6 +123,12 @@ export class FactoryService {
   retry(lineId: string, pieceId: string, hint: string) { this.need().e.retry(lineId, pieceId, hint); }
   release(lineId: string, pieceId: string, c: number, decision?: { choice: string; note: string }) { this.need().e.release(lineId, pieceId, c, 'you', decision); }
   answer(lineId: string, pieceId: string, text: string) { this.need().e.answer(lineId, pieceId, text); }
+  /** Lets a machine make the call it asked for, this once (D44). */
+  allow(requestId: string) { this.need().e.allow(requestId); }
+  /** Refuses it; the reason goes back to the agent. */
+  deny(requestId: string, reason = '') { this.need().e.deny(requestId, reason); }
+  /** The decision on a call of the machine started with `session`; asked by an agent's permission tool. */
+  permit(session: string, call: PermissionCall, gone?: AbortSignal) { return this.need().e.permitSession(session, call, gone); }
   halt(lineId: string) { this.need().e.halt(lineId); }
   resume(lineId: string) { this.need().e.resume(lineId); }
   runs() { return this.engine?.runSummaries() ?? []; }

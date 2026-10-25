@@ -1,0 +1,98 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/caribeedu/roboratory/blob/main/schemas/line.schema.json",
+  "title": "Roboratory line.yaml",
+  "description": "A line model: an intake, the pieces a box passes through, and the pallet it ends on. See docs/FORMATS.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": { "const": 1, "description": "The version of this format, not of the product." },
+    "deny": { "type": ["array", "null"], "items": { "type": "string" }, "description": "Commands no machine of this line may run, added to the sector's and the factory's." },
+    "intake": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "description": "Where work enters the line.",
+      "properties": {
+        "kind": { "enum": ["manual", "timer", "webhook", "chat"], "description": "Only manual intakes start runs today." },
+        "label": { "type": "string" },
+        "inputs": {
+          "type": "array",
+          "description": "The fields a work order asks for: a name, or a mapping.",
+          "items": {
+            "type": ["string", "object"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "label": { "type": "string" },
+              "required": { "type": "boolean" },
+              "placeholder": { "type": "string" },
+              "multiline": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    "pieces": {
+      "type": ["array", "null"],
+      "description": "The machines, signals and gates, in the order a box meets them unless needs says otherwise.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id"],
+        "properties": {
+          "id": { "type": "string", "description": "The piece's name, unique in the line. It cannot start with @." },
+          "label": { "type": "string" },
+          "goal": { "type": "string", "description": "What this piece is for in this line (at most 250 characters, checked when you save in build mode)." },
+          "needs": { "$ref": "#/definitions/needs" },
+          "machine": { "type": "string", "description": "The machine folder this piece runs." },
+          "signal": {
+            "type": ["string", "object"],
+            "description": "A script that passes the box on when it exits 0: a command, or { run, timeout }.",
+            "additionalProperties": false,
+            "properties": { "run": { "type": "string" }, "timeout": { "type": ["string", "number"] } }
+          },
+          "gate": {
+            "type": "object",
+            "description": "A place where the box waits for you, or for a rule.",
+            "additionalProperties": false,
+            "properties": {
+              "rule": { "type": "string", "description": "Passes the box on by itself when this holds." },
+              "choices": { "type": "array", "items": { "type": "string" }, "description": "Options you pick from; the choice is routed on." },
+              "confirmations": { "type": "integer", "minimum": 1, "description": "How many times it asks if you are sure." }
+            }
+          }
+        }
+      }
+    },
+    "pallet": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "description": "Where finished work lands.",
+      "properties": { "label": { "type": "string" }, "needs": { "$ref": "#/definitions/needs" } }
+    }
+  },
+  "definitions": {
+    "needs": {
+      "type": ["string", "object", "array", "null"],
+      "description": "Where the box comes from: a piece id, { from, when, back, laps }, or a list of those.",
+      "additionalProperties": false,
+      "properties": {
+        "from": { "type": "string" },
+        "when": { "type": "string", "description": "A rule over the box; the belt carries it only when this holds." },
+        "back": { "type": "boolean", "description": "A return belt for rework; it needs a when." },
+        "laps": { "type": "integer", "minimum": 1, "description": "How many times the box may go back this way." }
+      },
+      "items": {
+        "type": ["string", "object"],
+        "additionalProperties": false,
+        "properties": {
+          "from": { "type": "string" },
+          "when": { "type": "string" },
+          "back": { "type": "boolean" },
+          "laps": { "type": "integer", "minimum": 1 }
+        }
+      }
+    }
+  }
+}

@@ -90,7 +90,7 @@ Kept as principles: everything runs locally, there is no telemetry, and files us
 **Why:** silence detection is a guess. It can capture a partial answer and re-prompt an agent that is still working, and in a chain of steps each wrong guess spreads. Process exit is exact.
 
 **Checked against the agent CLIs' documentation and local help:**
-- Claude Code (`-p`, `--json-schema`) and Codex (`exec`, `--output-schema`) both enforce the schema natively.
+- Claude Code (`-p`, `--json-schema`) enforces the schema natively.
 - Gemini CLI and OpenCode have headless JSON modes.
 
 **Vendor-specific on purpose:** per-agent templates and output parsing are allowed.
@@ -254,14 +254,14 @@ Kept as principles: everything runs locally, there is no telemetry, and files us
 **Related:** D25.
 
 ## D27. Machines are told what their shell allows
-**Decision:** the Claude adapter appends the machine's shell rules to its prompt, built from its allowed tools: the command prefixes it may run, that every part of a compound command must be allowed, and that a denied command does not mean the others are denied. A machine with an open shell (`Bash`) gets no rules; managers have no shell and get none.
+**Decision:** the Claude adapter appends the machine's shell rules to its prompt, built from its allowed tools: the command prefixes it may run, that every part of a compound command must be allowed, and that a denied command does not mean the others are denied. A machine with an open shell (`Bash`) gets no rules; managers have no shell and get none. Where a command outside the list is asked of a person instead of denied (D44), the rules say so.
 
 **Alternatives:** writing the rules into each role (they drift from `allow`); leaving the agent to find out by trial (a real ticket run lost four steps to it).
 
 **Why:** in that real run, four machines sent a compound command such as `R=...; ls`, got it denied, concluded the whole shell was off, and either skipped their checks or answered `blocked`. The rules come from the same list that permits the commands, so they stay true.
 
 ## D28. A simulated agent for the demo and the tests
-**Decision:** besides `claude` and `codex`, a machine or manager can use `agent: sim`. It is configured in `machine.yaml` (how long it works, what it says, which files it writes, what it answers) and runs inside the app.
+**Decision:** besides `claude`, a machine or manager can use `agent: sim`. It is configured in `machine.yaml` (how long it works, what it says, which files it writes, what it answers) and runs inside the app.
 
 **Why:** the demo factory has to work offline and cost nothing, and the tests have to exercise the whole runtime (worktrees, contracts, fires, gates, managers) without calling a model. Running real agents always spends money, so it stays an explicit choice in each `machine.yaml`.
 
@@ -300,14 +300,14 @@ Kept as principles: everything runs locally, there is no telemetry, and files us
 
 **Why:** restricting machines needs containers or an OS sandbox, which costs more than it buys today. Making managers read-only costs nothing, because the CLIs already support it, and it guarantees that nothing changes without you.
 
-**Related:** D29 and D9.
+**Related:** D29, D9 and D44 (what the engine decides about the commands of a machine).
 
 ## D33. Manager tools: factory data plus MCP tools listed by name
 **Decision:**
 - Managers see the factory's state, runs, transcripts and files, plus MCP tools listed by tool name: in `sector.yaml` for a Sector Manager, in `factory.yaml` for the General Manager.
 - MCP servers are configured in the agent CLI, never by Roboratory, and machines' `tools:` work the same way.
 - On start, Roboratory checks that listed tools exist and warns about missing ones.
-- Managers run read-only through the CLI: `--tools` on Claude Code, `--sandbox read-only` on Codex. They return changes as patches inside their contract answer, and Roboratory writes them only when you accept.
+- Managers run read-only through the CLI (`--tools` on Claude Code). They return changes as patches inside their contract answer, and Roboratory writes them only when you accept.
 
 **Why:** managers can diagnose alongside you without any path to act outside verbs and review.
 
@@ -437,3 +437,68 @@ A rework drops the arrivals and skips that the last lap left downstream (D15).
 **Why:** runs stop every time the app is rebuilt or quit. Permission requests at run time and the manager's investigations (see [ROADMAP.md](ROADMAP.md)) need a process that waits for you, so the engine must move before they are built, not after. Tests that drive the real engine through one client are simpler to write and keep than tests that reach inside the app.
 
 **Related:** D30 (the verbs get a command-line interface), D41 (build-mode locks cover the command too).
+
+# Permissions and the core formats
+
+## D44. Permissions: requests at run time, hard denials, read-only machines
+**Decision:**
+- **Requests.** A machine's `allow` lists the commands it may run. A shell command or MCP tool outside the list, and not hard-denied, is a permission request: the machine waits, and the engine raises a `permission` item in the attention queue with the machine, the line, the tool and the exact command. It shows the exclamation balloon and sits in the queue at the priority of a fire, but the machine is not on fire: it is waiting, not broken, and the line does not stop. You answer with one of two verbs: `allow`, for this call only, or `deny` with a reason, which goes back to the agent as the tool's refusal. Nothing is allowed for good, and not for the rest of the run either.
+- **The wait.** It has no limit and no automatic denial, and it does not count against the machine's `timeout`: the clock runs only while the agent works. A request lives as long as the machine's process; if the engine is killed the step reruns and asks again.
+- **Hard denials.** `deny:` in `factory.yaml` lists commands that are never allowed. A sector (`sector.yaml`), a line (`line.yaml`) and a machine (`machine.yaml`) may add entries and never remove one, so each level can only tighten the one above. The app and the engine carry no list of their own: the factory template and the reference factory start with one (for example `git push --force`, `rm -rf`, `sudo`, `gh pr merge`), and a factory edits it. A hard denial is never asked about; the agent is told it is forbidden by the factory. The engine enforces it (see **Who decides a command**).
+- **Syntax.** `allow` and `deny` hold command prefixes, as written: `npm test`, `git push --force`. A tool name stands for the tool (`Edit`, `mcp__server__tool`).
+- **Who decides a command.** The engine, not the agent's CLI, decides every shell command, because the CLI's own rules can be walked around (`git -C . push` passes a rule on `git push`). The adapter passes the agent no allow or deny rules for the shell and sends every command it does not run by itself to the engine through the permission tool. The engine takes the whole command, splits it at `;`, `&&`, `||`, `|` and line breaks, and for each part drops git's global options (`-C <path>`, `--git-dir`, `--work-tree`, `--no-pager`) before reading the subcommand; `-c <key>=<value>` can set an alias or a pager, so a command with it is a request. A part that matches a hard denial denies the command. The command is allowed without asking when every part starts with an entry of `allow`. Anything else is a request to you. A command the engine cannot account for (a substitution `$(…)` or backticks, a subshell, a comment, a redirect to a file, a word the shell would expand where the command or git's subcommand stands) is never allowed by itself: it is a request, with the command in front of you. `env`, `command`, `time`, `nohup`, `exec`, `nice` and shell keywords (`if`, `then`, `{`, `!`) are looked through. A wrapper that runs a string, such as `sh -c`, `xargs` or `sudo`, is not looked into: it matches only if it is itself listed, and otherwise it is a request. A denial names the command whatever folder it is run from, and in any case on a file system that ignores case; its flags may stand anywhere and `-rf` is also `-fr` and `-r -f`, but a flag spelled another way (`-f` for `--force`) is another word, so list both. Commands the CLI treats as read-only (`ls`, `cat`, `git status`) it allows by itself and never asks about, so a hard denial cannot take away reading. Where there is no permission tool (an engine run in process by a test), the CLI is given the lists as its own rules instead and refuses what is not listed.
+- **Read-only machines.** `read_only: true` in `machine.yaml` (off by default) gives a machine no file-editing tools and denies `git push`. The commands in its `allow` still run, so it can run tests and read from a remote. It is not a sandbox: a listed command can still write files (D32).
+- **Defaults.** Every machine starts with the file tools and the local git subcommands, and its `allow` adds to them. The local subcommands are the ones that do not send anything to a remote (`status`, `diff`, `log`, `add`, `commit`, `switch`, `checkout`, `merge`, `rebase`, `stash`, `worktree`, `fetch`, `pull` and the like). `git push` is a request. A machine that should always push lists `git push` in its `allow`.
+- **Who is not asked.** Managers get no requests: a command outside their list fails, as they run read-only (D29, D33). Signals are scripts of the factory, not agents, and are not asked either.
+- **The verbs.** `allow` and `deny` are audited like every verb (D30), as `you` from the app or the command (`roboratory allow`, `roboratory deny`). Like `release`, they are never automatic: no policy grants them and a manager cannot propose them (D34).
+- **Trace.** `run.jsonl` records each request and its decision, and the Ledger shows them with the wait.
+- **What the agent is told.** The prompt (D27) says which commands it may run, that anything else is asked of a person and can be denied with a reason, and that a denial is not repeated: it picks another way or answers `blocked` (D22).
+- **The Claude adapter.** It asks through `--permission-prompt-tool`, which Claude Code calls only when its rules do not decide. The tool is a small process of the `roboratory` command that Claude starts and that passes the request to the engine over its socket and token, and the answer back. It serves that one tool and runs nothing; the engine hosts no MCP server and does not stand between the agent and its tools. The adapter runs Claude Code in its default permission mode instead of `dontAsk`, gives it the file and MCP tools by name, and `--disallowedTools Agent` as before.
+
+**Checked with a real agent** (Claude Code 2.1.226 on Haiku, `e2e/tools/permission-check.mjs`, US$ 0.02 in all):
+- The tool is called only for what the allow and deny rules leave undecided, with `{tool_name, input: {command, description}, tool_use_id}`. It answers `{"behavior":"allow","updatedInput":<the input>}` or `{"behavior":"deny","message":…}`, and the agent repeats the message word for word.
+- It works with `--output-format stream-json` and `--json-schema`. The tool's process starts with the run and connects within seconds, and a request that waited 190 s before an answer ran normally.
+- In this mode Claude Code allows read-only commands (`date`, `ls`, `cat`, `git status`) by itself, which `dontAsk` did not, and asks for the rest. A `--disallowedTools` rule holds and the tool is not called.
+- Through Roboratory itself (`e2e/tools/real-permissions-check.mjs`, one machine on Haiku, US$ 0.01 in all): a command outside the list waited for an answer and ran after `allow`; a command refused with a reason was not run and the agent repeated the reason; a command on the factory's list was refused with no request. A model may decline a destructive command on its own before it reaches the tool, so a check of the factory's list uses a harmless one.
+- A deny rule such as `Bash(git push:*)` does **not** catch `git -C . push`, wildcards included: with `Bash(git:*)` allowed, that push went through. An allow list that names the local subcommands, in the plain and the `git * <subcommand>` forms, asks for the `git -C . push`.
+
+**Alternatives:**
+- A shell run by the engine and offered to the agent as an MCP tool, with the native shell off. Models use their own shell better, and the engine would then run the commands, which asks for the sandbox of D32. (What was chosen decides a command in the engine but leaves running it to the agent.)
+- Leaving the rules to the CLI: deny and allow rules passed as flags. The check found they miss the `git -C` form, so a hard denial would hold only for the plain command.
+- Answering over the agent's standard input with the control protocol of its SDK. Its messages are not documented for the CLI, so it would break with an update.
+- A hook on every tool call. It costs a process per call and repeats the rules outside the engine.
+- Allowing a command for the rest of the run. It is left for v0.10, which measures how often the same command is allowed again within a run.
+- Denying by time. A person may take longer than any limit, and a denial by timeout reads to the agent as a refusal of the command.
+- A build-mode warning when a role names a command its `allow` list does not permit. It would be a guess over prose that is wrong in both directions; the request at run time shows the same defect with the real command.
+
+**Why:** the first real ticket run found tool permissions held by instruction only: four of six machines took a denied command for a denied shell, and any machine could run `git push`. A command that fails stops the work; one that waits for you lets you decide with the exact command in front of you, and the agent hears why. Hard denials stay in the factory's files so they can be read, reviewed and changed like every other rule.
+
+**Not guaranteed:** the engine reads commands, not what they do. A command the agent builds inside a listed program (a script that pushes) is out of its reach, and so is a command the CLI allows by itself because it only reads. With an open shell (`Bash` in `allow`) the denials are a best effort, since everything the engine cannot read is what an open shell would run. Only a container or sandbox (D32) closes these.
+
+**Related:** D27 (the prompt's shell rules), D29 and D33 (managers), D30, D31 and D34 (verbs and policy), D32 (what stays open without a sandbox), D43 (the engine is the process that waits), D45.
+
+## D45. Agents sit behind a port
+**Decision:**
+- The engine and the managers call one port, `AgentRunner`: a request (role, prompt, contract, folders, permissions, timeout) in, a result (output, transcript events, cost) out. Each agent is an adapter behind it, and `agent:` in `machine.yaml` names the adapter. The adapters are Claude Code (D8) and the simulated agent (D28). A name that is not an adapter is a problem found when the factory loads.
+- Everything specific to an agent CLI stays inside its adapter: the command line, how it enforces the contract, the stream it writes, its cost, how its MCP tools are named, its read-only mode and how it asks for a permission (D44). The engine does not know a CLI.
+- Another agent means one more adapter and a line where adapters are listed, and nothing else.
+
+**Alternatives:** keeping several CLIs as adapters (each needs its own way of asking for permissions and of read-only mode, and one that is never exercised for real is a risk with no use); one adapter written inline in the engine (it works until the second agent).
+
+**Why:** the permission request, the read-only mode and the contract each depend on what an agent's CLI can do. With one port, the engine states what it needs and an adapter says how, so a new agent never touches the engine.
+
+**Related:** D8 (headless machines), D28 (the simulated agent), D44.
+
+## D46. The core files are versioned and strict
+**Decision:**
+- `line.yaml` and `machine.yaml` carry `schema_version: 1`, an integer that is the version of the format and has nothing to do with the version of the product. It is required.
+- A JSON Schema describes each file (`schemas/`). The loader checks every file against it, build mode loads its drafts through the same loader, and any editor can read the same files; [FORMATS.md](FORMATS.md) specifies the two formats.
+- A key the schema does not know is an error, not a warning. A mistyped `alow:` would otherwise be ignored without a word.
+- A file without `schema_version`, or with one the app does not know, fails with a message that says what to change. A format that changes later gets the next number and a note on how to migrate.
+- A new need is first solved in the factory (roles, scripts, conventions); a new field goes into the schema only when the factory cannot solve it.
+
+**Alternatives:** unknown keys as warnings (a format that accepts anything is not frozen); the product's version as the format's (a release that changes nothing in the files would still break every factory); a schema only in the docs (the loader and the forms would drift from it).
+
+**Why:** the files are the product's contract with the people who write factories, so they are specified once and checked the same way everywhere.
+
+**Related:** D4 (the factory repository is the source of truth), D41 (build mode writes these files).

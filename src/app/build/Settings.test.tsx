@@ -33,6 +33,12 @@ async function commit(user: ReturnType<typeof userEvent.setup>, label: string, t
 describe('Line settings', () => {
   const line = { kind: 'line', lineId: LINE_ID } as const;
 
+  it('lists the commands no machine of its model may run', async () => {
+    const { op, user } = open(line);
+    await commit(user, 'Line never allowed', 'make clean');
+    expect(op).toHaveBeenLastCalledWith({ op: 'setModel', lineId: LINE_ID, deny: ['make clean'] });
+  });
+
   it('renames the line, sets its direction and its target repository', async () => {
     const { op, user } = open(line);
     await commit(user, 'Line name', 'Releases of orders');
@@ -88,6 +94,12 @@ describe('Sector settings', () => {
     expect(op).toHaveBeenLastCalledWith({ op: 'setSector', sectorId: 'releases', name: 'Shipping' });
     await user.click(screen.getByRole('button', { name: 'Color #5b8fd3' }));
     expect(op).toHaveBeenLastCalledWith({ op: 'setSector', sectorId: 'releases', color: '#5b8fd3' });
+  });
+
+  it('lists the commands no machine of the sector may run', async () => {
+    const { op, user } = open(sector);
+    await commit(user, 'Sector never allowed', 'gh pr merge');
+    expect(op).toHaveBeenLastCalledWith({ op: 'setSector', sectorId: 'releases', deny: ['gh pr merge'] });
   });
 
   it('shows the manager as configured and changes it', async () => {
@@ -157,10 +169,16 @@ describe('Factory settings', () => {
     expect(op).toHaveBeenLastCalledWith({ op: 'setFactory', ceiling: { retry: { auto: 3 }, halt: { auto: 5 } } });
   });
 
+  it('lists the commands no machine may run', async () => {
+    const { op, user } = open(factory);
+    await commit(user, 'Factory never allowed', 'sudo, rm -rf');
+    expect(op).toHaveBeenLastCalledWith({ op: 'setFactory', deny: ['sudo', 'rm -rf'] });
+  });
+
   it('configures the General Manager and the factory culture', async () => {
     const { op, user } = open(factory);
-    await user.selectOptions(await screen.findByLabelText('Manager agent'), 'codex');
-    expect(op).toHaveBeenLastCalledWith({ op: 'setFactory', generalManager: { agent: 'codex' } });
+    await user.selectOptions(await screen.findByLabelText('Manager agent'), 'sim');
+    expect(op).toHaveBeenLastCalledWith({ op: 'setFactory', generalManager: { agent: 'sim' } });
     await user.click(screen.getByRole('button', { name: /Culture/ }));
     const culture = await screen.findByLabelText('Factory culture');
     await user.type(culture, 'Be kind.');

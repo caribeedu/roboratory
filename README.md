@@ -23,7 +23,7 @@ Running several AI agents on real work today means either free-form chat between
 
 - **Deterministic lines.** Routing, checks and gates are defined in files, so the same input takes the same path every time.
 - **Contracts at every step.** An output that does not match its JSON Schema runs the step again; when attempts run out, the machine catches fire and the line stops behind it.
-- **Humans hold the gates that matter.** Releasing a gate or applying a change is never automatic. Managers answer questions and propose, and you decide.
+- **Humans hold the gates that matter.** Releasing a gate or applying a change is never automatic, and a machine that wants to run a command outside its list waits for you to allow it. Managers answer questions and propose, and you decide.
 - **Everything visible.** If something is running, waiting or burning, it shows on the floor, on the minimap and in the log.
 - **Git is the source of truth.** The factory is a repository. Changing it means a reviewed diff, never improvisation at runtime.
 - **Local.** No telemetry, open file formats, and your own agent CLIs and subscriptions.
@@ -53,7 +53,7 @@ A run starts when a work order enters at an **intake**, and every run follows th
 
 | Piece | Concept | What it is |
 |---|---|---|
-| **Machine** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/machine.png?v=2" height="56" alt=""> | One agent | Runs one headless agent (Claude Code or Codex) with a role and a contract. The step ends when the process exits. |
+| **Machine** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/machine.png?v=2" height="56" alt=""> | One agent | Runs one headless agent (Claude Code) with a role and a contract. The step ends when the process exits. |
 | **Box** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/box.png?v=2" height="56" alt=""> | Outcome | The output of a machine, validated against its contract. It is the unit of progress that travels along the line. |
 | **Belt** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/belt.png?v=2" height="56" alt=""> | Routing | Carries boxes from one piece to the next. A splitter belt routes each box by one of its fields; a return belt sends it back for rework. |
 | **Signal** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/signal.png?v=2" height="56" alt=""> | Eval | A script that checks a box. Exit code 0 lets it pass; anything else stops the line. |
@@ -67,7 +67,7 @@ A run starts when a work order enters at an **intake**, and every run follows th
 
 ## What you can do today
 
-- **Run lines** with simulated, Claude Code or Codex agents, on target repositories with one git worktree per machine.
+- **Run lines** with simulated or Claude Code agents, on target repositories with one git worktree per machine.
 
   <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/line.png?v=2" alt="A line at work: an intake, machines, a signal, a gate and a pallet" width="900">
 
@@ -89,7 +89,7 @@ A run starts when a work order enters at an **intake**, and every run follows th
 
 ## Getting started
 
-**Requirements:** Node 22.12 or later and git. To run real agents you also need [Claude Code](https://claude.com/claude-code) or [Codex](https://github.com/openai/codex) installed and signed in. Roboratory runs on macOS, Windows and Linux; on Windows, signals run through `sh` (install Git for Windows) and agent CLIs must be native executables. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#platform-notes).
+**Requirements:** Node 22.12 or later and git. To run real agents you also need [Claude Code](https://claude.com/claude-code) installed and signed in. Roboratory runs on macOS, Windows and Linux; on Windows, signals run through `sh` (install Git for Windows) and agent CLIs must be native executables. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#platform-notes).
 
 ```sh
 npm ci
@@ -99,7 +99,7 @@ npm ci
 npm start
 ```
 
-Choose **Open the demo factory** on the welcome screen. It creates a factory in `~/Roboratory/Demo Factory` with three sectors and two demo target repositories. Its machines use the simulated agent, so it runs offline and costs nothing. To build or change lines, press **Build** on the Floor. To run a real agent, choose `claude` (or `codex`) as a machine's agent. **Real agents spend money**, so check a line with the simulated agent first.
+Choose **Open the demo factory** on the welcome screen. It creates a factory in `~/Roboratory/Demo Factory` with three sectors and two demo target repositories. Its machines use the simulated agent, so it runs offline and costs nothing. To build or change lines, press **Build** on the Floor. To run a real agent, choose `claude` as a machine's agent. **Real agents spend money**, so check a line with the simulated agent first.
 
 ## Documentation
 
@@ -107,7 +107,8 @@ Choose **Open the demo factory** on the welcome screen. It creates a factory in 
 |---|---|
 | [Product](docs/PRODUCT.md) | What Roboratory is, entity by entity, and how you use it |
 | [Architecture](docs/ARCHITECTURE.md) | File layout, runtime and scope |
-| [Decisions](docs/DECISIONS.md) | Every design decision, with its reasoning (D1–D43) |
+| [Decisions](docs/DECISIONS.md) | Every design decision, with its reasoning (D1–D46) |
+| [File formats](docs/FORMATS.md) | `line.yaml` and `machine.yaml`: every key, with JSON Schemas for your editor |
 | [Roadmap](docs/ROADMAP.md) | What is planned and what is still open |
 | [Assessment](docs/ASSESSMENT.md) | An honest assessment after the first real run |
 | [Competitors](docs/COMPETITORS.md) | Other tools that orchestrate coding agents, and what Roboratory takes from each |
@@ -117,7 +118,7 @@ Choose **Open the demo factory** on the welcome screen. It creates a factory in 
 
 ## Status
 
-Roboratory is an early release (v0.8): the factory, the Floor, headless machines, managers, build mode and an engine that runs without the app (with a `roboratory` command) are built; permission requests and automatic intakes are planned ([docs/ROADMAP.md](docs/ROADMAP.md)).
+Roboratory is an early release (v0.9): the factory, the Floor, headless machines that ask before they run a command outside their list, managers, build mode, versioned file formats and an engine that runs without the app (with a `roboratory` command) are built; checkers that prove their work and automatic intakes are planned ([docs/ROADMAP.md](docs/ROADMAP.md)).
 
 ## Contributing and security
 

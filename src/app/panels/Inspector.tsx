@@ -134,6 +134,25 @@ function Transcript({ logs, lineId, pieceId, runId, limit = 40 }: { logs: LogEnt
   );
 }
 
+/** A command the machine asks to run and waits on you for (D44). */
+function PermissionCard({ ask, act }: { ask: { id: string; tool: string; summary: string; since: number }; act: Props['act'] }) {
+  const [reason, setReason] = useState('');
+  const now = useNow();
+  return (
+    <form className="ask-card permission" aria-label="Permission request" onSubmit={(e) => e.preventDefault()}>
+      <h3>The agent asks to run a command</h3>
+      <pre className="ask-command">{ask.summary}</pre>
+      <p className="muted small">{ask.tool === 'Bash' ? 'A shell command' : ask.tool} outside its list · waiting {ago(ask.since, now)}. The machine is paused until you answer.</p>
+      <div className="actions">
+        <button className="btn primary" type="button" onClick={() => void act(() => api().allow(ask.id), 'Allowed, this once')}>Allow once</button>
+      </div>
+      <label htmlFor={`deny-${ask.id}`}>Or refuse it, with a reason the agent reads</label>
+      <textarea id={`deny-${ask.id}`} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Use npm run lint:ci instead; this line may not publish." />
+      <div className="actions"><button className="btn" type="button" onClick={() => void act(() => api().deny(ask.id, reason), 'Denied')}>Deny</button></div>
+    </form>
+  );
+}
+
 function MachinePanel({ line, piece, pv, logs, act, onOpenRun, halted }: { line: Line; piece: Piece; pv: Snapshot['lines'][string]['pieces'][string]; logs: LogEntry[]; act: Props['act']; onOpenRun: (id: string) => void; halted: boolean }) {
   const [hint, setHint] = useState('');
   const [answer, setAnswer] = useState('');
@@ -180,6 +199,7 @@ function MachinePanel({ line, piece, pv, logs, act, onOpenRun, halted }: { line:
   }
   return (
     <>
+      {pv.permissions?.map((a) => <PermissionCard key={a.id} ask={a} act={act} />)}
       <dl className="kv">
         <dt>Run</dt><dd>{pv.runId ? <button className="link" onClick={() => onOpenRun(pv.runId!)}>{pv.runId}</button> : '—'}</dd>
         <dt>Attempt</dt><dd>{pv.attempt ? `${pv.attempt} of ${pv.attempts}` : '—'}</dd>

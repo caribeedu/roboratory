@@ -9,7 +9,7 @@ import { apply } from './ops';
 const machine = (props = '{"verdict":{"type":"string","enum":["pass","fail"]}}') => ({
   'role.md': 'role\n',
   'contract.json': `{"type":"object","properties":${props}}`,
-  'machine.yaml': 'agent: sim\n',
+  'machine.yaml': 'schema_version: 1\nagent: sim\n',
 });
 
 function factory(lineYaml: string, machines: Record<string, ReturnType<typeof machine>>) {
@@ -26,6 +26,7 @@ function factory(lineYaml: string, machines: Record<string, ReturnType<typeof ma
 }
 
 const LINE = `# Summary: build -> check
+schema_version: 1
 intake: { kind: manual }
 pieces:
   # the builder
@@ -139,6 +140,41 @@ describe('build-mode edits', () => {
     expect(issues(d)).toEqual(['S: retry 2 on its own is above the factory ceiling (1).', 'S: managers can never release on their own.']);
   });
 
+  it('writes the denials of a machine, a line, a sector and the factory, and removes the key when the list is emptied', () => {
+    const root = factory(LINE, { build: machine(), check: machine() });
+    const d = new Draft(root);
+    const read = (rel: string) => d.read(path.join(root, rel));
+    apply(d, { op: 'setMachine', lineId: 's/a', pieceId: 'build', conf: { deny: ['rm -rf'], read_only: true } });
+    apply(d, { op: 'setModel', lineId: 's/a', deny: ['make clean'] });
+    apply(d, { op: 'setSector', sectorId: 's', deny: ['gh pr merge'] });
+    apply(d, { op: 'setFactory', deny: ['sudo'] });
+    expect(read('sectors/s/models/m/machines/build/machine.yaml')).toContain('deny: [rm -rf]\nread_only: true');
+    expect(lineOf(d)).toContain('deny: [make clean]');
+    expect(read('sectors/s/sector.yaml')).toContain('deny: [gh pr merge]');
+    expect(read('factory.yaml')).toContain('deny: [sudo]');
+    const f = d.load();
+    expect(f.deny).toEqual(['sudo']);
+    expect(f.sectors[0].deny).toEqual(['gh pr merge']);
+    expect(f.sectors[0].lines[0].model).toMatchObject({ deny: ['make clean'] });
+    expect(f.sectors[0].lines[0].model.machines.build).toMatchObject({ deny: ['rm -rf'], readOnly: true });
+    apply(d, { op: 'setMachine', lineId: 's/a', pieceId: 'build', conf: { deny: [], read_only: false } });
+    apply(d, { op: 'setFactory', deny: [] });
+    expect(read('sectors/s/models/m/machines/build/machine.yaml')).toBe('schema_version: 1\nagent: sim\n');
+    expect(read('factory.yaml')).toBe('name: T\n');
+  });
+
+  it('gives a machine.yaml or line.yaml it edits the version of the format when it has none', () => {
+    const root = factory(LINE, { build: { ...machine(), 'machine.yaml': 'agent: sim\n' }, check: machine() });
+    const d = new Draft(root);
+    const line = path.join(root, 'sectors/s/models/m/line.yaml');
+    fs.writeFileSync(line, fs.readFileSync(line, 'utf8').replace('schema_version: 1\n', ''));
+    apply(d, { op: 'setMachine', lineId: 's/a', pieceId: 'build', conf: { model: 'haiku' } });
+    apply(d, { op: 'setModel', lineId: 's/a', deny: ['make clean'] });
+    expect(d.read(path.join(root, 'sectors/s/models/m/machines/build/machine.yaml'))).toBe('schema_version: 1\nagent: sim\nmodel: haiku\n');
+    expect(lineOf(d)).toMatch(/^schema_version: 1\n/m);
+    expect(d.load().problems?.filter((p) => /schema_version/.test(p.message))).toEqual([]);
+  });
+
   it('writing back what the disk holds drops the change', () => {
     const root = factory(LINE, { build: machine(), check: machine() });
     const d = new Draft(root);
@@ -184,7 +220,8 @@ describe('build-mode edits', () => {
   });
 
   it('sets and clears a signal timeout without losing its command, and lets a return belt read why a signal failed', () => {
-    const SIG = `intake: { kind: manual }
+    const SIG = `schema_version: 1
+intake: { kind: manual }
 pieces:
   - id: build
     machine: build

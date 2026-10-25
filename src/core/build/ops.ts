@@ -111,7 +111,7 @@ function insert(d: Draft, l: LineDef, op: Extract<BuildOp, { op: 'insert' }>) {
     const dir = path.join(l.model.dir, 'machines', id);
     d.write(path.join(dir, 'role.md'), `## This step\n\nDescribe what this machine does, what it writes in its folder, and what it returns.\n`);
     d.write(path.join(dir, 'contract.json'), NEW_CONTRACT);
-    d.write(path.join(dir, 'machine.yaml'), 'agent: claude\nmodel: sonnet\nattempts: 2\ntimeout: 20m\n');
+    d.write(path.join(dir, 'machine.yaml'), 'schema_version: 1\nagent: claude\nmodel: sonnet\nattempts: 2\ntimeout: 20m\n');
   }
 }
 
@@ -202,8 +202,12 @@ function setMachine(d: Draft, l: LineDef, op: Extract<BuildOp, { op: 'setMachine
   const m = p?.machine ? l.model.machines[p.machine] : undefined;
   if (!m) fail(`"${op.pieceId}" is not a machine.`);
   const conf: MachineConf = op.conf;
-  d.editYaml(path.join(m!.dir, 'machine.yaml'), (doc) => setMap(doc, doc.contents as YAMLMap, { ...conf }));
+  // an empty list and an off switch are the defaults, so the key is removed rather than written
+  const set: Record<string, unknown> = { ...conf, deny: denyValue(conf.deny), read_only: conf.read_only === false ? null : conf.read_only };
+  d.editYaml(path.join(m!.dir, 'machine.yaml'), (doc) => setMap(doc, doc.contents as YAMLMap, set));
 }
+
+const denyValue = (deny: string[] | undefined) => (deny && !deny.length ? null : deny);
 
 function managerValues(m: ManagerConf) { return { agent: m.agent, model: m.model, tools: m.tools }; }
 const policyValue = (p: Policy) => Object.fromEntries(Object.entries(p).filter(([, r]) => (r?.auto ?? 0) > 0).map(([k, r]) => [k, { auto: r!.auto }]));
@@ -244,7 +248,7 @@ export function apply(d: Draft, op: BuildOp) {
         const mdir = path.join(sdir, 'models', op.model);
         if (d.exists(mdir)) fail(`Model "${op.model}" already exists.`);
         modelNameFree(d, f, op.sectorId, op.model);
-        d.write(path.join(mdir, 'line.yaml'), 'intake:\n  kind: manual\n  label: Start\n  inputs: []\npieces: []\npallet:\n  label: Delivered\n');
+        d.write(path.join(mdir, 'line.yaml'), 'schema_version: 1\nintake:\n  kind: manual\n  label: Start\n  inputs: []\npieces: []\npallet:\n  label: Delivered\n');
       } else {
         checkId(op.model, 'A model name');
         if (!d.exists(path.join(sdir, 'models', op.model, 'line.yaml')) && !d.exists(d.abs(path.join('shared', 'models', op.model, 'line.yaml')))) fail(`Model "${op.model}" not found.`);
@@ -297,11 +301,16 @@ export function apply(d: Draft, op: BuildOp) {
       });
       return;
     }
+    case 'setModel': {
+      const l = findLine(f, op.lineId);
+      d.editYaml(path.join(l.model.dir, 'line.yaml'), (doc) => setMap(doc, doc.contents as YAMLMap, { deny: denyValue(op.deny) }));
+      return;
+    }
     case 'setSector': {
       if (!f.sectors.some((s) => s.id === op.sectorId)) fail(`Sector "${op.sectorId}" not found.`);
       d.editYaml(path.join(sectorDir(d, op.sectorId), 'sector.yaml'), (doc) => {
         const root = doc.contents as YAMLMap;
-        setMap(doc, root, { name: op.name, color: op.color });
+        setMap(doc, root, { name: op.name, color: op.color, deny: denyValue(op.deny) });
         if (op.policy) root.set('policy', flowNode(doc, policyValue(op.policy), root.get('policy', true)));
         if (op.manager) { let m = root.get('manager', true); if (!isMap(m)) { root.set('manager', doc.createNode({})); m = root.get('manager', true); } setMap(doc, m as unknown as YAMLMap, managerValues(op.manager)); }
       });
@@ -310,7 +319,7 @@ export function apply(d: Draft, op: BuildOp) {
     case 'setFactory': {
       d.editYaml(d.abs('factory.yaml'), (doc) => {
         const root = doc.contents as YAMLMap;
-        setMap(doc, root, { name: op.name });
+        setMap(doc, root, { name: op.name, deny: denyValue(op.deny) });
         // on is the default, so only "off" is written
         if (op.lineContext !== undefined) { if (op.lineContext) root.delete('line_context'); else root.set('line_context', false); }
         if (op.ceiling) root.set('ceiling', flowNode(doc, policyValue(op.ceiling), root.get('ceiling', true)));

@@ -2,7 +2,7 @@
 import { useContext, useEffect, useState } from 'react';
 import YAML from 'yaml';
 import type { BuildOp, BuildView, FieldInfo, MachineConf } from '../../shared/build';
-import type { Snapshot } from '../../shared/types';
+import { AGENTS, type Snapshot } from '../../shared/types';
 import { Markdown } from '../Markdown';
 import { Head, Rule, Section } from '../panels/Inspector';
 import { api } from '../store';
@@ -239,7 +239,6 @@ function SignalForm({ view, line, piece, op }: { view: BuildView; line: Line; pi
 
 // ---------- machine ----------
 
-const AGENTS = ['claude', 'codex', 'sim'];
 const EFFORTS = ['', 'low', 'medium', 'high', 'xhigh', 'max'];
 
 function MachineForms({ view, line, piece, op }: { view: BuildView; line: Line; piece: Piece; op: Op }) {
@@ -266,7 +265,9 @@ function MachineForms({ view, line, piece, op }: { view: BuildView; line: Line; 
       <Section title="Access">
         <Tools value={arr('tools')} onChange={(tools) => set({ tools })} />
         <Row label="Folders" hint="Extra folders the agent may read and edit, besides its run folder."><ListField label="Folders" value={arr('dirs')} placeholder="~/repos/my-service" onCommit={(dirs) => set({ dirs })} /></Row>
-        <Row label="Allowed commands" hint="Permission rules, e.g. Bash(gh pr view:*)."><ListField label="Allowed commands" value={arr('allow')} onCommit={(allow) => set({ allow })} /></Row>
+        <Row label="Allowed commands" hint="Commands it may run besides the defaults, as prefixes: npm test, gh pr view. Anything else waits for you."><ListField label="Allowed commands" value={arr('allow')} onCommit={(allow) => set({ allow })} /></Row>
+        <Row label="Never allowed" hint="Commands it must never run, added to the factory's, the sector's and the line's."><ListField label="Never allowed" value={arr('deny')} onCommit={(deny) => set({ deny })} /></Row>
+        <Row label="Read-only" hint="No file edits and no git push. Commands it is allowed still run."><label><input type="checkbox" aria-label="Read-only" checked={conf.read_only === true} onChange={(e) => set({ read_only: e.target.checked })} /> read-only</label></Row>
       </Section>
       <RoleForms view={view} dir={dir} roles={arr('roles')} setRoles={(roles) => set({ roles })} op={op}
         addRole={(path, content) => op({ op: 'batch', ops: [{ op: 'writeFile', path, content }, { op: 'setMachine', lineId: line.id, pieceId: piece.id, conf: { roles: [...arr('roles'), path] } }] })} />

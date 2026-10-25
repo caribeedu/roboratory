@@ -89,14 +89,17 @@ function iconPath() {
 }
 
 function createWindow() {
+  // the end-to-end specs run the window in the background, so they do not take the focus of whoever is at the computer
+  const background = process.env.ROBORATORY_BACKGROUND === '1';
   win = new BrowserWindow({
+    show: !background,
     width: 1480, height: 940, minWidth: 980, minHeight: 640,
     backgroundColor: '#14110d',
     icon: iconPath(),
     title: 'Roboratory',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition: { x: 14, y: 16 },
-    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: false },
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: false, backgroundThrottling: !background },
   });
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) win.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   else win.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
@@ -138,7 +141,7 @@ handle('closeFactory', () => { disconnect(); send('snapshot', EMPTY); });
 handle('engineStart', async () => { if (client) { await client.restart(); setEngine({ state: statusOf(client), version: client.info.version }); } });
 handle('engineRestartWhenIdle', () => client?.call('restartWhenIdle'));
 for (const name of [
-  'run', 'retry', 'release', 'answer', 'halt', 'resume', 'ask', 'acceptProposal', 'rejectProposal',
+  'run', 'retry', 'release', 'answer', 'allow', 'deny', 'halt', 'resume', 'ask', 'acceptProposal', 'rejectProposal',
   'buildStart', 'buildApply', 'buildUndo', 'buildRedo', 'buildFields', 'buildRead', 'buildSave', 'buildDiscard',
 ]) forward(name);
 forward('runs', []);

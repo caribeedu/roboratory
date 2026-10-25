@@ -33,7 +33,7 @@ export const MANAGER_CONTRACT = {
   },
 };
 const validate = new Ajv({ allErrors: true, strict: false }).compile(MANAGER_CONTRACT);
-const NEVER_AUTO: VerbName[] = ['release', 'apply', 'resume'];
+const NEVER_AUTO: VerbName[] = ['release', 'apply', 'resume', 'allow', 'deny'];
 
 /** How many times per run a manager may run a verb alone: the stricter of sector policy and factory ceiling. */
 export function autoAllowance(sector: Policy, ceiling: Policy, verb: VerbName): number {
@@ -83,7 +83,7 @@ export class Managers {
     const res = def.agent === 'sim'
       ? { output: simManager(f, this.engine(), scope, question) }
       : await runAgent({
-        agent: def.agent, model: def.model, readOnly: true, tools: def.tools, allow: [], addDirs: [],
+        agent: def.agent, model: def.model, readOnly: true, shell: false, tools: def.tools, allow: [], deny: [], addDirs: [],
         cwd: sector ? sector.dir : f.root, timeoutMs: 5 * 60000, schema: MANAGER_CONTRACT,
         role: [def.role || (sector ? `You are the Sector Manager of "${sector.name}".` : 'You are the General Manager of this factory.'), f.culture, sector?.culture].filter((x) => x && x.trim()).join('\n\n'),
         prompt: managerPrompt(scope, sector, brief, question, this.messages(scope).slice(-8, -2)), onEvent: () => {},
@@ -260,7 +260,7 @@ function simManager(f: FactoryDef, e: Engine, scope: Scope, question: string): R
           files: [
             { path: `sectors/${id}/sector.yaml`, content: `name: ${name}\npolicy: {}\nmanager:\n  agent: sim\n` },
             { path: `sectors/${id}/manager/role.md`, content: `You are the ${name} Sector Manager.\n` },
-            { path: `sectors/${id}/models/intake-triage/line.yaml`, content: 'intake:\n  kind: manual\n  label: Request\n  inputs:\n    - { name: ticket, label: Ticket, required: true }\npieces:\n  - id: triage\n    machine: triager\npallet:\n  label: Triaged\n' },
+            { path: `sectors/${id}/models/intake-triage/line.yaml`, content: 'schema_version: 1\nintake:\n  kind: manual\n  label: Request\n  inputs:\n    - { name: ticket, label: Ticket, required: true }\npieces:\n  - id: triage\n    machine: triager\npallet:\n  label: Triaged\n' },
             { path: `sectors/${id}/lines.yaml`, content: 'lines:\n  - id: main\n    name: Incoming requests\n    model: intake-triage\n' },
           ],
         }],

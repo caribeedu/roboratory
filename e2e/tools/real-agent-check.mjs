@@ -24,19 +24,20 @@ const w = (rel, c) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recur
 w('factory.yaml', 'name: Real check\n');
 w('sectors/s/sector.yaml', 'name: S\nmanager: { agent: claude }\n');
 w('sectors/s/lines.yaml', `lines:\n  - id: l\n    model: m\n    repo: ${repo}\n`);
-w('sectors/s/models/m/line.yaml', `intake: { kind: manual, inputs: [{ name: task, required: true }] }
+w('sectors/s/models/m/line.yaml', `schema_version: 1
+intake: { kind: manual, inputs: [{ name: task, required: true }] }
 pieces:
   - { id: implement, machine: implementer }
   - { id: publish, machine: publisher }
 ${gh ? '  - { id: pr-check, signal: { run: "gh pr view {{box.pr_url}} --json isDraft -q .isDraft | grep -q true" } }\n' : ''}`);
 w('sectors/s/models/m/machines/implementer/role.md', 'Make the change asked in the box, keep it minimal, and commit it with git.\n');
 w('sectors/s/models/m/machines/implementer/contract.json', JSON.stringify({ type: 'object', required: ['summary', 'files'], properties: { summary: { type: 'string' }, files: { type: 'array', items: { type: 'string' } } } }));
-w('sectors/s/models/m/machines/implementer/machine.yaml', 'agent: claude\nmodel: sonnet\nattempts: 2\ntimeout: 8m\n');
+w('sectors/s/models/m/machines/implementer/machine.yaml', 'schema_version: 1\nagent: claude\nmodel: sonnet\nattempts: 2\ntimeout: 8m\n');
 w('sectors/s/models/m/machines/publisher/role.md', gh
   ? 'Push the current branch to origin and open a DRAFT pull request with gh. Report pr_url, branch and title.\n'
   : 'Do not push. Write PR.md describing the change on this branch and report pr_url as local://pr/<branch>, plus branch and title.\n');
 w('sectors/s/models/m/machines/publisher/contract.json', JSON.stringify({ type: 'object', required: ['pr_url', 'branch', 'title'], properties: { pr_url: { type: 'string' }, branch: { type: 'string' }, title: { type: 'string' } } }));
-w('sectors/s/models/m/machines/publisher/machine.yaml', `agent: claude\nmodel: sonnet\nattempts: 2\ntimeout: 8m\nallow: ["Bash(gh pr create:*)", "Bash(git push:*)"]\n`);
+w('sectors/s/models/m/machines/publisher/machine.yaml', `schema_version: 1\nagent: claude\nmodel: sonnet\nattempts: 2\ntimeout: 8m\nallow: ["gh pr create", "git push"]\n`);
 
 // load the compiled core through vite-node-free tsx-less path: use vitest's TS loader via dynamic import of the source with esbuild register
 const require = createRequire(import.meta.url);

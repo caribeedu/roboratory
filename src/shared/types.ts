@@ -50,6 +50,10 @@ export interface PieceDef {
   goal?: string;
 }
 
+/** The agents a machine or manager can use: one adapter each, behind the AgentRunner port (D45). */
+export const AGENTS = ['claude', 'sim'] as const;
+export type AgentName = (typeof AGENTS)[number];
+
 export interface MachineDef {
   name: string;
   /** folder the machine is defined in */
@@ -62,8 +66,12 @@ export interface MachineDef {
   timeoutMs: number;
   /** MCP tool names, e.g. mcp__new-relic__run_nrql_query */
   tools: string[];
-  /** extra permission rules for the agent, e.g. Bash(npm test) */
+  /** commands the machine may run besides the defaults, as prefixes (`npm test`) or tool names (`Edit`) (D44) */
   allow: string[];
+  /** commands it must never run; adds to the factory's, the sector's and the line's (D44) */
+  deny: string[];
+  /** no file-editing tools and no `git push` (D44) */
+  readOnly: boolean;
   /** extra directories the agent may use, e.g. ~/repos */
   dirs: string[];
   /** Claude Code effort level (low, medium, high, max) */
@@ -82,6 +90,8 @@ export interface LineModel {
   intake: { kind: IntakeKind; inputs: InputField[]; label?: string };
   pieces: PieceDef[]; // includes intake (id '@intake') and pallet (id '@pallet')
   machines: Record<string, MachineDef>;
+  /** commands no machine of the line may run, added to the sector's and the factory's (D44) */
+  deny: string[];
 }
 
 export interface LineDef {
@@ -115,6 +125,8 @@ export interface SectorDef {
   /** sectors/<id>/culture.md, appended after the factory culture (D23) */
   culture: string;
   policy: Policy;
+  /** commands no machine of the sector may run, added to the factory's (D44) */
+  deny: string[];
   manager: ManagerDef;
   lines: LineDef[];
 }
@@ -123,6 +135,8 @@ export interface FactoryDef {
   root: string;
   name: string;
   ceiling: Policy;
+  /** commands no machine may run (D44); the template starts a factory with a list */
+  deny: string[];
   generalManager: ManagerDef;
   /** culture.md at the root, appended to every agent's role (D23) */
   culture: string;
@@ -137,7 +151,7 @@ export interface FactoryDef {
 
 export interface LoadProblem { model?: string; pieceId?: string; message: string }
 
-export type VerbName = 'run' | 'retry' | 'release' | 'halt' | 'resume' | 'apply' | 'answer';
+export type VerbName = 'run' | 'retry' | 'release' | 'halt' | 'resume' | 'apply' | 'answer' | 'allow' | 'deny';
 
 // ---------- runtime state ----------
 
@@ -171,7 +185,12 @@ export interface PieceView {
   pallet?: number;
   /** a machine that needs you (D21) */
   question?: HumanQuestion;
+  /** permission requests this machine waits on you for (D44) */
+  permissions?: PermissionAsk[];
 }
+
+/** A command or tool a machine asks to use, and is waiting on a person for. */
+export interface PermissionAsk { id: string; tool: string; /** the command, or the tool and what it was given */ summary: string; since: number }
 
 export interface LineView {
   id: string;
@@ -212,7 +231,9 @@ export interface LogEntry {
 export interface AttentionItem {
   id: string;
   severity: number; // higher first
-  kind: 'fire' | 'gate' | 'signal' | 'proposal' | 'question';
+  kind: 'fire' | 'gate' | 'signal' | 'proposal' | 'question' | 'permission';
+  /** a permission request waiting for `allow` or `deny` (D44) */
+  requestId?: string;
   sectorId: string;
   lineId: string;
   pieceId: string;
@@ -221,6 +242,9 @@ export interface AttentionItem {
   title: string;
   detail: string;
 }
+
+/** A stopped machine or signal. A permission request ranks with it in the queue but is not one. */
+export const isBurning = (i: AttentionItem) => i.kind === 'fire' || i.kind === 'signal';
 
 export interface Proposal {
   id: string;

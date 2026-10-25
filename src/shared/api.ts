@@ -29,6 +29,10 @@ export interface RoboratoryApi {
   retry(lineId: string, pieceId: string, hint: string): Promise<void>;
   release(lineId: string, pieceId: string, confirmations: number, decision?: { choice: string; note: string }): Promise<void>;
   answer(lineId: string, pieceId: string, text: string): Promise<void>;
+  /** Lets a machine make the call it asked for, this once (D44). */
+  allow(requestId: string): Promise<void>;
+  /** Refuses it; the reason goes back to the agent. */
+  deny(requestId: string, reason: string): Promise<void>;
   halt(lineId: string): Promise<void>;
   resume(lineId: string): Promise<void>;
   runs(): Promise<RunSummary[]>;

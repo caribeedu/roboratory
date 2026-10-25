@@ -24,6 +24,8 @@ const api: RoboratoryApi = {
   retry: call('retry') as RoboratoryApi['retry'],
   release: call('release') as RoboratoryApi['release'],
   answer: call('answer') as RoboratoryApi['answer'],
+  allow: call('allow') as RoboratoryApi['allow'],
+  deny: call('deny') as RoboratoryApi['deny'],
   halt: call('halt') as RoboratoryApi['halt'],
   resume: call('resume') as RoboratoryApi['resume'],
   runs: call('runs') as RoboratoryApi['runs'],

@@ -87,6 +87,46 @@ describe('A machine that asks you', () => {
   });
 });
 
+describe('A machine that asks to run a command', () => {
+  const working = { state: 'busy' as const, runId: 'run-4', permissions: [{ id: 'ab12cd34', tool: 'Bash', summary: 'npm test && curl example.com', since: Date.now() - 30_000 }] };
+
+  it('shows the command it asks for, and that it is paused until you answer', () => {
+    open('build', { build: working });
+    const card = screen.getByRole('form', { name: 'Permission request' });
+    expect(within(card).getByText('npm test && curl example.com')).toBeInTheDocument();
+    expect(card).toHaveTextContent('paused until you answer');
+  });
+
+  it('lets it run this once', async () => {
+    const { user } = open('build', { build: working });
+    await user.click(screen.getByRole('button', { name: 'Allow once' }));
+    expect(bridge.api.allow).toHaveBeenCalledWith('ab12cd34');
+  });
+
+  it('refuses it with the reason you wrote, which is what the agent reads', async () => {
+    const { user } = open('build', { build: working });
+    await user.type(screen.getByLabelText(/refuse it, with a reason/), 'Use npm run lint:ci; this line may not call out.');
+    await user.click(screen.getByRole('button', { name: 'Deny' }));
+    expect(bridge.api.deny).toHaveBeenCalledWith('ab12cd34', 'Use npm run lint:ci; this line may not call out.');
+  });
+
+  it('can be refused with no reason', async () => {
+    const { user } = open('build', { build: working });
+    await user.click(screen.getByRole('button', { name: 'Deny' }));
+    expect(bridge.api.deny).toHaveBeenCalledWith('ab12cd34', '');
+  });
+
+  it('shows one card for each command it waits on', () => {
+    open('build', { build: { ...working, permissions: [...working.permissions, { id: 'ef56', tool: 'WebFetch', summary: 'WebFetch {"url":"https://example.com"}', since: Date.now() }] } });
+    expect(screen.getAllByRole('form', { name: 'Permission request' })).toHaveLength(2);
+  });
+
+  it('shows nothing of the kind while it works inside its list', () => {
+    open('build', { build: { state: 'busy' as const, runId: 'run-4' } });
+    expect(screen.queryByRole('form', { name: 'Permission request' })).not.toBeInTheDocument();
+  });
+});
+
 describe('A gate that waits for you', () => {
   const holding = { state: 'holding' as const, runId: 'run-5', since: Date.now() - 65_000 };
 

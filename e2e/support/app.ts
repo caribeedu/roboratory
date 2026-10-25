@@ -65,7 +65,11 @@ export interface Launched { app: ElectronApplication; window: Page; errors: stri
 export async function launch(sandbox: Sandbox, args: string[] = []): Promise<Launched> {
   // CI containers have no setuid sandbox for Chromium
   const sandboxFlag = process.env.CI && process.platform === 'linux' ? ['--no-sandbox'] : [];
-  const app = await electron.launch({ executablePath: appExecutable(), args: [...sandboxFlag, ...args], env: sandbox.env as Record<string, string> });
+  // Locally the window stays hidden, so the specs never take the focus of whoever is using the computer (E2E_SHOW=1 shows it).
+  // The CI shows it, as it always did: it is the one place where a hidden window could behave differently.
+  const hidden = !process.env.CI && !process.env.E2E_SHOW;
+  const env = { ...sandbox.env, ...(hidden ? { ROBORATORY_BACKGROUND: '1' } : {}) } as Record<string, string>;
+  const app = await electron.launch({ executablePath: appExecutable(), args: [...sandboxFlag, ...args], env });
   const window = await app.firstWindow();
   const errors: string[] = [];
   window.on('pageerror', (e) => errors.push(String(e)));

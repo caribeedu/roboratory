@@ -323,8 +323,8 @@ describe('A machine', () => {
   it('picks its agent, and says when it is the free simulated one', async () => {
     const { op, user } = await edit('build');
     expect(await screen.findByText('The simulated agent costs nothing.')).toBeInTheDocument();
-    await user.selectOptions(screen.getByLabelText('Agent'), 'codex');
-    expect(op).toHaveBeenCalledWith({ op: 'setMachine', lineId: LINE_ID, pieceId: 'build', conf: { agent: 'codex' } });
+    await user.selectOptions(screen.getByLabelText('Agent'), 'sim');
+    expect(op).toHaveBeenCalledWith({ op: 'setMachine', lineId: LINE_ID, pieceId: 'build', conf: { agent: 'sim' } });
   });
 
   it('warns that real agents cost money', async () => {
@@ -348,8 +348,16 @@ describe('A machine', () => {
     const { op, user } = await edit('build');
     await commit(user, 'Folders', '~/repos/a, ~/repos/b');
     expect(op).toHaveBeenLastCalledWith(expect.objectContaining({ conf: { dirs: ['~/repos/a', '~/repos/b'] } }));
-    await commit(user, 'Allowed commands', 'Bash(gh pr view:*)');
-    expect(op).toHaveBeenLastCalledWith(expect.objectContaining({ conf: { allow: ['Bash(gh pr view:*)'] } }));
+    await commit(user, 'Allowed commands', 'gh pr view, npm test');
+    expect(op).toHaveBeenLastCalledWith(expect.objectContaining({ conf: { allow: ['gh pr view', 'npm test'] } }));
+  });
+
+  it('lists the commands it must never run, and makes it read-only', async () => {
+    const { op, user } = await edit('build');
+    await commit(user, 'Never allowed', 'rm -rf, git push --force');
+    expect(op).toHaveBeenLastCalledWith(expect.objectContaining({ conf: { deny: ['rm -rf', 'git push --force'] } }));
+    await user.click(screen.getByLabelText('Read-only'));
+    expect(op).toHaveBeenLastCalledWith(expect.objectContaining({ conf: { read_only: true } }));
   });
 
   describe('tools', () => {

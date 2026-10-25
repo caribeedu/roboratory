@@ -22,6 +22,8 @@ export interface ServerOptions {
   build?: string;
   /** How long the engine stays up with no open run and no client, in ms. */
   idleGraceMs?: number;
+  /** How a machine's agent starts `roboratory permission-tool` (D44); set by the bundle that knows its own path. */
+  permissionTool?: { command: string; args: string[]; env: Record<string, string> };
   /** `restart` is true when the engine left to be started again by a newer version. */
   onExit?: (restart: boolean) => void;
 }
@@ -138,6 +140,8 @@ const calls: Record<string, Handler> = {
   retry: (s, l, p, h) => s.retry(l, p, h),
   release: (s, l, p, c, d) => s.release(l, p, c, d),
   answer: (s, l, p, t) => s.answer(l, p, t),
+  allow: (s, id) => s.allow(id),
+  deny: (s, id, reason) => s.deny(id, reason),
   halt: (s, l) => s.halt(l),
   resume: (s, l) => s.resume(l),
   runs: (s) => s.runs(),
@@ -179,7 +183,7 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
     logs: (l) => push('logs', l),
     messages: (k) => push('messages', k),
     build: (v) => push('build', v),
-  });
+  }, { permissionTool: opts.permissionTool });
   let closed = false;
   let failed = false;
   let restarting = false;
@@ -218,6 +222,13 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
       service.engine?.pauseDispatch();
       push('restarting', {});
       return true;
+    },
+    // an agent's permission tool asks whether a machine may make a call; the reply comes when a person has decided (D44)
+    // (a request is given up if the connection that asked ends before a person answers)
+    permission: (c: net.Socket, session: string, call: { tool: string; input: Record<string, unknown> }) => {
+      const ended = new AbortController();
+      c.once('close', () => ended.abort());
+      return service.permit(session, call, ended.signal);
     },
     // a stream of what is worth acting on, for `roboratory watch`
     watch: (c: net.Socket) => { watchers.add(c); return true; },
@@ -273,7 +284,7 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
     }
   }
 
-  const WORTH = new Set(['run.start', 'run.end', 'piece.hold', 'piece.ask', 'piece.fire', 'rework', 'piece.blocked']);
+  const WORTH = new Set(['run.start', 'run.end', 'piece.hold', 'piece.ask', 'piece.fire', 'rework', 'piece.blocked', 'permission.request']);
   service.engine?.on('record', (run: { id: string; lineId: string }, ev: Record<string, any>) => {
     if (ev.type === 'cost') spent.set(run.id, (spent.get(run.id) ?? 0) + ev.usd);
     if (!watchers.size || !WORTH.has(ev.type)) return;

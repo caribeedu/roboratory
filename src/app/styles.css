@@ -124,7 +124,7 @@ kbd { font-family: var(--mono); font-size: 10px; padding: 0 4px; border: 1px sol
 .att:hover { background: var(--panel-3); }
 .att-icon { width: 22px; height: 22px; display: grid; place-items: center; font-family: var(--display); font-size: 13px; border: 1px solid var(--edge); }
 .att.fire .att-icon, .att.signal .att-icon { background: var(--fail); color: #fff; }
-.att.gate .att-icon { background: var(--warn); color: var(--lamp-ink); }
+.att.gate .att-icon, .att.permission .att-icon { background: var(--warn); color: var(--lamp-ink); }
 .att.question .att-icon { background: #3f7fbf; color: #fff; }
 .att-text { min-width: 0; display: flex; flex-direction: column; }
 .att-text b { font-weight: 700; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -207,6 +207,9 @@ textarea { resize: vertical; }
 .ask-card { background: #16263a; border: 2px solid #2c4a6e; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
 .ask-card h3 { margin: 0; font-family: var(--display); font-size: 16px; color: #a9d0ff; }
 .ask-q { margin: 0; font-size: 15px; }
+.ask-card.permission { background: #2e2412; border-color: #8a6a1f; }
+.ask-card.permission h3 { color: #f1c76a; }
+.ask-command { margin: 0; padding: 8px 10px; background: #14110d; border: 1px solid var(--edge); font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap; word-break: break-all; max-height: 8em; overflow: auto; }
 .confirm-q { margin: 0; font-family: var(--display); font-size: 17px; color: #ffe3a1; }
 .work-order { display: flex; flex-direction: column; gap: 10px; padding: 12px; background: #2a241b; border: 2px solid var(--edge); box-shadow: inset 0 3px 0 var(--lamp); }
 .work-order h3 { margin: 0; font-family: var(--display); font-size: 17px; }

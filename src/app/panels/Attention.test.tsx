@@ -33,6 +33,16 @@ describe('The attention queue', () => {
     expect(onPick).toHaveBeenCalledWith(gate);
   });
 
+  it('shows a permission request with the gate\'s exclamation, ranked with fires, without calling it a fire', () => {
+    const ask = item({ id: 'p', kind: 'permission', severity: 3, requestId: 'ab12', pieceId: 'build', title: 'Build asks to run a command', detail: 'orders-api releases · npm test' });
+    const { container } = render(<AttentionQueue items={[ask, item({})]} factory={factory} onPick={vi.fn()} />);
+    const first = within(screen.getByRole('list')).getAllByRole('button')[0];
+    expect(first).toHaveTextContent('!');
+    expect(first).toHaveTextContent('Build asks to run a command');
+    expect(first).toHaveClass('permission');
+    expect(container.querySelector('.panel-head .dot')).toHaveClass('hold');
+  });
+
   it('says "1 needs you" for one item, and folds away when you click its head', async () => {
     render(<AttentionQueue items={[item({})]} factory={factory} onPick={vi.fn()} />);
     const head = screen.getByRole('button', { name: /1 needs you/ });
@@ -49,6 +59,13 @@ describe('The attention queue', () => {
 });
 
 describe('The minimap', () => {
+  it('marks a sector with a permission request as waiting for you, not on fire', () => {
+    render(<Minimap factory={factory} lines={{ [LINE_ID]: lineView({ build: { state: 'busy' } }) }} attention={[item({ kind: 'permission', severity: 3 })]} current="releases" onPick={vi.fn()} />);
+    const releases = within(screen.getByRole('navigation', { name: 'Sectors' })).getByRole('button', { name: /Releases/ });
+    expect(releases).toHaveClass('hold');
+    expect(releases).not.toHaveClass('fire');
+  });
+
   it('lists every sector, marks the current one, and how many things need you in each', async () => {
     const onPick = vi.fn();
     render(<Minimap factory={factory} lines={{ [LINE_ID]: lineView({ build: { state: 'busy' } }) }} attention={[item({}), item({ id: 'b', kind: 'fire', severity: 3 })]} current="releases" onPick={onPick} />);

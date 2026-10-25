@@ -29,7 +29,7 @@ npm start
 | `node e2e/tools/readme-shots.mjs`, `piece-images.mjs`, `render-svg.mjs` | Regenerate the README's images: a line at work and build mode, one picture per piece drawn with the app's own sprites, and an SVG rendered to PNG |
 | `node e2e/tools/scenario.mjs`, `real-agent-check.mjs` | A staged demo day, and a paid run with the real Claude agent |
 
-The e2e specs and tools launch the packaged app: they find it in `out/` for your platform (`ROBORATORY_OUT_DIR` changes the folder, `ROBORATORY_EXE` points at a specific executable).
+The e2e specs and tools launch the packaged app: they find it in `out/` for your platform (`ROBORATORY_OUT_DIR` changes the folder, `ROBORATORY_EXE` points at a specific executable). **Locally the specs keep the window hidden** (`ROBORATORY_BACKGROUND=1`, set by `launch` in `e2e/support/app.ts`), so they never take the focus of whoever is using the computer; `E2E_SHOW=1` shows it, to watch a spec. The CI always shows it.
 
 ## Tests
 
@@ -97,7 +97,8 @@ The CI (`.github/workflows/tests.yml`) runs the Vitest layers and the e2e suite 
 
 ## Layout
 
-- `src/core/`: the logic that runs in the engine process, free of Electron and tested with Vitest: the loader, the engine, agents, git, managers, the service, the socket server (`server.ts`) and its client (`client.ts`). `src/engine.ts` bundles the server and the command (`src/cli.ts`) into `engine.js`. `src/core/build/` is build mode (the draft, its edits, checks and sessions). `src/core/agents/` has one adapter per agent CLI (Claude Code, Codex, the simulated agent).
+- `src/core/`: the logic that runs in the engine process, free of Electron and tested with Vitest: the loader, the engine, agents, git, managers, the service, the socket server (`server.ts`) and its client (`client.ts`). `src/engine.ts` bundles the server and the command (`src/cli.ts`) into `engine.js`. `src/core/build/` is build mode (the draft, its edits, checks and sessions). `src/core/agents/` has one adapter per agent behind the `AgentRunner` port (Claude Code, the simulated agent; D45). `src/core/permissions.ts` reads a machine's lists and its shell commands (D44), `src/core/permission-tool.ts` is the process an agent's CLI starts to ask the engine, and `src/core/formats.ts` checks `line.yaml` and `machine.yaml` against `schemas/` (D46).
+- `schemas/`: the JSON Schemas of `line.yaml` and `machine.yaml`; `docs/FORMATS.md` is their specification. Change them together, and the version only with a decision.
 - `src/shared/`: code and types used by both sides (layout, rule expressions, API types).
 - `src/app/`: the renderer: React panels, the PixiJS floor and its procedural sprites. `src/app/build/` holds build mode's panels.
 - `src/main.ts` and `src/preload.ts`: the Electron wiring. The main process holds an `EngineClient` and relays the interface's calls to the engine; it keeps no factory state.
@@ -114,12 +115,14 @@ The CI (`.github/workflows/tests.yml`) runs the Vitest layers and the e2e suite 
 
 ## Real agents cost money
 
-Tests, the demo and dry runs use `agent: sim`. Do not run a line with `agent: claude` or `codex`, or `e2e/tools/real-agent-check.mjs`, without a cost estimate and approval. To keep an unavoidable real call to cents, use `--model haiku --tools "" --strict-mcp-config --mcp-config '{"mcpServers":{}}'`.
+Tests, the demo and dry runs use `agent: sim`. Do not run a line with `agent: claude`, or `e2e/tools/real-agent-check.mjs`, `e2e/tools/permission-check.mjs` or `e2e/tools/real-permissions-check.mjs`, without a cost estimate and approval. To keep an unavoidable real call to cents, use `--model haiku --tools "" --strict-mcp-config --mcp-config '{"mcpServers":{}}'`.
 
 ## Lessons about the agent CLIs
 
 - **Claude's tool schemas refuse `anyOf`/`oneOf`/`allOf` at the root.** The Claude adapter puts the contract-or-question choice under `result` and unwraps it (`claudeSchema` in `src/core/agents/claude.ts`). Any new schema sent to `claude -p --json-schema` must keep a plain object at the root.
 - **Check what the CLI sends without paying:** point it at a local server that only records the request (`ANTHROPIC_BASE_URL=http://127.0.0.1:<port> claude -p …`); the tool list and schemas are in the captured body.
+- **Claude Code asks a program of ours about what its rules leave undecided** with `--permission-prompt-tool mcp__<server>__<tool>`: a tool of an MCP server started from `--mcp-config`, which gets `{tool_name, input, tool_use_id}` and answers `{behavior: "allow", updatedInput}` or `{behavior: "deny", message}`. The agent reads the message word for word, and a request can wait for minutes. `e2e/tools/permission-check.mjs` checks this with Haiku for cents.
+- **Claude Code's deny rules can be walked around:** `Bash(git push:*)` does not catch `git -C . push`, so the engine decides shell commands itself (D44). In the default permission mode it also allows read-only commands (`ls`, `cat`, `date`, `git status`) by itself, without asking the tool.
 - **Machines cannot start sub-agents** (`--disallowedTools Agent`): a step's work stays in one context and transcript.
 - **Each agent CLI has its own adapter** in `src/core/agents/`. The engine hands every adapter the contract and the question alternative; anything specific to one CLI (arguments, schema shape, MCP naming, transcript wording) stays in its file.
 - **Machines get line context** (D25): the line in order, goals, belts in and out. Writing a role, do not restate the line; give the piece a goal instead.
@@ -129,7 +132,7 @@ Tests, the demo and dry runs use `agent: sim`. Do not run a line with `agent: cl
 ## Platform notes
 
 - **Signals run through `sh`.** On Windows, install Git for Windows (or use WSL) and keep `sh` on `PATH`.
-- **Agent CLIs must be native executables on Windows** (for example `claude.exe`). A `.cmd` shim cannot receive multi-line arguments, so the adapters refuse it with a message. `ROBORATORY_CLAUDE_BIN` and `ROBORATORY_CODEX_BIN` point at a specific executable.
+- **Agent CLIs must be native executables on Windows** (for example `claude.exe`). A `.cmd` shim cannot receive multi-line arguments, so the adapters refuse it with a message. `ROBORATORY_CLAUDE_BIN` points at a specific executable.
 - **There is no executable bit on Windows.** Scripts written by build mode are marked executable on macOS and Linux only.
 - **A rebuilt app only takes effect after you quit the running one** (⌘Q on macOS): launching it again can bring the old process back. When the app is open it locks `out/`; build a copy with `ROBORATORY_OUT_DIR=<dir>`.
 - **Spawn with `windowsHide: true`, always.** The engine runs detached with no console, so on Windows any console program it starts (git, an agent CLI, `sh`) opens a visible terminal window unless it is hidden. This includes the tests' and e2e scripts' own spawns.

@@ -8,6 +8,8 @@ import { columnsAndLanes } from '../shared/layout';
 import type {
   Direction, FactoryDef, InputField, IntakeKind, LineDef, LineModel, LoadProblem, MachineDef, ManagerDef, Need, PieceDef, Policy, SectorDef,
 } from '../shared/types';
+import { AGENTS } from '../shared/types';
+import { checkFormat } from './formats';
 import { diskFs, type Vfs } from './vfs';
 import { expandHome } from './paths';
 
@@ -31,6 +33,8 @@ function readYaml(io: LoadIo, file: string): Obj {
   if (!isObj(parsed)) throw new Error(`${file}: expected a mapping at the top level`);
   return parsed;
 }
+/** A list of strings, as the files write it: a missing key is an empty list, and a lone string is a list of one. */
+const strList = (v: unknown): string[] => (Array.isArray(v) ? v : v === undefined || v === null ? [] : [v]).map((x) => str(x).trim()).filter(Boolean);
 const readText = (io: LoadIo, file: string, d = '') => (io.fs.exists(file) ? io.fs.read(file) : d);
 const titleCase = (id: string) => id.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -54,10 +58,17 @@ function parsePolicy(v: unknown): Policy {
   return out;
 }
 
+/** An agent is one the app has an adapter for (D45); anything else is a structural problem, found when the factory loads. */
+function agentName(io: LoadIo, v: unknown, fallback: string, whose: string): string {
+  const name = str(v, fallback);
+  if (!(AGENTS as readonly string[]).includes(name)) problem(io, `${whose}: agent "${name}" is not one of ${AGENTS.join(', ')}`);
+  return name;
+}
+
 function parseManager(io: LoadIo, v: unknown, roleFile: string, fallbackAgent: string): ManagerDef {
   const o = isObj(v) ? v : {};
   return {
-    agent: str(o.agent, fallbackAgent),
+    agent: agentName(io, o.agent, fallbackAgent, roleFile),
     model: o.model ? str(o.model) : undefined,
     role: readText(io, roleFile, ''),
     tools: Array.isArray(o.tools) ? o.tools.map((t) => str(t)) : [],
@@ -90,7 +101,9 @@ function loadMachine(io: LoadIo, name: string, dirs: { dir: string; shared: bool
   for (const { dir, shared } of dirs) {
     const mdir = path.join(dir, name);
     if (!io.fs.exists(mdir)) continue;
-    const conf = io.fs.exists(path.join(mdir, 'machine.yaml')) ? readYaml(io, path.join(mdir, 'machine.yaml')) : {};
+    const confFile = path.join(mdir, 'machine.yaml');
+    const conf = io.fs.exists(confFile) ? readYaml(io, confFile) : {};
+    if (io.fs.exists(confFile)) { const wrong = checkFormat('machine', conf); if (wrong.length) problem(io, `${confFile}: ${wrong.join('; ')}`); }
     const contractFile = path.join(mdir, 'contract.json');
     let contract: Obj = { type: 'object' };
     if (io.fs.exists(contractFile)) {
@@ -108,12 +121,14 @@ function loadMachine(io: LoadIo, name: string, dirs: { dir: string; shared: bool
       effort: conf.effort ? str(conf.effort) : undefined,
       goal: conf.goal !== undefined && str(conf.goal).trim() ? str(conf.goal).trim() : undefined,
       contract,
-      agent: str(conf.agent, 'claude'),
+      agent: str(conf.agent, 'claude'), // checked against the schema above
       model: conf.model ? str(conf.model) : undefined,
       attempts: Math.max(1, Number(conf.attempts ?? 3)),
       timeoutMs: parseDuration(conf.timeout, 10 * 60000),
       tools: Array.isArray(conf.tools) ? conf.tools.map((t) => str(t)) : [],
-      allow: Array.isArray(conf.allow) ? conf.allow.map((t) => str(t)) : [],
+      allow: strList(conf.allow),
+      deny: strList(conf.deny),
+      readOnly: conf.read_only === true,
       sim: isObj(conf.sim) ? conf.sim : undefined,
     };
   }
@@ -122,6 +137,8 @@ function loadMachine(io: LoadIo, name: string, dirs: { dir: string; shared: bool
 
 export function loadModel(dir: string, shared: boolean, machineDirs: { dir: string; shared: boolean }[], root = path.resolve(dir, '..', '..', '..'), io: LoadIo = disk): LineModel {
   const conf = readYaml(io, path.join(dir, 'line.yaml'));
+  const wrong = checkFormat('line', conf);
+  if (wrong.length) problem(io, `${path.join(dir, 'line.yaml')}: ${wrong.join('; ')}`, dir);
   const intakeConf = isObj(conf.intake) ? conf.intake : {};
   const kind = str(intakeConf.kind, 'manual') as IntakeKind;
   if (!['manual', 'timer', 'webhook', 'chat'].includes(kind)) throw new Error(`intake.kind "${kind}" is not one of manual, timer, webhook, chat`);
@@ -169,7 +186,7 @@ export function loadModel(dir: string, shared: boolean, machineDirs: { dir: stri
   }
   for (const p of pieces) if (p.needs.length && p.needs.every((n) => n.back)) problem(io, `piece "${p.id}" has only return belts; it also needs a forward belt`, dir, p.id);
   columnsAndLanes(pieces); // throws on loops
-  return { name: path.basename(dir), dir, shared, intake: { kind, inputs, label: intakeConf.label ? str(intakeConf.label) : undefined }, pieces, machines };
+  return { name: path.basename(dir), dir, shared, intake: { kind, inputs, label: intakeConf.label ? str(intakeConf.label) : undefined }, pieces, machines, deny: strList(conf.deny) };
 }
 
 /** Loads from disk, or from a draft overlay. A tolerant load keeps structural problems in `problems` instead of failing. */
@@ -194,6 +211,7 @@ export function loadFactory(root: string, opts: { fs?: Vfs; tolerant?: boolean }
         name: str(sconf.name, titleCase(sid)),
         color: str(sconf.color, SECTOR_COLORS[i % SECTOR_COLORS.length]),
         policy: parsePolicy(sconf.policy),
+        deny: strList(sconf.deny),
         manager: parseManager(io, sconf.manager, path.join(sdir, 'manager', 'role.md'), 'claude'),
         lines: [],
       };
@@ -226,7 +244,7 @@ export function loadFactory(root: string, opts: { fs?: Vfs; tolerant?: boolean }
     } catch (e) { warnings.push(`sectors/${sid}: ${(e as Error).message}`); }
   });
   const gm = parseManager(io, fconf.general_manager, path.join(root, 'general-manager', 'role.md'), 'claude');
-  return { root, name: str(fconf.name, titleCase(path.basename(root))), ceiling: parsePolicy(fconf.ceiling), generalManager: gm, culture: readText(io, path.join(root, 'culture.md')), lineContext: fconf.line_context !== false, sectors, warnings, problems: io.problems };
+  return { root, name: str(fconf.name, titleCase(path.basename(root))), ceiling: parsePolicy(fconf.ceiling), deny: strList(fconf.deny), generalManager: gm, culture: readText(io, path.join(root, 'culture.md')), lineContext: fconf.line_context !== false, sectors, warnings, problems: io.problems };
 }
 
 /** How many lines and sectors use each model folder and machine folder. */

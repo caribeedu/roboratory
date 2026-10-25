@@ -3,11 +3,19 @@ import os from 'node:os';
 import path from 'node:path';
 import { claudeSchema, mcpServerOf, resultLine, shellRules, toolArgs, toolLabel, unwrapClaude } from './claude';
 import { runAgent, type AgentEvent, type AgentRequest } from './index';
+import { effectiveRules } from '../permissions';
 import { extractJson } from './process';
+import { Waits } from './waits';
+
+/** What the engine hands an adapter for a machine: its lists and the defaults, worked out (D44). */
+const machineRules = (o: { allow?: string[]; deny?: string[]; readOnly?: boolean } = {}) => {
+  const readOnly = o.readOnly ?? false;
+  return { ...effectiveRules({ allow: o.allow ?? [], deny: o.deny ?? [], readOnly, shell: true }), readOnly, shell: true };
+};
 
 const base = (over: Partial<AgentRequest> = {}): AgentRequest => ({
-  agent: 'claude', role: 'role', prompt: 'do it', schema: { type: 'object' }, cwd: os.tmpdir(), addDirs: [], allow: [], tools: [],
-  readOnly: false, timeoutMs: 10000, onEvent: () => {}, ...over,
+  agent: 'claude', role: 'role', prompt: 'do it', schema: { type: 'object' }, cwd: os.tmpdir(), addDirs: [], tools: [],
+  ...machineRules(), timeoutMs: 10000, onEvent: () => {}, ...over,
 });
 
 function fakeClaude(script: string) {
@@ -41,6 +49,11 @@ out({ type: 'result', subtype: 'success', is_error: false, result: 'done', struc
     expect((await runAgent(base())).error).toMatch(/error_max_turns: too many turns/);
   });
 
+  it('refuses an agent it has no adapter for, naming the ones it has', async () => {
+    const r = await runAgent(base({ agent: 'gemini' }));
+    expect(r.error).toBe('Unknown agent "gemini". Use claude or sim.');
+  });
+
   it('times out and kills the process', async () => {
     process.env.ROBORATORY_CLAUDE_BIN = fakeClaude(`setTimeout(() => {}, 10000);`);
     expect((await runAgent(base({ timeoutMs: 200 }))).error).toMatch(/timed out/);
@@ -58,19 +71,20 @@ console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false
   }
 
   it('tells a machine which shell commands it may run, and nothing when its shell is open', async () => {
-    const { prompt } = await startedWith({ allow: ['Bash(gh pr view:*)', 'Bash(curl:*)'] });
-    expect(prompt).toContain('Shell: you may run only commands that start with `git`, `gh pr view`, `curl`. Anything else is denied.');
+    const { prompt } = await startedWith(machineRules({ allow: ['gh pr view', 'curl'] }));
+    expect(prompt).toMatch(/Shell: you may run only commands that start with `git status`.*`git commit`.*`gh pr view`, `curl`. Anything else is denied./);
+    expect(prompt).not.toContain('`git push`');
     expect(prompt).toContain('A denied command does not mean the others are denied.');
-    expect((await startedWith({ allow: ['Bash'] })).prompt).toBe('do it');
-    expect((await startedWith({ readOnly: true })).prompt).toBe('do it');
+    expect((await startedWith(machineRules({ allow: ['Bash'] }))).prompt).toBe('do it');
+    expect((await startedWith({ readOnly: true, shell: false, allow: [], deny: [] })).prompt).toBe('do it');
   });
 
   it('says a shell is off when no command is allowed at all', () => {
-    expect(shellRules(['Read', 'Grep'])).toMatch(/you have no shell/);
+    expect(shellRules([], false)).toMatch(/you have no shell/);
   });
 
   it('starts managers read-only, so no write tools exist in their session', async () => {
-    const manager = await startedWith({ readOnly: true, tools: ['mcp__nr__q'] });
+    const manager = await startedWith({ readOnly: true, shell: false, allow: [], deny: [], tools: ['mcp__nr__q'] });
     expect(manager.value('--tools')).toBe('Read,Grep,Glob');
     expect(manager.value('--allowedTools')).toBe('Read,Grep,Glob,mcp__nr__q');
     expect(manager.value('--permission-mode')).toBe('dontAsk');
@@ -78,13 +92,83 @@ console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false
   });
 
   it('starts machines with file edits, the chosen model and effort, the extra folders, and no sub-agents', async () => {
-    const machine = await startedWith({ allow: ['Bash(sh test.sh)'], addDirs: ['/x'], effort: 'high', model: 'opus' });
+    const machine = await startedWith({ ...machineRules({ allow: ['sh test.sh'] }), addDirs: ['/x'], effort: 'high', model: 'opus' });
     expect(machine.value('--effort')).toBe('high');
     expect(machine.value('--model')).toBe('opus');
     expect(machine.args).not.toContain('--tools');
     expect(machine.value('--allowedTools')).toContain('Edit');
     expect(machine.args).toContain('/x');
     expect(machine.value('--disallowedTools')).toBe('Agent');
+  });
+
+  it('gives a machine the local git commands as rules of their own, never git push or all of git', async () => {
+    const allowed = (await startedWith(machineRules())).value('--allowedTools').split(',');
+    expect(allowed).toEqual(expect.arrayContaining(['Edit', 'Write', 'Bash(git commit:*)', 'Bash(git status:*)']));
+    expect(allowed).not.toContain('Bash(git:*)');
+    expect(allowed).not.toContain('Bash(git push:*)');
+    expect((await startedWith(machineRules({ allow: ['git push'] }))).value('--allowedTools').split(',')).toContain('Bash(git push:*)');
+  });
+
+  it('hands the hard denials to the CLI as deny rules, and the tools too', async () => {
+    const machine = await startedWith(machineRules({ deny: ['rm -rf', 'git push --force', 'WebFetch'] }));
+    expect(machine.value('--disallowedTools')).toBe('Agent,Bash(rm -rf:*),Bash(git push --force:*),WebFetch');
+  });
+
+  it('starts a read-only machine with no file tools but its shell, and git push denied', async () => {
+    const machine = await startedWith(machineRules({ readOnly: true, allow: ['gh pr view'] }));
+    expect(machine.value('--tools')).toBe('Read,Grep,Glob,Bash');
+    const allowed = machine.value('--allowedTools').split(',');
+    expect(allowed).toEqual(expect.arrayContaining(['Bash(gh pr view:*)', 'Bash(git diff:*)']));
+    expect(allowed).not.toContain('Edit');
+    expect(allowed).not.toContain('Bash(git commit:*)');
+    expect(machine.value('--disallowedTools')).toContain('Bash(git push:*)');
+  });
+
+  describe('asking a person (D44)', () => {
+    const access = (waits = new Waits()) => ({ session: 'session-1', root: '/the/factory', tool: { command: 'node', args: ['/bundle/engine.js', 'permission-tool'], env: { ELECTRON_RUN_AS_NODE: '1' } }, decide: async () => ({ behavior: 'deny' as const, message: 'no' }), waits });
+
+    it('hands every shell command to the engine through the permission tool, and tells the machine so', async () => {
+      const m = await startedWith({ ...machineRules({ allow: ['npm test'], deny: ['rm -rf', 'WebFetch'] }), permission: access() });
+      expect(m.value('--permission-mode')).toBe('default');
+      expect(m.value('--permission-prompt-tool')).toBe('mcp__roboratory__approve');
+      const server = JSON.parse(m.value('--mcp-config')).mcpServers.roboratory;
+      expect(server).toEqual({ command: 'node', args: ['/bundle/engine.js', 'permission-tool'], env: { ELECTRON_RUN_AS_NODE: '1', ROBORATORY_FACTORY: '/the/factory', ROBORATORY_SESSION: 'session-1' } });
+      // no shell rules go to the CLI, so none can be walked around; its tools and the tool denials still do
+      expect(m.value('--allowedTools').split(',')).not.toEqual(expect.arrayContaining([expect.stringMatching(/^Bash/)]));
+      expect(m.value('--allowedTools')).toContain('Edit');
+      expect(m.value('--disallowedTools')).toBe('Agent,WebFetch');
+      expect(m.prompt).toContain('Any other command is asked of a person');
+      expect(m.prompt).toContain('`npm test`');
+    });
+
+    it('sends an open shell through the tool too, and says nothing about commands', async () => {
+      const m = await startedWith({ ...machineRules({ allow: ['Bash'] }), permission: access() });
+      expect(m.value('--allowedTools').split(',')).not.toContain('Bash');
+      expect(m.prompt).toBe('do it');
+    });
+
+    it('keeps a manager, which has no shell, on the CLI refusing what is not listed', async () => {
+      const m = await startedWith({ readOnly: true, shell: false, allow: [], deny: [], permission: access() });
+      expect(m.value('--permission-mode')).toBe('dontAsk');
+      expect(m.args).not.toContain('--permission-prompt-tool');
+    });
+
+    it('stops the time limit while a request waits for a person, and runs it again after', async () => {
+      process.env.ROBORATORY_CLAUDE_BIN = fakeClaude(`setTimeout(() => console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: '', structured_output: { ok: true } })), 500);`);
+      const waits = new Waits();
+      setTimeout(() => waits.add(1), 100);
+      setTimeout(() => waits.add(-1), 900);
+      // 500 ms of work against a 400 ms limit: only the 800 ms spent waiting lets it finish
+      expect((await runAgent(base({ timeoutMs: 400, permission: access(waits) }))).output).toEqual({ ok: true });
+      process.env.ROBORATORY_CLAUDE_BIN = fakeClaude(`setTimeout(() => {}, 5000);`);
+      const again = new Waits();
+      setTimeout(() => again.add(1), 100);
+      setTimeout(() => again.add(-1), 400);
+      const t0 = Date.now();
+      expect((await runAgent(base({ timeoutMs: 300, permission: access(again) }))).error).toMatch(/timed out after/);
+      // 300 ms of work and 300 ms of waiting: without the pause it would have ended at 300 ms
+      expect(Date.now() - t0).toBeGreaterThanOrEqual(550);
+    });
   });
 
   it('runs the simulated agent and writes its files', async () => {

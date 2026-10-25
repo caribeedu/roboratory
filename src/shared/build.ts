@@ -17,7 +17,12 @@ export interface MachineConf {
   roles?: string[];
   dirs?: string[];
   tools?: string[];
+  /** commands it may run besides the defaults (D44) */
   allow?: string[];
+  /** commands it must never run; an empty list removes the key */
+  deny?: string[];
+  /** no file edits and no `git push`; false removes the key */
+  read_only?: boolean;
 }
 
 export interface ManagerConf { agent?: string; model?: string | null; tools?: string[] }
@@ -39,8 +44,10 @@ export type BuildOp =
   | { op: 'setMachine'; lineId: string; pieceId: string; conf: MachineConf }
   | { op: 'writeFile'; path: string; content: string; executable?: boolean }
   | { op: 'setLine'; lineId: string; name?: string; direction?: Direction; params?: Record<string, string>; repo?: string | null }
-  | { op: 'setSector'; sectorId: string; name?: string; color?: string; policy?: Policy; manager?: ManagerConf }
-  | { op: 'setFactory'; name?: string; ceiling?: Policy; generalManager?: ManagerConf; lineContext?: boolean }
+  /** commands no machine of the line's model may run (D44); an empty list removes the key */
+  | { op: 'setModel'; lineId: string; deny?: string[] }
+  | { op: 'setSector'; sectorId: string; name?: string; color?: string; policy?: Policy; manager?: ManagerConf; deny?: string[] }
+  | { op: 'setFactory'; name?: string; ceiling?: Policy; generalManager?: ManagerConf; lineContext?: boolean; deny?: string[] }
   | { op: 'removeLine'; lineId: string }
   | { op: 'removeModel'; sectorId: string; model: string }
   | { op: 'removeSector'; sectorId: string }

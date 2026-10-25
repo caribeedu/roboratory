@@ -81,6 +81,8 @@ export class Draft {
     if (doc.errors.length) throw new Error(`${relPosix(this.root, p)}: ${doc.errors[0].message}`);
     if (!doc.contents) doc.contents = doc.createNode({}) as never;
     fn(doc);
+    // the core formats are versioned (D46): a file edited here that lacks its version gets it, first
+    if (/(^|[\\/])(machine|line)\.yaml$/.test(p) && isMap(doc.contents) && !doc.contents.has('schema_version')) doc.contents.items.unshift(doc.createPair('schema_version', 1) as never);
     this.write(p, preserve(this.exists(p) ? this.read(p) : '', doc));
   }
 

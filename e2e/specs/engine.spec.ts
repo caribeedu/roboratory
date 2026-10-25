@@ -58,12 +58,12 @@ test.describe('The command line', () => {
   /** A small factory with a machine that asks, one that fails once, and a gate: every verb has something to do. */
   function verbsFactory(sandbox: Sandbox) {
     const root = path.join(sandbox.dir, 'verbs');
-    const sim = (extra: string) => `agent: sim\nattempts: 1\nsim:\n  seconds: 1\n${extra}`;
+    const sim = (extra: string) => `schema_version: 1\nagent: sim\nattempts: 1\nsim:\n  seconds: 1\n${extra}`;
     const files: Record<string, string> = {
       'factory.yaml': 'name: Verbs\n',
       'sectors/s/sector.yaml': 'name: S\n',
       'sectors/s/lines.yaml': 'lines:\n  - id: l\n    model: m\n',
-      'sectors/s/models/m/line.yaml': 'intake: { kind: manual, inputs: [{ name: topic, required: true }] }\npieces:\n  - { id: asker, machine: asker }\n  - { id: flaky, machine: flaky }\n  - { id: ok, label: OK, gate: {} }\n',
+      'sectors/s/models/m/line.yaml': 'schema_version: 1\nintake: { kind: manual, inputs: [{ name: topic, required: true }] }\npieces:\n  - { id: asker, machine: asker }\n  - { id: flaky, machine: flaky }\n  - { id: ok, label: OK, gate: {} }\n',
       'sectors/s/models/m/machines/asker/role.md': 'role',
       'sectors/s/models/m/machines/asker/contract.json': '{"type":"object"}',
       'sectors/s/models/m/machines/asker/machine.yaml': sim('  ask: { question: "Which one?" }\n  output: { picked: "{{box.human_answer.answer}}" }\n'),

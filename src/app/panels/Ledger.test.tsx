@@ -21,10 +21,10 @@ const events = [
 ];
 
 let bridge: FakeBridge;
-function setup(runs: RunSummary[], runId: string | null = null) {
+function setup(runs: RunSummary[], runId: string | null = null, log: Record<string, unknown>[] = events) {
   bridge = installBridge({
     runs: vi.fn(async () => runs),
-    runDetail: vi.fn(async (id: string) => { const summary = runs.find((r) => r.id === id); return summary ? { summary, events, dir: '/factory/.runs/x', diff: undefined } : null; }),
+    runDetail: vi.fn(async (id: string) => { const summary = runs.find((r) => r.id === id); return summary ? { summary, events: log, dir: '/factory/.runs/x', diff: undefined } : null; }),
   });
   const onRun = vi.fn();
   render(<Ledger factory={factory} runId={runId} onRun={onRun} notify={vi.fn()} onPiece={vi.fn()} />);
@@ -74,5 +74,25 @@ describe('The Ledger', () => {
     expect(screen.getAllByText('Launch')).not.toHaveLength(0);
     const who = screen.getByRole('heading', { name: 'Who did what' }).nextElementSibling as HTMLElement;
     expect(who).toHaveTextContent('you released Launch after 2 confirmations');
+  });
+
+  it('tells what a machine asked to run, how long it waited, and what you answered', async () => {
+    const { user } = setup([run({ id: 'r1' })], 'r1', [
+      { type: 'run.start', t, input: { tag: 'v1.0.0' }, actor: 'you' },
+      { type: 'piece.start', t: t + 1000, piece: 'build', attempt: 1 },
+      { type: 'permission.request', t: t + 2000, id: 'a1', piece: 'build', tool: 'Bash', summary: 'npm test' },
+      { type: 'verb', t: t + 14_000, verb: 'allow', actor: 'you', piece: 'build', tool: 'Bash', command: 'npm test' },
+      { type: 'permission.decision', t: t + 14_000, id: 'a1', piece: 'build', decision: 'allow', waitedMs: 12_000 },
+      { type: 'permission.denied', t: t + 15_000, piece: 'build', tool: 'Bash', summary: 'rm -rf build', by: 'rm -rf' },
+      { type: 'verb', t: t + 20_000, verb: 'deny', actor: 'you', piece: 'build', tool: 'Bash', command: 'curl example.com', reason: 'No network on this line.' },
+      { type: 'run.end', t: t + 30_000, status: 'done' },
+    ]);
+    const who = (await screen.findByRole('heading', { name: 'Who did what' })).nextElementSibling as HTMLElement;
+    expect(who).toHaveTextContent('you allowed Build to run "npm test"');
+    expect(who).toHaveTextContent('you denied Build "curl example.com" — "No network on this line."');
+    await user.click(screen.getByRole('button', { name: /^Build/ }));
+    expect(await screen.findByText('Asked to run: npm test')).toBeInTheDocument();
+    expect(screen.getByText('Allowed after 12s')).toBeInTheDocument();
+    expect(screen.getByText('Refused, never allowed here (rm -rf): rm -rf build')).toBeInTheDocument();
   });
 });
