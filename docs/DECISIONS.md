@@ -454,6 +454,12 @@ A rework drops the arrivals and skips that the last lap left downstream (D15).
 - **What the agent is told.** The prompt (D27) says which commands it may run, that anything else is asked of a person and can be denied with a reason, and that a denial is not repeated: it picks another way or answers `blocked` (D22).
 - **The Claude adapter.** It asks through `--permission-prompt-tool`, which Claude Code calls only when its rules do not decide. The tool is a small process of the `roboratory` command that Claude starts and that passes the request to the engine over its socket and token, and the answer back. It serves that one tool and runs nothing; the engine hosts no MCP server and does not stand between the agent and its tools.
 
+**Checked with a real agent** (Claude Code 2.1.226 on Haiku, `e2e/tools/permission-check.mjs`, US$ 0.02 in all):
+- The tool is called only for what the allow and deny rules leave undecided, with `{tool_name, input: {command, description}, tool_use_id}`. It answers `{"behavior":"allow","updatedInput":<the input>}` or `{"behavior":"deny","message":…}`, and the agent repeats the message word for word.
+- It works with `--output-format stream-json` and `--json-schema`. The tool's process starts with the run and connects within seconds, and a request that waited 190 s before an answer ran normally.
+- In this mode Claude Code allows read-only commands (`date`, `ls`, `cat`, `git status`) by itself, which `dontAsk` did not, and asks for the rest. A `--disallowedTools` rule holds and the tool is not called.
+- A deny rule such as `Bash(git push:*)` does **not** catch `git -C . push`, wildcards included: with `Bash(git:*)` allowed, that push went through. An allow list that names the local subcommands, in the plain and the `git * <subcommand>` forms, asks for the `git -C . push`.
+
 **Alternatives:**
 - A shell run by the engine and offered to the agent as an MCP tool, with the native shell off. Every command would pass through the engine, but models use their own shell better, and the engine would then run the commands, which asks for the sandbox of D32.
 - Answering over the agent's standard input with the control protocol of its SDK. Its messages are not documented for the CLI, so it would break with an update.
