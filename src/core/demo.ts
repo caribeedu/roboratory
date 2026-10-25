@@ -241,6 +241,10 @@ deny:
   - git reset --hard
   - rm -rf
   - sudo
+  - sh -c
+  - bash -c
+  - eval
+  - xargs
   - gh pr merge
   - gh repo delete
   - npm publish

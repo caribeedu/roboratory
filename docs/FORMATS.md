@@ -36,7 +36,7 @@ A machine runs one agent for one step. A machine folder with no `machine.yaml` r
 | `read_only` | boolean | No file edits and no `git push`. The commands in `allow` still run. |
 | `sim` | mapping | How the simulated agent behaves. Free-form. |
 
-The defaults, the way commands are read and what a person is asked are in [D44](DECISIONS.md#d44-permissions-requests-at-run-time-hard-denials-read-only-machines).
+A command is read by its parts, but not what it runs inside: `sh -c "…"`, `xargs` and `eval` run a string the engine cannot see. A factory that wants that closed denies them (`deny: [sh -c, bash -c, eval, xargs, sudo]`), as the demo factory does. The defaults, the way commands are read and what a person is asked are in [D44](DECISIONS.md#d44-permissions-requests-at-run-time-hard-denials-read-only-machines).
 
 ```yaml
 schema_version: 1

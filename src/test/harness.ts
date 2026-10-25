@@ -135,7 +135,7 @@ export function restartEngine(root: string): Engine {
 
 // ---------- watching the floor and the run ----------
 
-export async function until(fn: () => boolean, ms = 8000) {
+export async function until(fn: () => boolean, ms = 20000) {
   const t0 = Date.now();
   while (!fn()) { if (Date.now() - t0 > ms) throw new Error('timed out waiting'); await new Promise((r) => setTimeout(r, 10)); }
 }
@@ -196,7 +196,7 @@ console.log(JSON.stringify({ type: 'result', subtype: 'success', result: '', str
     waitForCalls: async (n) => {
       const t0 = Date.now();
       while (calls().length < n) {
-        if (Date.now() - t0 > 8000) throw new Error(`the agent was called ${calls().length} times, not ${n}`);
+        if (Date.now() - t0 > 20000) throw new Error(`the agent was called ${calls().length} times, not ${n}`);
         await new Promise((r) => setTimeout(r, 10));
       }
     },

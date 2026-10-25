@@ -29,6 +29,7 @@ A machine now asks before it runs a command outside its list, and what the facto
 
 ### Tests
 - **A fake agent CLI that speaks MCP** drives the whole chain in the process-level tests: the adapter's flags, the permission tool, the engine, the command's `allow` and `deny`, and the reason reaching the agent. `src/core/permissions.test.ts` covers how commands are read; an end-to-end spec covers the card, the queue and the Ledger on the packaged app.
+- **The e2e specs no longer take the focus** when run on your computer: the window stays hidden (`E2E_SHOW=1` shows it). The CI keeps showing it, and now keeps the report and traces of a failed job, which it had been dropping because they sit in hidden folders.
 - **`e2e/tools/permission-check.mjs`** checks the mechanism with the real Claude Code on Haiku, and **`e2e/tools/real-permissions-check.mjs`** drives a real engine and a real agent through allow, deny and a hard denial, for cents. The second also runs with `--fake`, free.
 
 ### Upgrading

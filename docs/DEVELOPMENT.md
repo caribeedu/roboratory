@@ -29,7 +29,7 @@ npm start
 | `node e2e/tools/readme-shots.mjs`, `piece-images.mjs`, `render-svg.mjs` | Regenerate the README's images: a line at work and build mode, one picture per piece drawn with the app's own sprites, and an SVG rendered to PNG |
 | `node e2e/tools/scenario.mjs`, `real-agent-check.mjs` | A staged demo day, and a paid run with the real Claude agent |
 
-The e2e specs and tools launch the packaged app: they find it in `out/` for your platform (`ROBORATORY_OUT_DIR` changes the folder, `ROBORATORY_EXE` points at a specific executable).
+The e2e specs and tools launch the packaged app: they find it in `out/` for your platform (`ROBORATORY_OUT_DIR` changes the folder, `ROBORATORY_EXE` points at a specific executable). **Locally the specs keep the window hidden** (`ROBORATORY_BACKGROUND=1`, set by `launch` in `e2e/support/app.ts`), so they never take the focus of whoever is using the computer; `E2E_SHOW=1` shows it, to watch a spec. The CI always shows it.
 
 ## Tests
 
