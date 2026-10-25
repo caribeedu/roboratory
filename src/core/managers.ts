@@ -260,7 +260,7 @@ function simManager(f: FactoryDef, e: Engine, scope: Scope, question: string): R
           files: [
             { path: `sectors/${id}/sector.yaml`, content: `name: ${name}\npolicy: {}\nmanager:\n  agent: sim\n` },
             { path: `sectors/${id}/manager/role.md`, content: `You are the ${name} Sector Manager.\n` },
-            { path: `sectors/${id}/models/intake-triage/line.yaml`, content: 'intake:\n  kind: manual\n  label: Request\n  inputs:\n    - { name: ticket, label: Ticket, required: true }\npieces:\n  - id: triage\n    machine: triager\npallet:\n  label: Triaged\n' },
+            { path: `sectors/${id}/models/intake-triage/line.yaml`, content: 'schema_version: 1\nintake:\n  kind: manual\n  label: Request\n  inputs:\n    - { name: ticket, label: Ticket, required: true }\npieces:\n  - id: triage\n    machine: triager\npallet:\n  label: Triaged\n' },
             { path: `sectors/${id}/lines.yaml`, content: 'lines:\n  - id: main\n    name: Incoming requests\n    model: intake-triage\n' },
           ],
         }],

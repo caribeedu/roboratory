@@ -24,7 +24,7 @@ for (const f of walk(root)) {
     const props = contract.properties ?? {};
     const sample = (k, s) => s.enum ? s.enum[0] : s.type === 'array' ? [] : s.type === 'boolean' ? true : s.type === 'integer' || s.type === 'number' ? 1 : s.type === 'object' ? {} : s.pattern ? 'https://github.com/acme-corp/demo/pull/1' : `${k} (simulated)`;
     const out = Object.fromEntries(Object.entries(props).map(([k, s]) => [k, sample(k, s)]));
-    const lines = ['agent: sim', 'attempts: 2', 'sim:', '  seconds: 1'];
+    const lines = ['schema_version: 1', 'agent: sim', 'attempts: 2', 'sim:', '  seconds: 1'];
     if (props.verdict) lines.push('  outputs:', `    - ${JSON.stringify({ ...out, verdict: 'fail', top_finding: 'simulated finding' })}`, `    - ${JSON.stringify({ ...out, verdict: 'pass' })}`);
     else lines.push(`  output: ${JSON.stringify(out)}`);
     fs.writeFileSync(f, lines.join('\n') + '\n');

@@ -17,12 +17,6 @@ export interface Rules { allow: string[]; deny: string[] }
 /** A tool name (`Edit`, `Bash`, `mcp__server__tool`) as opposed to a command prefix (`npm test`). */
 export const isToolName = (entry: string) => /^[A-Z]/.test(entry) || entry.startsWith('mcp__');
 
-/** The older `Bash(npm test:*)` form as the prefix it stands for; a bare `Bash` stays the tool. */
-export function prefixOf(entry: string): string {
-  const m = /^Bash\((.*?)(?::\*)?\)$/.exec(entry.trim());
-  return (m ? m[1] : entry).trim();
-}
-
 /**
  * The rules a machine runs with. Every machine can read; one that may edit also gets the file tools; and a shell comes
  * with the local git subcommands (`git push` is not among them, so it is asked about). `read_only` takes the file tools
@@ -33,9 +27,9 @@ export function effectiveRules(o: { allow: string[]; deny: string[]; readOnly: b
   const allow = [
     ...READ_TOOLS, ...(o.readOnly ? [] : WRITE_TOOLS),
     ...(o.shell ? [...GIT_LOOK, ...(o.readOnly ? [] : GIT_LOCAL)].map((s) => `git ${s}`) : []),
-    ...o.allow.map(prefixOf),
+    ...o.allow.map((a) => a.trim()),
   ];
-  const deny = [...o.deny.map(prefixOf), ...(o.readOnly ? ['git push', ...WRITE_TOOLS] : [])];
+  const deny = [...o.deny.map((d) => d.trim()), ...(o.readOnly ? ['git push', ...WRITE_TOOLS] : [])];
   return { allow: [...new Set(allow)].filter(Boolean), deny: [...new Set(deny)].filter(Boolean) };
 }
 

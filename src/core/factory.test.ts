@@ -51,7 +51,7 @@ describe('factory loader', () => {
     const root = createDemoFactory(path.join(dir, 'factory'), path.join(dir, 'repos'));
     const machine = path.join(root, 'shared/machines/triager/machine.yaml');
     fs.writeFileSync(machine, fs.readFileSync(machine, 'utf8').replace(/^agent: .*$/m, 'agent: gemini'));
-    expect(loadFactory(root).warnings.join('\n')).toMatch(/machine "triager": agent "gemini" is not one of claude, sim/);
+    expect(loadFactory(root).warnings.join('\n')).toMatch(/machine.yaml: agent must be claude or sim/);
     fs.writeFileSync(machine, fs.readFileSync(machine, 'utf8').replace('agent: gemini', 'agent: sim'));
     const sector = path.join(root, 'sectors/releases/sector.yaml');
     fs.writeFileSync(sector, fs.readFileSync(sector, 'utf8').replace('manager:\n  agent: sim', 'manager:\n  agent: opencode'));

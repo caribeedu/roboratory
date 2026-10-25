@@ -61,7 +61,7 @@ export function simMachine(spec: SimSpec = {}): Files {
   if (spec.commit) sim.commit = spec.commit;
   if (spec.requests) sim.requests = spec.requests;
   if (spec.stopIfDenied) sim.stop_if_denied = true;
-  const yaml: Record<string, unknown> = { agent: 'sim', ...(spec.attempts ? { attempts: spec.attempts } : {}), ...(spec.goal ? { goal: spec.goal } : {}), sim };
+  const yaml: Record<string, unknown> = { schema_version: 1, agent: 'sim', ...(spec.attempts ? { attempts: spec.attempts } : {}), ...(spec.goal ? { goal: spec.goal } : {}), sim };
   return {
     'role.md': spec.role ?? 'role',
     'contract.json': JSON.stringify(spec.contract ?? { type: 'object' }),
@@ -77,26 +77,29 @@ export const checker = (verdicts: (string | Record<string, unknown>)[], extra: S
   simMachine({ outputs: verdicts.map((v) => (typeof v === 'string' ? { verdict: v } : v)), contract: { type: 'object', required: ['verdict'] }, ...extra });
 
 /** A machine whose agent is the real Claude adapter, pointed at the fake CLI. */
-export const claudeMachine = (over: Files = {}): Files => ({ 'role.md': 'role', 'contract.json': '{"type":"object"}', 'machine.yaml': 'agent: claude\n', ...over });
+export const claudeMachine = (over: Files = {}): Files => ({ 'role.md': 'role', 'contract.json': '{"type":"object"}', 'machine.yaml': 'schema_version: 1\nagent: claude\n', ...over });
 
 // ---------- factories ----------
 
 export interface Built { dir: string; root: string; f: FactoryDef }
 
 /** A one-sector factory (sector `s`, line `l`, model `m`) whose line is `lineYaml`; `withRepo` gives the line a target repository. */
+const versioned = (yaml: string) => (/^schema_version:/m.test(yaml) ? yaml : `schema_version: 1\n${yaml}`);
+
 export function buildFactory(lineYaml: string, machines: Record<string, Files>, files: Files = {}, withRepo = false): Built {
   const dir = tmpDir('roboratory-engine-');
   const root = path.join(dir, 'factory');
   if (withRepo) createTargetRepo(path.join(dir, 'repo'), 'repo');
   const machineFiles = Object.entries(machines).reduce<Files>((acc, [name, f]) => {
-    for (const [file, text] of Object.entries(f)) acc[`sectors/s/models/m/machines/${name}/${file}`] = text;
+    // the format's version is not what these tests are about, so a machine file that leaves it out is given one
+    for (const [file, text] of Object.entries(f)) acc[`sectors/s/models/m/machines/${name}/${file}`] = file === 'machine.yaml' ? versioned(text) : text;
     return acc;
   }, {});
   writeFiles(root, {
     'factory.yaml': 'name: T\n',
     'sectors/s/sector.yaml': 'name: S\n',
     'sectors/s/lines.yaml': `lines:\n  - id: l\n    model: m\n${withRepo ? '    repo: ../repo\n' : ''}    params: { svc: orders }\n`,
-    'sectors/s/models/m/line.yaml': lineYaml,
+    'sectors/s/models/m/line.yaml': versioned(lineYaml),
     ...machineFiles,
     ...files,
   });
@@ -108,7 +111,7 @@ export function buildFactory(lineYaml: string, machines: Record<string, Files>, 
 export const LINE = 's/l';
 
 /** Opening lines for line.yaml: an intake and a list of pieces. */
-export const line = (pieces: string, pallet = '') => `intake: { kind: manual }\npieces:\n${pieces}\n${pallet}`;
+export const line = (pieces: string, pallet = '') => `schema_version: 1\nintake: { kind: manual }\npieces:\n${pieces}\n${pallet}`;
 
 // ---------- engines ----------
 

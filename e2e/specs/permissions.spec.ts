@@ -13,10 +13,10 @@ function factoryFor(sandbox: Sandbox, o: { deny?: string[] } = {}) {
   w('factory.yaml', `name: Perm Factory\n${o.deny ? `deny: [${o.deny.join(', ')}]\n` : ''}`);
   w('sectors/s/sector.yaml', 'name: Shop\n');
   w('sectors/s/lines.yaml', 'lines:\n  - { id: l, name: Orders, model: m }\n');
-  w('sectors/s/models/m/line.yaml', 'intake: { kind: manual }\npieces:\n  - { id: build, label: Build, machine: build }\n');
+  w('sectors/s/models/m/line.yaml', 'schema_version: 1\nintake: { kind: manual }\npieces:\n  - { id: build, label: Build, machine: build }\n');
   w('sectors/s/models/m/machines/build/role.md', 'Build.\n');
   w('sectors/s/models/m/machines/build/contract.json', '{"type":"object"}');
-  w('sectors/s/models/m/machines/build/machine.yaml', 'agent: sim\nattempts: 1\nsim:\n  seconds: 1\n  requests: ["npm install"]\n  stop_if_denied: true\n  output: { ok: true }\n');
+  w('sectors/s/models/m/machines/build/machine.yaml', 'schema_version: 1\nagent: sim\nattempts: 1\nsim:\n  seconds: 1\n  requests: ["npm install"]\n  stop_if_denied: true\n  output: { ok: true }\n');
   return root;
 }
 

@@ -23,8 +23,8 @@ describe('What a machine may run', () => {
     expect(prompt).not.toContain('`git push`');
   });
 
-  it('adds the commands its own allow lists, as prefixes or in the older Bash(...) form', async () => {
-    const { allowed } = await rulesOf({ 'machine.yaml': 'agent: claude\nallow: ["npm test", "Bash(gh pr view:*)", "git push"]\n' });
+  it('adds the commands its own allow lists, as prefixes', async () => {
+    const { allowed } = await rulesOf({ 'machine.yaml': 'schema_version: 1\nagent: claude\nallow: ["npm test", "gh pr view", "git push"]\n' });
     expect(allowed).toEqual(expect.arrayContaining(['Bash(npm test:*)', 'Bash(gh pr view:*)', 'Bash(git push:*)']));
   });
 

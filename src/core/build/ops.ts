@@ -111,7 +111,7 @@ function insert(d: Draft, l: LineDef, op: Extract<BuildOp, { op: 'insert' }>) {
     const dir = path.join(l.model.dir, 'machines', id);
     d.write(path.join(dir, 'role.md'), `## This step\n\nDescribe what this machine does, what it writes in its folder, and what it returns.\n`);
     d.write(path.join(dir, 'contract.json'), NEW_CONTRACT);
-    d.write(path.join(dir, 'machine.yaml'), 'agent: claude\nmodel: sonnet\nattempts: 2\ntimeout: 20m\n');
+    d.write(path.join(dir, 'machine.yaml'), 'schema_version: 1\nagent: claude\nmodel: sonnet\nattempts: 2\ntimeout: 20m\n');
   }
 }
 
@@ -248,7 +248,7 @@ export function apply(d: Draft, op: BuildOp) {
         const mdir = path.join(sdir, 'models', op.model);
         if (d.exists(mdir)) fail(`Model "${op.model}" already exists.`);
         modelNameFree(d, f, op.sectorId, op.model);
-        d.write(path.join(mdir, 'line.yaml'), 'intake:\n  kind: manual\n  label: Start\n  inputs: []\npieces: []\npallet:\n  label: Delivered\n');
+        d.write(path.join(mdir, 'line.yaml'), 'schema_version: 1\nintake:\n  kind: manual\n  label: Start\n  inputs: []\npieces: []\npallet:\n  label: Delivered\n');
       } else {
         checkId(op.model, 'A model name');
         if (!d.exists(path.join(sdir, 'models', op.model, 'line.yaml')) && !d.exists(d.abs(path.join('shared', 'models', op.model, 'line.yaml')))) fail(`Model "${op.model}" not found.`);

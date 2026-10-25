@@ -9,6 +9,7 @@ import type {
   Direction, FactoryDef, InputField, IntakeKind, LineDef, LineModel, LoadProblem, MachineDef, ManagerDef, Need, PieceDef, Policy, SectorDef,
 } from '../shared/types';
 import { AGENTS } from '../shared/types';
+import { checkFormat } from './formats';
 import { diskFs, type Vfs } from './vfs';
 import { expandHome } from './paths';
 
@@ -100,7 +101,9 @@ function loadMachine(io: LoadIo, name: string, dirs: { dir: string; shared: bool
   for (const { dir, shared } of dirs) {
     const mdir = path.join(dir, name);
     if (!io.fs.exists(mdir)) continue;
-    const conf = io.fs.exists(path.join(mdir, 'machine.yaml')) ? readYaml(io, path.join(mdir, 'machine.yaml')) : {};
+    const confFile = path.join(mdir, 'machine.yaml');
+    const conf = io.fs.exists(confFile) ? readYaml(io, confFile) : {};
+    if (io.fs.exists(confFile)) { const wrong = checkFormat('machine', conf); if (wrong.length) problem(io, `${confFile}: ${wrong.join('; ')}`); }
     const contractFile = path.join(mdir, 'contract.json');
     let contract: Obj = { type: 'object' };
     if (io.fs.exists(contractFile)) {
@@ -118,7 +121,7 @@ function loadMachine(io: LoadIo, name: string, dirs: { dir: string; shared: bool
       effort: conf.effort ? str(conf.effort) : undefined,
       goal: conf.goal !== undefined && str(conf.goal).trim() ? str(conf.goal).trim() : undefined,
       contract,
-      agent: agentName(io, conf.agent, 'claude', `machine "${name}"`),
+      agent: str(conf.agent, 'claude'), // checked against the schema above
       model: conf.model ? str(conf.model) : undefined,
       attempts: Math.max(1, Number(conf.attempts ?? 3)),
       timeoutMs: parseDuration(conf.timeout, 10 * 60000),
@@ -134,6 +137,8 @@ function loadMachine(io: LoadIo, name: string, dirs: { dir: string; shared: bool
 
 export function loadModel(dir: string, shared: boolean, machineDirs: { dir: string; shared: boolean }[], root = path.resolve(dir, '..', '..', '..'), io: LoadIo = disk): LineModel {
   const conf = readYaml(io, path.join(dir, 'line.yaml'));
+  const wrong = checkFormat('line', conf);
+  if (wrong.length) problem(io, `${path.join(dir, 'line.yaml')}: ${wrong.join('; ')}`, dir);
   const intakeConf = isObj(conf.intake) ? conf.intake : {};
   const kind = str(intakeConf.kind, 'manual') as IntakeKind;
   if (!['manual', 'timer', 'webhook', 'chat'].includes(kind)) throw new Error(`intake.kind "${kind}" is not one of manual, timer, webhook, chat`);

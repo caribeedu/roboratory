@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/caribeedu/roboratory/blob/main/schemas/machine.schema.json",
+  "title": "Roboratory machine.yaml",
+  "description": "A machine: the agent that does one step of a line, and what it may do. See docs/FORMATS.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": { "const": 1, "description": "The version of this format, not of the product." },
+    "agent": { "enum": ["claude", "sim"], "description": "The agent that runs the step. Defaults to claude." },
+    "model": { "type": "string", "description": "The model the agent uses; the agent's own default when absent." },
+    "effort": { "type": "string", "description": "The agent's effort level." },
+    "goal": { "type": "string", "description": "What the machine is for, used by any line that gives the piece no goal of its own." },
+    "attempts": { "type": "integer", "minimum": 1, "description": "How many times the step is tried before the machine catches fire. Defaults to 3." },
+    "timeout": { "type": ["string", "number"], "description": "How long one attempt may work, like 90s, 10m or 2h; a number is seconds. Defaults to 10m." },
+    "roles": { "type": "array", "items": { "type": "string" }, "description": "Shared role files, relative to the factory, placed before the machine's own role.md." },
+    "dirs": { "type": "array", "items": { "type": "string" }, "description": "Extra folders the agent may use." },
+    "tools": { "type": "array", "items": { "type": "string" }, "description": "MCP servers or tools the agent may use, as mcp__server or mcp__server__tool." },
+    "allow": { "type": "array", "items": { "type": "string" }, "description": "Commands the machine may run besides the defaults, as prefixes (npm test), or tool names (Edit). Anything else is asked of a person." },
+    "deny": { "type": "array", "items": { "type": "string" }, "description": "Commands the machine must never run, added to the factory's, the sector's and the line's." },
+    "read_only": { "type": "boolean", "description": "No file edits and no git push. The commands in allow still run." },
+    "sim": { "type": "object", "description": "How the simulated agent behaves (agent: sim). Free-form." }
+  }
+}

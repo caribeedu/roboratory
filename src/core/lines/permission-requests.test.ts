@@ -65,12 +65,10 @@ describe('A command outside the list', () => {
     expect(e.attention().map((a) => a.kind)).toEqual(['permission', 'gate']);
   });
 
-  it('is not asked about when a list covers it, in the older Bash(...) form too', async () => {
-    for (const allow of ['allow: ["npm test"]\n', 'allow: ["Bash(npm test:*)"]\n']) {
-      const { e } = await runWith({}, { machineYaml: allow });
-      await whenDone(e);
-      expect(eventsOf(e, e.runSummaries()[0].id, 'permission.request')).toEqual([]);
-    }
+  it('is not asked about when a list covers it', async () => {
+    const { e } = await runWith({}, { machineYaml: 'allow: ["npm test"]\n' });
+    await whenDone(e);
+    expect(eventsOf(e, e.runSummaries()[0].id, 'permission.request')).toEqual([]);
   });
 
   it('is asked about for each command of a compound one that the list does not cover', async () => {

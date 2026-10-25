@@ -9,7 +9,7 @@ import { apply } from './ops';
 const machine = (props = '{"verdict":{"type":"string","enum":["pass","fail"]}}') => ({
   'role.md': 'role\n',
   'contract.json': `{"type":"object","properties":${props}}`,
-  'machine.yaml': 'agent: sim\n',
+  'machine.yaml': 'schema_version: 1\nagent: sim\n',
 });
 
 function factory(lineYaml: string, machines: Record<string, ReturnType<typeof machine>>) {
@@ -26,6 +26,7 @@ function factory(lineYaml: string, machines: Record<string, ReturnType<typeof ma
 }
 
 const LINE = `# Summary: build -> check
+schema_version: 1
 intake: { kind: manual }
 pieces:
   # the builder
@@ -158,7 +159,7 @@ describe('build-mode edits', () => {
     expect(f.sectors[0].lines[0].model.machines.build).toMatchObject({ deny: ['rm -rf'], readOnly: true });
     apply(d, { op: 'setMachine', lineId: 's/a', pieceId: 'build', conf: { deny: [], read_only: false } });
     apply(d, { op: 'setFactory', deny: [] });
-    expect(read('sectors/s/models/m/machines/build/machine.yaml')).toBe('agent: sim\n');
+    expect(read('sectors/s/models/m/machines/build/machine.yaml')).toBe('schema_version: 1\nagent: sim\n');
     expect(read('factory.yaml')).toBe('name: T\n');
   });
 
@@ -207,7 +208,8 @@ describe('build-mode edits', () => {
   });
 
   it('sets and clears a signal timeout without losing its command, and lets a return belt read why a signal failed', () => {
-    const SIG = `intake: { kind: manual }
+    const SIG = `schema_version: 1
+intake: { kind: manual }
 pieces:
   - id: build
     machine: build

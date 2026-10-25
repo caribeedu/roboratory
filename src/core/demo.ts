@@ -52,7 +52,8 @@ export function createDemoFactory(root: string, reposDir = path.join(root, '..',
   const triage = machine(
     'You triage a ticket. Read the ticket id from the box, decide whether it is a bug or a question, and rate its severity.\n',
     { type: 'object', required: ['ticket', 'type', 'severity'], properties: { ticket: { type: 'string' }, type: { enum: ['bug', 'question'] }, severity: { enum: ['low', 'medium', 'high'] }, summary: { type: 'string' } } },
-    `agent: sim
+    `schema_version: 1
+agent: sim
 read_only: true
 attempts: 3
 timeout: 5m
@@ -71,7 +72,8 @@ sim:
   const planner = machine(
     'You plan the fix for a bug. Read the triage box and write a short plan to PLAN.md in your folder.\n',
     { type: 'object', required: ['ticket', 'steps', 'files'], properties: { ticket: { type: 'string' }, steps: { type: 'integer' }, files: { type: 'array', items: { type: 'string' } }, risk: { enum: ['low', 'medium', 'high'] } } },
-    `agent: sim
+    `schema_version: 1
+agent: sim
 sim:
   seconds: 5
   write:
@@ -89,7 +91,8 @@ sim:
   const implementer = machine(
     'You implement the plan. Read PLAN.md from the planner\'s folder, change the code, write FIX.md describing the change, and commit.\n',
     { type: 'object', required: ['ticket', 'branch', 'diff'], properties: { ticket: { type: 'string' }, branch: { type: 'string' }, diff: { type: 'string' }, tests_added: { type: 'integer' } } },
-    `agent: sim
+    `schema_version: 1
+agent: sim
 attempts: 3
 timeout: 15m
 allow: ["sh test.sh"]
@@ -115,7 +118,8 @@ sim:
   const publisher = machine(
     'You publish the change: push the branch and open a draft pull request. Leave a note of what you published in your output (pr_url, branch, title).\n',
     { type: 'object', required: ['pr_url', 'branch', 'title'], properties: { pr_url: { type: 'string', pattern: '^(https://github\\.com/.+/pull/\\d+|local://pr/.+)$' }, branch: { type: 'string' }, title: { type: 'string' } } },
-    `agent: sim
+    `schema_version: 1
+agent: sim
 allow: ["git push", "gh pr create"]
 sim:
   seconds: 4
@@ -134,7 +138,8 @@ sim:
   const responder = machine(
     'You answer a question ticket with a short, sourced reply.\n',
     { type: 'object', required: ['ticket', 'answer'], properties: { ticket: { type: 'string' }, answer: { type: 'string' }, links: { type: 'integer' } } },
-    `agent: sim
+    `schema_version: 1
+agent: sim
 sim:
   seconds: 3
   transcript:
@@ -149,7 +154,8 @@ sim:
   const correlator = machine(
     'You correlate an alert with recent signals: error rate, deploys, traces.\n',
     { type: 'object', required: ['service', 'error_rate'], properties: { service: { type: 'string' }, error_rate: { type: 'number' }, baseline: { type: 'number' }, deploys_in_window: { type: 'array' } } },
-    `agent: sim
+    `schema_version: 1
+agent: sim
 read_only: true
 tools: ["mcp__new-relic__run_nrql_query"]
 sim:
@@ -168,7 +174,8 @@ sim:
   const investigator = machine(
     'You find the most likely cause. Your answer must name the suspected cause and your confidence between 0 and 1.\n',
     { type: 'object', required: ['service', 'suspected_cause', 'confidence'], properties: { service: { type: 'string' }, suspected_cause: { type: 'string' }, confidence: { type: 'number', minimum: 0, maximum: 1 }, evidence: { type: 'integer' } } },
-    `agent: sim
+    `schema_version: 1
+agent: sim
 read_only: true
 attempts: 3
 tools: ["mcp__new-relic__run_nrql_query", "mcp__incident-io__alert_show"]
@@ -192,7 +199,8 @@ sim:
   const mitigator = machine(
     'You apply the agreed mitigation: roll back to the previous release.\n',
     { type: 'object', required: ['action', 'target'], properties: { action: { enum: ['rollback', 'restart', 'scale'] }, target: { type: 'string' } } },
-    `agent: sim
+    `schema_version: 1
+agent: sim
 sim:
   seconds: 5
   transcript:
@@ -207,7 +215,8 @@ sim:
   const deployer = machine(
     'You deploy the tagged release with a 10% canary.\n',
     { type: 'object', required: ['tag', 'strategy'], properties: { tag: { type: 'string' }, strategy: { enum: ['canary', 'rolling'] }, canary: { type: 'string' } } },
-    `agent: sim
+    `schema_version: 1
+agent: sim
 sim:
   seconds: 6
   transcript:
@@ -247,7 +256,8 @@ general_manager:
 `,
     'general-manager/role.md': 'You are the General Manager. You answer questions that span sectors.\n',
     // shared library: a line model used by two lines
-    'shared/models/ticket-to-pr/line.yaml': `intake:
+    'shared/models/ticket-to-pr/line.yaml': `schema_version: 1
+intake:
   kind: manual
   label: Jira intake
   inputs:
@@ -314,7 +324,8 @@ manager:
   tools: ["mcp__new-relic__run_nrql_query"]
 `,
     'sectors/incidents/manager/role.md': 'You are the Incidents Sector Manager. Help diagnose and suggest the next action.\n',
-    'sectors/incidents/models/triage-to-mitigation/line.yaml': `intake:
+    'sectors/incidents/models/triage-to-mitigation/line.yaml': `schema_version: 1
+intake:
   kind: manual
   label: Alert
   inputs:
@@ -356,7 +367,8 @@ manager:
   agent: sim
 `,
     'sectors/releases/manager/role.md': 'You are the Releases Sector Manager.\n',
-    'sectors/releases/models/ship-to-prod/line.yaml': `intake:
+    'sectors/releases/models/ship-to-prod/line.yaml': `schema_version: 1
+intake:
   kind: manual
   label: Release tag
   inputs:

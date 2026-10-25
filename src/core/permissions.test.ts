@@ -1,4 +1,4 @@
-import { decideShell, effectiveRules, parseCommand, prefixOf, type Rules } from './permissions';
+import { decideShell, effectiveRules, parseCommand, type Rules } from './permissions';
 
 const rules = (allow: string[], deny: string[] = []): Rules => ({ allow, deny });
 
@@ -95,14 +95,6 @@ describe('The rules of a machine', () => {
     expect(decideShell('git diff main', r)).toEqual({ verdict: 'allow' });
     expect(decideShell('git commit -m x', r)).toMatchObject({ verdict: 'ask' });
     expect(decideShell('gh pr view 12', r)).toEqual({ verdict: 'allow' });
-  });
-
-  it('reads the older Bash(...) form as the prefix it stands for', () => {
-    expect(prefixOf('Bash(gh pr view:*)')).toBe('gh pr view');
-    expect(prefixOf('Bash(sh test.sh)')).toBe('sh test.sh');
-    expect(prefixOf('Bash')).toBe('Bash');
-    expect(prefixOf('mcp__slack')).toBe('mcp__slack');
-    expect(effectiveRules({ allow: ['Bash(gh:*)'], deny: ['Bash(rm -rf:*)'], readOnly: false, shell: true })).toMatchObject({ deny: ['rm -rf'], allow: expect.arrayContaining(['gh']) });
   });
 
   it('gives a machine with no shell no commands', () => {

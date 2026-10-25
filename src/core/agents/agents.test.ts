@@ -71,7 +71,7 @@ console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false
   }
 
   it('tells a machine which shell commands it may run, and nothing when its shell is open', async () => {
-    const { prompt } = await startedWith(machineRules({ allow: ['Bash(gh pr view:*)', 'Bash(curl:*)'] }));
+    const { prompt } = await startedWith(machineRules({ allow: ['gh pr view', 'curl'] }));
     expect(prompt).toMatch(/Shell: you may run only commands that start with `git status`.*`git commit`.*`gh pr view`, `curl`. Anything else is denied./);
     expect(prompt).not.toContain('`git push`');
     expect(prompt).toContain('A denied command does not mean the others are denied.');
@@ -92,7 +92,7 @@ console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false
   });
 
   it('starts machines with file edits, the chosen model and effort, the extra folders, and no sub-agents', async () => {
-    const machine = await startedWith({ ...machineRules({ allow: ['Bash(sh test.sh)'] }), addDirs: ['/x'], effort: 'high', model: 'opus' });
+    const machine = await startedWith({ ...machineRules({ allow: ['sh test.sh'] }), addDirs: ['/x'], effort: 'high', model: 'opus' });
     expect(machine.value('--effort')).toBe('high');
     expect(machine.value('--model')).toBe('opus');
     expect(machine.args).not.toContain('--tools');
