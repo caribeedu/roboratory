@@ -8,17 +8,53 @@ From the assessment of the first real ticket run ([ASSESSMENT.md](ASSESSMENT.md)
 
 ### v0.9 — Permissions, and a frozen core
 
-1. **Permissions as a first-class feature.** Machines are already told what their shell allows (D27).
-   - Permission requests at run time, handled by the engine: a command outside the list waits for you in the attention queue, to allow once or deny with a reason that goes back to the agent, instead of failing. Nothing is allowed for good. Managers get no write requests.
-   - A list of hard denials that applies in every line; a line can tighten the factory's rules, never loosen them.
-   - A build-mode check: a role that names commands its `allow` list does not permit gets a warning before any run.
-   - Read-only machines get no file edits and no `git push`. This closes §5.5.
-2. **Freeze the core.** A short specification of `line.yaml` and `machine.yaml`, with a JSON Schema the loader, build mode and editors share. New needs are solved in the factory (roles, scripts, conventions) before a new concept goes into the engine.
+1. **Permissions as a first-class feature** (D44). A command or MCP tool outside a machine's list waits for you in the attention queue, to allow once or deny with a reason that goes back to the agent, instead of failing. Hard denials come from the factory's files, and a sector, line or machine can only add to them. Read-only machines get no file edits and no `git push`, and the default for other machines no longer includes `git push` either. This closes §5.5.
+2. **Agents behind a port** (D45). The Claude adapter and the simulated agent implement one `AgentRunner` port; nothing in the engine knows a CLI.
+3. **Freeze the core** (D46). A short specification of `line.yaml` and `machine.yaml`, with a JSON Schema the loader, build mode and editors share, `schema_version: 1`, and unknown keys as errors.
+
+#### The plan
+
+Each step ends with the type check and the unit tests green, and with its docs written. A step that changes a behavior has its test first, at the lowest layer that can see it ([DEVELOPMENT.md](DEVELOPMENT.md#tests)). Real agents are used only where a step says so, with a cost ceiling approved first (AGENTS.md, invariant 8).
+
+1. **Documents.** D44 to D46 and the Codex removal from the decisions; this plan; the v0.10 and §3 expectations below.
+2. **A throwaway check with the real agent** (`e2e/tools/permission-check.mjs`, Claude Haiku, a temporary folder, US$ 0.50 ceiling). It settles what the plan below assumes, and its findings are written into D44 (a "Checked" paragraph) before step 5:
+   - `--permission-prompt-tool` is called only when the allow and deny rules do not decide, and the tool can wait minutes for an answer;
+   - it works together with `--json-schema` and `--output-format stream-json`, which the adapter already uses;
+   - what the tool receives (the tool's name and input) and what it must answer (`allow` with the input, `deny` with a message), and that the agent reads the message;
+   - a `--disallowedTools` rule holds and does not reach the tool;
+   - whether a deny rule on `git push` also catches `git -C <path> push`, and what rule keeps `git` from reaching a remote by default without listing every local subcommand;
+   - how long Claude Code waits for the tool's process to connect, and the cost of the check.
+   If the tool cannot wait, or the combination fails, step 5 stops and the mechanism is decided again.
+3. **Remove Codex and add the port.** `codex.ts` and `codex.test.ts` go; `src/core/agents/index.ts` becomes the registry of the `AgentRunner` port (the Claude and simulated adapters implement it; the engine and `managers.ts` call only the port); an unknown `agent:` is a load problem. Every mention of Codex goes with it, as if it had never existed: the agent lists in the build forms (`PieceEditor.tsx`, `Settings.tsx`) and their tests, `demo.ts`, `package.json`, README, ARCHITECTURE, DEVELOPMENT, PRODUCT and CHANGELOG, and the environment variable for its executable. Tests: the existing ones stay green; one for the registry and for a machine that names an agent that does not exist.
+4. **Commands as prefixes, `deny`, `read_only` and the default for `git`.**
+   - The loader reads `allow` and `deny` as prefixes (`machine.yaml`; `deny` also in `factory.yaml`, `sector.yaml` and `line.yaml`, combined by union) and the legacy `Bash(...)` form until step 7; `read_only` is read from `machine.yaml`. The effective lists are computed once, in the engine, and handed to the adapter.
+   - The Claude adapter translates them: allow rules, deny rules (`--disallowedTools`), `--tools` without `Edit`/`Write` for a read-only machine, and a default allow of the local `git` commands in place of `Bash(git:*)`, with the rule found in step 2. `shellRules` (D27) is written from the same prefixes.
+   - The build forms edit `allow`, `deny` and `read_only`; the build checks keep `deny` entries valid and a line or machine from loosening the factory's.
+   - The factory template (`template.ts`) and the reference factory (D42) start with a `deny` list, and their validators and reviewers become `read_only`.
+   - Tests: the effective lists by level (factory, sector, line, machine); the arguments the Claude adapter builds, observed through a fake CLI; the prompt a machine receives; the form.
+5. **The permission request.**
+   - The `PermissionGate` in the engine: given a machine's effective rules, a request is denied by a hard denial, denied by `read_only`, or becomes a `permission` attention item. `allow` resolves it for this call and `deny` with a reason resolves it with the refusal; a halt, a stop or the end of the machine's process resolves what is left.
+   - The Claude adapter asks through `--permission-prompt-tool` and a `--mcp-config` that starts `roboratory permission-tool` (a subcommand of `src/cli.ts`, serving only that tool), which passes each request to the engine with the socket and token the lock file holds.
+   - The `AgentRunner` request carries a way to pause the machine's clock while a request waits, so `timeout` counts agent time only (`spawnCollect` in `process.ts`).
+   - `AttentionItem` gets the kind `permission`; `VerbName` gets `allow` and `deny`; `Policy` and the managers' proposals refuse both (D34). Events `permission.request` and `permission.decision` go to `run.jsonl`, the Ledger shows them, and `roboratory allow`/`deny` and `watch` handle them, audited as `you` with the source.
+   - The prompt of a machine says how requests work (D27 extended). The denial the agent sees is the reason you wrote.
+   - The simulated agent can ask: a `sim:` entry lists commands it requests, so every layer can test the flow without a model.
+   - Tests: in `src/core/lines/` (a request waits and the line goes on elsewhere; allow once; deny with a reason the agent receives; a hard denial never reaches the queue; `read_only`; the clock stops while waiting; a halt resolves it; a restart that waits for idle does not cut a request), for the new command with a real engine, and for the permission tool against a real engine.
+6. **The interface.** The `permission` item in the attention queue (icon, text, priority of a fire, sound), the exclamation balloon in the gate's color on the machine, which stays working, and a panel with the command and the machine's reason, **Allow once** and **Deny** with a reason. The Ledger shows requests and the wait. Tests: the panel in jsdom with the bridge faked; an end-to-end spec on the packaged app with a simulated agent that asks, covering allow, deny and the queue.
+7. **Freeze the core.** The JSON Schemas of `line.yaml` and `machine.yaml` in `src/shared/`, the loader and build mode checking against them, `schema_version: 1` required, unknown keys as errors with the file and key named, and the legacy `Bash(...)` form refused with the prefix to write instead. The demo factory, the template and the reference factory move to the format. The two formats are specified in a document of their own. Tests: valid and invalid files per field, the messages, and the demo and reference factories loading clean.
+8. **Verification and release preparation.**
+   - The suite: `npm run typecheck`, `npm run test:coverage` (the floor holds), `npm run package` and `npm run test:e2e`, then the CI on the three systems.
+   - A real run, with a cost estimate approved first (invariant 8): a short line on Claude Haiku in a temporary folder, with one request waiting and answered, one denial whose reason the agent repeats, and one hard denial.
+   - `package.json` and `package-lock.json` go to 0.9.0 and the README's status line names it ([RELEASING.md](RELEASING.md)).
+   - The docs match the code: README, PRODUCT, ARCHITECTURE (§2.2, §3.4, §3.6, §3.7), DEVELOPMENT, AGENTS.md (invariants 5 and 6), ASSESSMENT (item 2 closed), a CHANGELOG entry from the template, and this section and §5.5 removed.
+
+Open risks the steps decide: how a deny rule sees `git -C <path> push` (step 2); whether Claude's `--permission-prompt-tool` accepts the tool through `--mcp-config` together with the user's own MCP servers and `--strict-mcp-config` (step 2); Windows, where the tool's process is started by Claude with the same executable rule as the engine's (step 5).
 
 ### v0.10 — Metrics and a cheap rehearsal
 
 1. **Metrics per machine** from `run.jsonl` (`roboratory stats`): cost, duration, attempts, laps, denied commands, questions, blocks, and checker passes later proved wrong (a pass followed by a question or rework further down the line). Costs say whether they are estimates.
-2. **A cheap rehearsal with real permissions** (`roboratory rehearse`): the real roles, signals and permissions, a cheap model, and every outward action denied, to find role and permission defects for cents. It finds defects of roles and permissions, not of quality. `e2e/tools/factory-sim-check.mjs` keeps checking the flow for free.
+2. **The need to allow for the rest of the run.** v0.9 allows one call at a time (D44). The metrics above decide whether a wider allowance is worth having, from `run.jsonl`: requests per run and per machine; how many allows repeat a command already allowed in the same run, and their share of all allows; the wait before each answer, and how many requests were denied. If repeated allows are a large share, an allowance limited to a command prefix and one run is designed with its own decision; if not, it stays out. The threshold is set from the first runs' numbers, not before them.
+3. **A cheap rehearsal with real permissions** (`roboratory rehearse`): the real roles, signals and permissions, a cheap model, and every outward action denied, to find role and permission defects for cents. It finds defects of roles and permissions, not of quality. `e2e/tools/factory-sim-check.mjs` keeps checking the flow for free.
 
 ### v0.11 — Checkers prove their work
 
@@ -48,15 +84,14 @@ None of these exist in the code yet.
 5. **First-factory tutorial** (D38).
 6. **Replaying a run on the Floor** (D40).
 7. **A git identity per machine** (D9, D10). Today every machine commits as "Roboratory" (`src/core/git.ts`).
-8. **Container isolation for machines** (D32).
+8. **Container isolation for machines** (D32). Permission requests (D44) cover shell commands and MCP tools; they do not cover file writes outside a machine's folders or network access, and a `read_only` machine can still write through a command in its `allow`. A container or OS sandbox is what would cover them, and it would let those become requests or rules too. The expectation is written here so the permission model does not grow around those gaps first.
 9. **Remote or shared factories.**
 10. **An interactive terminal in a machine's folder.** No PTY is in the project.
 
 ## 4. Not yet verified with real agents
 
-1. A real Codex run.
-2. A real draft PR on GitHub: `node e2e/tools/real-agent-check.mjs --github owner/repo`.
-3. The lines of the reference engineering factory (D42). Only one step has run for real, a data framing step that cost US$ 4.64 on opus before it moved to sonnet. Unverified until full runs:
+1. A real draft PR on GitHub: `node e2e/tools/real-agent-check.mjs --github owner/repo`.
+2. The lines of the reference engineering factory (D42). Only one step has run for real, a data framing step that cost US$ 4.64 on opus before it moved to sonnet. Unverified until full runs:
    - whether the incident tool's API can set custom fields and decline an incident, and whether follow-up creation can set a team;
    - the real durations of the signal scripts and CI watches.
 
