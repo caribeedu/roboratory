@@ -39,7 +39,15 @@ export function spawnCollect(bin: string, args: string[], req: AgentRequest, onL
     if (run.error) { resolve({ code: null, stderr: run.error, timedOut: false }); return; }
     const child = spawn(run.file, run.args, { cwd: req.cwd, env: run.env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     let buf = '', stderr = '', timedOut = false;
-    const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); }, req.timeoutMs);
+    // the time limit counts the agent's work, not the wait for a person to answer a permission request (D44)
+    let left = req.timeoutMs, started = Date.now();
+    let timer: NodeJS.Timeout | undefined;
+    const arm = () => { started = Date.now(); timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); }, left); };
+    const stopWatch = req.permission?.waits.on((waiting) => {
+      if (waiting > 0 && timer) { clearTimeout(timer); timer = undefined; left = Math.max(0, left - (Date.now() - started)); }
+      else if (waiting === 0 && !timer) arm();
+    });
+    arm();
     const abort = () => child.kill('SIGTERM');
     req.signal?.addEventListener('abort', abort, { once: true });
     child.stdout.on('data', (d) => {
@@ -50,7 +58,8 @@ export function spawnCollect(bin: string, args: string[], req: AgentRequest, onL
     child.stderr.on('data', (d) => { stderr += d.toString(); });
     child.on('error', (e) => { stderr += e.message; });
     child.on('close', (code) => {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
+      stopWatch?.();
       req.signal?.removeEventListener('abort', abort);
       if (buf.trim()) onLine(buf);
       resolve({ code, stderr, timedOut });

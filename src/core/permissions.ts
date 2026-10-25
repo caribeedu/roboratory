@@ -133,3 +133,11 @@ export function decideShell(command: string, rules: Rules): Verdict {
   const missing = (read as string[][]).find((w) => !commands.some((a) => startsWith(w, a)));
   return missing ? { verdict: 'ask', why: `"${missing.join(' ')}" is not in the list` } : { verdict: 'allow' };
 }
+
+/** What to do with a tool call: a shell command by its parts, anything else by the tool's name. */
+export function decideTool(tool: string, input: Record<string, unknown>, rules: Rules): Verdict {
+  if (tool === 'Bash') return decideShell(String(input.command ?? ''), rules);
+  if (rules.deny.includes(tool)) return { verdict: 'deny', by: tool };
+  if (rules.allow.includes(tool)) return { verdict: 'allow' };
+  return { verdict: 'ask', why: `${tool} is not in the list` };
+}

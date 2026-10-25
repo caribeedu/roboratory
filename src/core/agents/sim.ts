@@ -25,6 +25,15 @@ export async function runSim(req: AgentRequest): Promise<AgentResult> {
     }
     await sleep(step, req.signal);
   } catch { return { error: 'stopped' }; }
+  // commands it tries to run, each decided by the engine like a real agent's (D44); a denial may stop it, with the reason
+  if (Array.isArray(sim.requests) && req.permission) {
+    for (const command of sim.requests.map((c) => String(render(String(c), ctx)))) {
+      req.onEvent({ kind: 'tool', text: command });
+      const d = await req.permission.decide({ tool: 'Bash', input: { command } });
+      req.onEvent({ kind: 'ret', text: d.behavior === 'allow' ? 'ran' : `denied: ${d.message}` });
+      if (d.behavior === 'deny' && sim.stop_if_denied) return { output: { blocked: { reason: d.message } } };
+    }
+  }
   if (!req.readOnly && sim.write && typeof sim.write === 'object') {
     for (const [rel, content] of Object.entries(sim.write as Record<string, unknown>)) {
       const p = path.join(req.cwd, String(render(rel, ctx)));

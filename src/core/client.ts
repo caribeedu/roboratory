@@ -12,7 +12,7 @@ export interface LaunchSpec { command: string; args: string[]; env?: Record<stri
 export interface EngineInfo { version: string; build?: string; pid: number; root: string; name: string; restarting: boolean }
 export interface ConnectOptions {
   /** Who is calling, for the audit: the command line's verbs are recorded with the source "cli". */
-  client?: 'app' | 'cli';
+  client?: 'app' | 'cli' | 'permission-tool';
   /** Starts the engine when none runs. */
   start?: boolean;
   /** How to start it; defaults to this process running `script`. */

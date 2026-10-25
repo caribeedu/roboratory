@@ -151,7 +151,7 @@ export interface FactoryDef {
 
 export interface LoadProblem { model?: string; pieceId?: string; message: string }
 
-export type VerbName = 'run' | 'retry' | 'release' | 'halt' | 'resume' | 'apply' | 'answer';
+export type VerbName = 'run' | 'retry' | 'release' | 'halt' | 'resume' | 'apply' | 'answer' | 'allow' | 'deny';
 
 // ---------- runtime state ----------
 
@@ -185,7 +185,12 @@ export interface PieceView {
   pallet?: number;
   /** a machine that needs you (D21) */
   question?: HumanQuestion;
+  /** permission requests this machine waits on you for (D44) */
+  permissions?: PermissionAsk[];
 }
+
+/** A command or tool a machine asks to use, and is waiting on a person for. */
+export interface PermissionAsk { id: string; tool: string; /** the command, or the tool and what it was given */ summary: string; since: number }
 
 export interface LineView {
   id: string;
@@ -226,7 +231,9 @@ export interface LogEntry {
 export interface AttentionItem {
   id: string;
   severity: number; // higher first
-  kind: 'fire' | 'gate' | 'signal' | 'proposal' | 'question';
+  kind: 'fire' | 'gate' | 'signal' | 'proposal' | 'question' | 'permission';
+  /** a permission request waiting for `allow` or `deny` (D44) */
+  requestId?: string;
   sectorId: string;
   lineId: string;
   pieceId: string;

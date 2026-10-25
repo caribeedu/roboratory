@@ -6,7 +6,7 @@ import { runClaude } from './claude';
 import { runSim } from './sim';
 import type { AgentRequest, AgentResult, AgentRunner } from './types';
 
-export type { AgentEvent, AgentRequest, AgentResult, AgentRunner } from './types';
+export type { AgentEvent, AgentRequest, AgentResult, AgentRunner, PermissionAccess, PermissionCall, PermissionDecision } from './types';
 export { claudeMcpServers, mcpServerOf } from './claude';
 
 // typed by AgentName: an agent named in AGENTS without an adapter here does not compile

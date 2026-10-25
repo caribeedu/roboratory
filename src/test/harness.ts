@@ -41,6 +41,9 @@ export interface SimSpec {
   /** files the agent writes in its folder, and the commit message when it commits them */
   write?: Record<string, string>;
   commit?: string;
+  /** shell commands the agent tries to run, in order; a denial stops it with the reason when `stopIfDenied` */
+  requests?: string[];
+  stopIfDenied?: boolean;
   goal?: string;
   /** the contract; by default any object */
   contract?: Record<string, unknown>;
@@ -56,6 +59,8 @@ export function simMachine(spec: SimSpec = {}): Files {
   if (spec.badOutput) sim.bad_output = spec.badOutput;
   if (spec.write) sim.write = spec.write;
   if (spec.commit) sim.commit = spec.commit;
+  if (spec.requests) sim.requests = spec.requests;
+  if (spec.stopIfDenied) sim.stop_if_denied = true;
   const yaml: Record<string, unknown> = { agent: 'sim', ...(spec.attempts ? { attempts: spec.attempts } : {}), ...(spec.goal ? { goal: spec.goal } : {}), sim };
   return {
     'role.md': spec.role ?? 'role',

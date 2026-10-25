@@ -25,7 +25,7 @@ Each step ends with the type check and the unit tests green, and with its docs w
    - The build forms edit `allow`, `deny` and `read_only`; the build checks keep `deny` entries valid and a line or machine from loosening the factory's.
    - The factory template (`template.ts`) and the reference factory (D42) start with a `deny` list, and their validators and reviewers become `read_only`.
    - Tests: the parser (compound commands, `git -C`, `-c`, substitutions, wrappers, quoting) and the effective lists by level (factory, sector, line, machine); the arguments the Claude adapter builds, observed through a fake CLI; the prompt a machine receives; the form.
-5. **The permission request.**
+5. [done] **The permission request.**
    - The `PermissionGate` in the engine: given a machine's effective rules, a request is denied by a hard denial, denied by `read_only`, allowed because the list covers it, or becomes a `permission` attention item. `allow` resolves it for this call and `deny` with a reason resolves it with the refusal; a halt, a stop or the end of the machine's process resolves what is left.
    - The Claude adapter asks through `--permission-prompt-tool` and a `--mcp-config` that starts `roboratory permission-tool` (a subcommand of `src/cli.ts`, serving only that tool), which passes each request to the engine with the socket and token the lock file holds.
    - The `AgentRunner` request carries a way to pause the machine's clock while a request waits, so `timeout` counts agent time only (`spawnCollect` in `process.ts`).

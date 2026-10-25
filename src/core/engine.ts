@@ -1,5 +1,6 @@
 // The run engine: moves boxes along deterministic lines.
 // Order, routing, checks and gates come from files; agents only fill in each step (D7).
+import crypto from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -9,9 +10,10 @@ import { describe, evaluate } from '../shared/expr';
 import type {
   AttentionItem, BoxView, FactoryDef, HumanQuestion, LineDef, LineView, LogEntry, MachineDef, PieceDef, PieceState, PieceView, RunStatus, RunSummary, VerbName,
 } from '../shared/types';
-import { runAgent, type AgentEvent } from './agents';
+import { runAgent, type AgentEvent, type PermissionAccess, type PermissionCall, type PermissionDecision } from './agents';
+import { Waits } from './agents/waits';
 import { addWorktree, commitLeftovers, factoryVersion, git, headOf, mergeInto, removeWorktree } from './git';
-import { effectiveRules } from './permissions';
+import { decideTool, effectiveRules, type Rules } from './permissions';
 import { renderCommand } from './template';
 
 export const RUNS_DIR = '.runs';
@@ -65,7 +67,14 @@ const NEEDS_HUMAN = {
   properties: { needs_human: { type: 'object', required: ['question'], properties: { question: { type: 'string' }, options: { type: 'array', items: { type: 'string' } }, recommendation: { type: 'string' } } } },
 };
 
-export interface EngineOptions { beltMs?: number; now?: () => number; signalTimeoutMs?: number }
+export interface EngineOptions {
+  beltMs?: number; now?: () => number; signalTimeoutMs?: number;
+  /** how to start `roboratory permission-tool`, for agents that ask through a tool of their own (D44) */
+  permissionTool?: PermissionAccess['tool'];
+}
+
+/** A permission request waiting on a person (D44). */
+interface AskRt { id: string; runId: string; lineId: string; pieceId: string; tool: string; summary: string; input: Record<string, unknown>; since: number; settle(d: PermissionDecision): void }
 
 /** What a machine answers when something outside its work stops it (D22). */
 const BLOCKED = {
@@ -90,6 +99,10 @@ export class Engine extends EventEmitter {
   private seq = 0;
   private simFailed = new Set<string>();
   private paused = false;
+  private permissionTool?: PermissionAccess['tool'];
+  /** the permission requests of the machines running now, by the session each one was started with */
+  private sessions = new Map<string, (call: PermissionCall) => Promise<PermissionDecision>>();
+  private asks = new Map<string, AskRt>();
   /** Where the verb being called comes from ("cli"); audited next to the actor. Set by the server around a call. */
   source?: string;
 
@@ -99,6 +112,7 @@ export class Engine extends EventEmitter {
     this.beltMs = opts.beltMs ?? (Number(process.env.ROBORATORY_BELT_MS) || 2400);
     this.now = opts.now ?? Date.now;
     this.signalTimeoutMs = opts.signalTimeoutMs ?? 10 * 60000;
+    this.permissionTool = opts.permissionTool;
     for (const s of factory.sectors) for (const l of s.lines) this.lines.set(l.id, this.makeLine(l));
   }
 
@@ -127,6 +141,69 @@ export class Engine extends EventEmitter {
   }
 
   private sectorOf(line: LineDef) { return this.factory.sectors.find((s) => s.id === line.sectorId)!; }
+
+  // ---------- permission requests (D44) ----------
+
+  /** The engine's decision on a tool call of the machine started with `session`; the permission tool process asks it over the socket. */
+  permitSession(session: string, call: PermissionCall): Promise<PermissionDecision> {
+    const decide = this.sessions.get(session);
+    return decide ? decide(call) : Promise.resolve({ behavior: 'deny', message: 'No machine of this engine is running under this session; the call was not made.' });
+  }
+
+  private permit(run: RunRt, def: PieceDef, rules: Rules, waits: Waits, call: PermissionCall): Promise<PermissionDecision> {
+    const v = decideTool(call.tool, call.input, rules);
+    if (v.verdict === 'allow') return Promise.resolve({ behavior: 'allow', updatedInput: call.input });
+    const summary = call.tool === 'Bash' ? String(call.input.command ?? '') : `${call.tool} ${JSON.stringify(call.input).slice(0, 200)}`;
+    const where = { sectorId: run.line.sectorId, lineId: run.line.id, pieceId: def.id, runId: run.summary.id };
+    if (v.verdict === 'deny') {
+      this.record(run, { type: 'permission.denied', piece: def.id, tool: call.tool, summary, by: v.by });
+      this.log({ level: 'machine', ...where, kind: 'warn', text: `${def.label}: "${v.by}" is never allowed here; refused ${summary}` });
+      return Promise.resolve({ behavior: 'deny', message: `Forbidden by this factory: "${v.by}" is on its list of commands that are never allowed. Do not try it again in another form; choose another way, or answer blocked if you cannot go on without it.` });
+    }
+    return new Promise((resolve) => {
+      const id = crypto.randomBytes(4).toString('hex');
+      waits.add(1);
+      const ask: AskRt = {
+        id, runId: run.summary.id, lineId: run.line.id, pieceId: def.id, tool: call.tool, summary, input: call.input, since: this.now(),
+        settle: (d) => { this.asks.delete(id); waits.add(-1); resolve(d); this.changed(); },
+      };
+      this.asks.set(id, ask);
+      this.record(run, { type: 'permission.request', id, piece: def.id, tool: call.tool, summary, why: v.why });
+      this.log({ level: 'sector', ...where, kind: 'warn', text: `${def.label} asks to run: ${summary}` });
+      this.changed();
+    });
+  }
+
+  /** Gives up the requests of a machine that is gone, so none waits for an answer nobody can use. */
+  private settleAsks(runId: string, pieceId: string, message: string) {
+    for (const a of [...this.asks.values()]) if (a.runId === runId && a.pieceId === pieceId) a.settle({ behavior: 'deny', message });
+  }
+
+  private mustAsk(id: string) { const a = this.asks.get(id); if (!a) throw new Error(`No permission request ${id} is waiting.`); return a; }
+
+  private decided(a: AskRt, verb: 'allow' | 'deny', actor: string, reason = '') {
+    const run = this.runs.get(a.runId)!;
+    const line = this.mustLine(a.lineId);
+    const label = this.mustPiece(line, a.pieceId).def.label;
+    this.record(run, { type: 'verb', verb, actor, piece: a.pieceId, tool: a.tool, command: a.summary, ...(reason ? { reason } : {}) });
+    this.record(run, { type: 'permission.decision', id: a.id, piece: a.pieceId, decision: verb, waitedMs: this.now() - a.since });
+    this.log({ level: 'sector', sectorId: line.def.sectorId, lineId: a.lineId, pieceId: a.pieceId, runId: a.runId, kind: verb === 'allow' ? 'ok' : 'warn', text: `${label}: ${actor} ${verb === 'allow' ? 'allowed' : 'denied'} ${a.summary}${reason ? ` — "${reason}"` : ''}` });
+  }
+
+  /** Lets a machine make the call it asked for, this once (D44). */
+  allow(requestId: string, actor = 'you') {
+    const a = this.mustAsk(requestId);
+    this.decided(a, 'allow', actor);
+    a.settle({ behavior: 'allow', updatedInput: a.input });
+  }
+
+  /** Refuses the call; the reason goes back to the agent as the tool's refusal. */
+  deny(requestId: string, reason = '', actor = 'you') {
+    const a = this.mustAsk(requestId);
+    const why = reason.trim();
+    this.decided(a, 'deny', actor, why);
+    a.settle({ behavior: 'deny', message: why || 'A person denied this command.' });
+  }
 
   /** What a machine may run (D44): its own lists and the defaults, with every level's hard denials added. */
   private rulesFor(line: LineDef, machine: MachineDef) {
@@ -648,18 +725,26 @@ export class Engine extends EventEmitter {
       this.changed();
       const abort = new AbortController();
       p.abort = abort;
+      const rules = this.rulesFor(run.line, machine);
+      const waits = new Waits();
+      const session = crypto.randomUUID();
+      const decide = (call: PermissionCall) => this.permit(run, def, rules, waits, call);
+      this.sessions.set(session, decide);
       const res = await runAgent({
         agent: machine.agent, model: machine.model, effort: machine.effort, role, schema: machine.contract, question: ALTERNATIVES, cwd: dir, addDirs,
-        ...this.rulesFor(run.line, machine), tools: machine.tools, timeoutMs: machine.timeoutMs, sim: machine.sim, simFail,
+        ...rules, tools: machine.tools, timeoutMs: machine.timeoutMs, sim: machine.sim, simFail,
         simCtx: { box: w.box.payload, params: run.line.params, run: { id: run.summary.id }, git: { branch }, call },
         prompt: machinePrompt(run, this.factory.lineContext ? def.id : undefined, def.label, w.box.payload, machine.contract, siblings, lastError, w.hint, boxFile),
         signal: abort.signal,
+        permission: { session, root: this.factory.root, tool: this.permissionTool, decide, waits },
         onEvent: (e: AgentEvent) => {
           this.record(run, { type: 'agent', piece: def.id, attempt, kind: e.kind, text: e.text });
           this.log({ level: 'machine', sectorId: run.line.sectorId, lineId: run.line.id, pieceId: def.id, runId: run.summary.id, kind: e.kind === 'ret' ? 'text' : e.kind === 'tool' ? 'tool' : 'text', text: e.kind === 'ret' ? `◂ ${e.text}` : e.kind === 'tool' ? `▸ ${e.text}` : e.text });
         },
       });
       p.abort = undefined;
+      this.sessions.delete(session);
+      this.settleAsks(run.summary.id, def.id, 'The machine stopped before an answer came.');
       if (res.costUsd !== undefined) this.record(run, { type: 'cost', piece: def.id, usd: res.costUsd });
       // whatever came back (an answer, a question, a block, an error) is about an input that has since been replaced
       if (this.staleInput(run, w, def.id)) { this.dropStale(line, run, p); return; }
@@ -791,6 +876,7 @@ export class Engine extends EventEmitter {
         id: pid, state: l.halted && p.state === 'idle' ? 'idle' : p.state, runId: p.current?.runId, queue: p.queue.length,
         attempt: p.attempt, attempts: def?.attempts, error: p.error, since: p.since,
         lastBox: p.lastBox, lastRunId: p.lastRunId, pallet: p.pallet, question: p.question,
+        ...(this.hasAsks(id, pid) ? { permissions: [...this.asks.values()].filter((a) => a.lineId === id && a.pieceId === pid).map((a) => ({ id: a.id, tool: a.tool, summary: a.summary, since: a.since })) } : {}),
       };
       const atPiece = [...(p.current ? [p.current] : []), ...p.queue];
       for (const w of atPiece) boxes.push({ id: w.box.id, runId: w.runId, at: { piece: pid }, color: w.box.color, payload: w.box.payload });
@@ -799,12 +885,18 @@ export class Engine extends EventEmitter {
     return { id, sectorId: l.def.sectorId, halted: l.halted, pieces, boxes };
   }
 
+  private hasAsks(lineId: string, pieceId: string) { for (const a of this.asks.values()) if (a.lineId === lineId && a.pieceId === pieceId) return true; return false; }
+
   attention(): AttentionItem[] {
     const items: AttentionItem[] = [];
     for (const l of this.lines.values()) for (const [pid, p] of l.pieces) {
       if (p.state === 'fire') items.push({ id: `${l.def.id}#${pid}`, severity: 3, kind: p.def.kind === 'signal' ? 'signal' : 'fire', sectorId: l.def.sectorId, lineId: l.def.id, pieceId: pid, runId: p.current?.runId, since: p.since ?? this.now(), title: `${p.def.label} stopped`, detail: `${l.def.name} · ${p.error ?? ''}` });
       if (p.state === 'asking') items.push({ id: `${l.def.id}#${pid}`, severity: 2, kind: 'question', sectorId: l.def.sectorId, lineId: l.def.id, pieceId: pid, runId: p.current?.runId, since: p.since ?? this.now(), title: `${p.def.label} asks you`, detail: `${l.def.name} · ${p.question?.question ?? ''}` });
       if (p.state === 'holding') items.push({ id: `${l.def.id}#${pid}`, severity: 2, kind: 'gate', sectorId: l.def.sectorId, lineId: l.def.id, pieceId: pid, runId: p.current?.runId, since: p.since ?? this.now(), title: `${p.def.label} is waiting for you`, detail: `${l.def.name}${p.queue.length ? ` · ${p.queue.length} more behind it` : ''}` });
+    }
+    for (const a of this.asks.values()) {
+      const l = this.lines.get(a.lineId)!;
+      items.push({ id: `${a.lineId}#${a.pieceId}!${a.id}`, requestId: a.id, severity: 3, kind: 'permission', sectorId: l.def.sectorId, lineId: a.lineId, pieceId: a.pieceId, runId: a.runId, since: a.since, title: `${l.pieces.get(a.pieceId)!.def.label} asks to run a command`, detail: `${l.def.name} · ${a.summary}` });
     }
     return items.sort((a, b) => b.severity - a.severity || a.since - b.since);
   }

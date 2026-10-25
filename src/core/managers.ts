@@ -33,7 +33,7 @@ export const MANAGER_CONTRACT = {
   },
 };
 const validate = new Ajv({ allErrors: true, strict: false }).compile(MANAGER_CONTRACT);
-const NEVER_AUTO: VerbName[] = ['release', 'apply', 'resume'];
+const NEVER_AUTO: VerbName[] = ['release', 'apply', 'resume', 'allow', 'deny'];
 
 /** How many times per run a manager may run a verb alone: the stricter of sector policy and factory ceiling. */
 export function autoAllowance(sector: Policy, ceiling: Policy, verb: VerbName): number {

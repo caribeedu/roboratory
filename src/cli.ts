@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { EngineClient, launchFor } from './core/client';
 import { engineIsOlder } from './core/buildid';
+import { runPermissionTool } from './core/permission-tool';
 import { liveLock, startServer } from './core/server';
 import type { Snapshot } from './shared/types';
 
@@ -15,6 +16,8 @@ export const USAGE = `roboratory <command> [options]
   run <line> [--input k=v ...]  start a run
   release <line> <gate> [--choice c] [--note n] [--confirm n]
   answer <line> <machine> <text>
+  allow <request>               let a machine make the call it asks for, this once
+  deny <request> [--reason r]   refuse it; the reason goes back to the agent
   retry <line> <machine> [--hint h]
   halt <line>
   resume <line>
@@ -78,11 +81,18 @@ export async function main(argv: string[], env: CliEnv): Promise<number> {
   try { p = parse(argv); } catch (e) { env.err(`${(e as Error).message}\n`); return 2; }
   if (!p.cmd || p.cmd === 'help' || p.cmd === '--help' || p.cmd === '-h') { env.out(USAGE); return p.cmd ? 0 : 2; }
   if (p.cmd === '--version' || p.cmd === 'version') { env.out(`${env.version}\n`); return 0; }
-  const known = ['serve', 'stop', 'status', 'run', 'release', 'answer', 'retry', 'halt', 'resume', 'restart', 'watch'];
+  const known = ['serve', 'stop', 'status', 'run', 'release', 'answer', 'allow', 'deny', 'retry', 'halt', 'resume', 'restart', 'watch', 'permission-tool'];
   if (!known.includes(p.cmd)) { env.err(`Unknown command "${p.cmd}".\n\n${USAGE}`); return 2; }
 
   try {
     if (p.cmd === 'serve') return await serve(p, env);
+    // started by an agent's CLI, not by a person (D44)
+    if (p.cmd === 'permission-tool') {
+      const { ROBORATORY_FACTORY: root, ROBORATORY_SESSION: session } = process.env;
+      if (!root || !session) { env.err('permission-tool is started by an agent, with ROBORATORY_FACTORY and ROBORATORY_SESSION set.\n'); return 2; }
+      await runPermissionTool({ root, session });
+      return 0;
+    }
     const root = factoryRoot(p.flags);
 
     if (p.cmd === 'status') {
@@ -97,7 +107,7 @@ export async function main(argv: string[], env: CliEnv): Promise<number> {
         for (const id of Object.keys(snapshot.lines)) env.out(`  line ${id}${snapshot.lines[id].halted ? ' (halted)' : ''}\n`);
         const runs = await c.call<{ id: string; lineId: string; status: string }[]>('runs');
         for (const r of runs.filter((x) => st.runs.includes(x.lineId) && x.status !== 'done')) env.out(`  run ${r.id} on ${r.lineId}: ${r.status}\n`);
-        for (const a of snapshot.attention) env.out(`  needs you: ${a.title} (${a.lineId}) ${a.detail}\n`);
+        for (const a of snapshot.attention) env.out(`  needs you: ${a.title} (${a.lineId}) ${a.detail}${a.requestId ? ` [request ${a.requestId}]` : ''}\n`);
         if (engineIsOlder(st, { version: env.version, build: env.build ?? '' })) env.out(`The engine is not this command's build (${env.version}). Run \`roboratory restart --when-idle\`.\n`);
       } finally { c.close(); }
       return 0;
@@ -143,6 +153,8 @@ export async function main(argv: string[], env: CliEnv): Promise<number> {
           return 0;
         }
         case 'answer': need(3, 'answer <line> <machine> <text>'); await c.call('answer', resolveLine(snapshot, p.pos[0]), p.pos[1], p.pos.slice(2).join(' ')); env.out('Answered.\n'); return 0;
+        case 'allow': need(1, 'allow <request>'); await c.call('allow', p.pos[0]); env.out('Allowed, this once.\n'); return 0;
+        case 'deny': need(1, 'deny <request> [--reason r]'); await c.call('deny', p.pos[0], p.flags.reason?.[0] ?? p.pos.slice(1).join(' ')); env.out('Denied.\n'); return 0;
         case 'retry': need(2, 'retry <line> <machine> [--hint h]'); await c.call('retry', resolveLine(snapshot, p.pos[0]), p.pos[1], p.flags.hint?.[0] ?? ''); env.out('Retrying.\n'); return 0;
         case 'halt': need(1, 'halt <line>'); await c.call('halt', resolveLine(snapshot, p.pos[0])); env.out('Halted.\n'); return 0;
         case 'resume': need(1, 'resume <line>'); await c.call('resume', resolveLine(snapshot, p.pos[0])); env.out('Resumed.\n'); return 0;
@@ -172,10 +184,12 @@ async function serve(p: Parsed, env: CliEnv): Promise<number> {
   const root = p.pos[0] ? path.resolve(p.pos[0]) : factoryRoot(p.flags);
   const stamp = () => new Date().toISOString();
   let srv;
+  const launch = launchFor(env.script);
   try {
     srv = await startServer(root, {
       version: env.version,
       build: env.build,
+      permissionTool: { command: launch.command, args: [...launch.args, 'permission-tool'], env: launch.env ?? {} },
       onExit: (restart) => { env.out(`${stamp()} engine stopped${restart ? ' (restart)' : ''}\n`); process.exit(0); },
     });
   } catch (e) {
@@ -195,7 +209,7 @@ async function serve(p: Parsed, env: CliEnv): Promise<number> {
 async function watch(c: EngineClient, snap: Snapshot, env: CliEnv): Promise<number> {
   const now = () => new Date().toTimeString().slice(0, 8);
   // what already waits for you when you start watching
-  for (const a of snap.attention) env.out(`${now()} ${a.kind} ${a.lineId}/${a.pieceId ?? ''}: ${a.title}\n`);
+  for (const a of snap.attention) env.out(`${now()} ${a.kind} ${a.lineId}/${a.pieceId ?? ''}: ${a.title}${a.requestId ? ` [request ${a.requestId}] ${a.detail}` : ''}\n`);
   const line = (d: Record<string, any>): string | null => {
     const where = `${d.lineId}${d.piece ? `/${d.piece}` : ''}`;
     switch (d.type) {
@@ -203,6 +217,7 @@ async function watch(c: EngineClient, snap: Snapshot, env: CliEnv): Promise<numb
       case 'piece.hold': return `gate ${where} is waiting for you${usd(d.costUsd)}`;
       case 'piece.ask': return `question ${where}: ${d.question?.question ?? ''}${usd(d.costUsd)}`;
       case 'piece.fire': return `fire ${where}: ${d.error ?? ''}${usd(d.costUsd)}`;
+      case 'permission.request': return `permission ${where} asks to run: ${d.summary} [request ${d.id}] — roboratory allow ${d.id}, or deny ${d.id} --reason …`;
       case 'piece.blocked': return `blocked ${where}: ${d.reason ?? ''}`;
       case 'rework': return `rework ${d.from} → ${d.to} on ${d.lineId}, lap ${d.lap}${usd(d.costUsd)}`;
       case 'run.end': return `run ${d.runId} ${d.status}${d.why ? ` — ${d.why}` : ''}${usd(d.costUsd)}`;

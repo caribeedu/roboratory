@@ -138,7 +138,7 @@ handle('closeFactory', () => { disconnect(); send('snapshot', EMPTY); });
 handle('engineStart', async () => { if (client) { await client.restart(); setEngine({ state: statusOf(client), version: client.info.version }); } });
 handle('engineRestartWhenIdle', () => client?.call('restartWhenIdle'));
 for (const name of [
-  'run', 'retry', 'release', 'answer', 'halt', 'resume', 'ask', 'acceptProposal', 'rejectProposal',
+  'run', 'retry', 'release', 'answer', 'allow', 'deny', 'halt', 'resume', 'ask', 'acceptProposal', 'rejectProposal',
   'buildStart', 'buildApply', 'buildUndo', 'buildRedo', 'buildFields', 'buildRead', 'buildSave', 'buildDiscard',
 ]) forward(name);
 forward('runs', []);

@@ -143,7 +143,7 @@ describe('The roboratory command', () => {
 
     it('needs the arguments each command takes, and says how to type it', async () => {
       const root = await engine();
-      for (const [argv, usage] of [[['release', RELEASES], 'release <line> <gate>'], [['answer', RELEASES, 'asker'], 'answer <line> <machine> <text>'], [['retry', RELEASES], 'retry <line> <machine>'], [['halt'], 'halt <line>'], [['resume'], 'resume <line>']] as const) {
+      for (const [argv, usage] of [[['release', RELEASES], 'release <line> <gate>'], [['answer', RELEASES, 'asker'], 'answer <line> <machine> <text>'], [['retry', RELEASES], 'retry <line> <machine>'], [['halt'], 'halt <line>'], [['resume'], 'resume <line>'], [['allow'], 'allow <request>'], [['deny'], 'deny <request>']] as const) {
         const r = await run(root, ...argv);
         expect(r.code, argv.join(' ')).toBe(1);
         expect(r.err).toContain(usage);
