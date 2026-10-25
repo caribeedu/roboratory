@@ -41,6 +41,11 @@ out({ type: 'result', subtype: 'success', is_error: false, result: 'done', struc
     expect((await runAgent(base())).error).toMatch(/error_max_turns: too many turns/);
   });
 
+  it('refuses an agent it has no adapter for, naming the ones it has', async () => {
+    const r = await runAgent(base({ agent: 'gemini' }));
+    expect(r.error).toBe('Unknown agent "gemini". Use claude or sim.');
+  });
+
   it('times out and kills the process', async () => {
     process.env.ROBORATORY_CLAUDE_BIN = fakeClaude(`setTimeout(() => {}, 10000);`);
     expect((await runAgent(base({ timeoutMs: 200 }))).error).toMatch(/timed out/);

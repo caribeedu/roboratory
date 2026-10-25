@@ -97,7 +97,7 @@ The CI (`.github/workflows/tests.yml`) runs the Vitest layers and the e2e suite 
 
 ## Layout
 
-- `src/core/`: the logic that runs in the engine process, free of Electron and tested with Vitest: the loader, the engine, agents, git, managers, the service, the socket server (`server.ts`) and its client (`client.ts`). `src/engine.ts` bundles the server and the command (`src/cli.ts`) into `engine.js`. `src/core/build/` is build mode (the draft, its edits, checks and sessions). `src/core/agents/` has one adapter per agent CLI (Claude Code, Codex, the simulated agent).
+- `src/core/`: the logic that runs in the engine process, free of Electron and tested with Vitest: the loader, the engine, agents, git, managers, the service, the socket server (`server.ts`) and its client (`client.ts`). `src/engine.ts` bundles the server and the command (`src/cli.ts`) into `engine.js`. `src/core/build/` is build mode (the draft, its edits, checks and sessions). `src/core/agents/` has one adapter per agent behind the `AgentRunner` port (Claude Code, the simulated agent; D45).
 - `src/shared/`: code and types used by both sides (layout, rule expressions, API types).
 - `src/app/`: the renderer: React panels, the PixiJS floor and its procedural sprites. `src/app/build/` holds build mode's panels.
 - `src/main.ts` and `src/preload.ts`: the Electron wiring. The main process holds an `EngineClient` and relays the interface's calls to the engine; it keeps no factory state.
@@ -114,7 +114,7 @@ The CI (`.github/workflows/tests.yml`) runs the Vitest layers and the e2e suite 
 
 ## Real agents cost money
 
-Tests, the demo and dry runs use `agent: sim`. Do not run a line with `agent: claude` or `codex`, or `e2e/tools/real-agent-check.mjs`, without a cost estimate and approval. To keep an unavoidable real call to cents, use `--model haiku --tools "" --strict-mcp-config --mcp-config '{"mcpServers":{}}'`.
+Tests, the demo and dry runs use `agent: sim`. Do not run a line with `agent: claude`, or `e2e/tools/real-agent-check.mjs`, without a cost estimate and approval. To keep an unavoidable real call to cents, use `--model haiku --tools "" --strict-mcp-config --mcp-config '{"mcpServers":{}}'`.
 
 ## Lessons about the agent CLIs
 
@@ -129,7 +129,7 @@ Tests, the demo and dry runs use `agent: sim`. Do not run a line with `agent: cl
 ## Platform notes
 
 - **Signals run through `sh`.** On Windows, install Git for Windows (or use WSL) and keep `sh` on `PATH`.
-- **Agent CLIs must be native executables on Windows** (for example `claude.exe`). A `.cmd` shim cannot receive multi-line arguments, so the adapters refuse it with a message. `ROBORATORY_CLAUDE_BIN` and `ROBORATORY_CODEX_BIN` point at a specific executable.
+- **Agent CLIs must be native executables on Windows** (for example `claude.exe`). A `.cmd` shim cannot receive multi-line arguments, so the adapters refuse it with a message. `ROBORATORY_CLAUDE_BIN` points at a specific executable.
 - **There is no executable bit on Windows.** Scripts written by build mode are marked executable on macOS and Linux only.
 - **A rebuilt app only takes effect after you quit the running one** (⌘Q on macOS): launching it again can bring the old process back. When the app is open it locks `out/`; build a copy with `ROBORATORY_OUT_DIR=<dir>`.
 - **Spawn with `windowsHide: true`, always.** The engine runs detached with no console, so on Windows any console program it starts (git, an agent CLI, `sh`) opens a visible terminal window unless it is hidden. This includes the tests' and e2e scripts' own spawns.

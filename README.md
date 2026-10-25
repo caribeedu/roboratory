@@ -53,7 +53,7 @@ A run starts when a work order enters at an **intake**, and every run follows th
 
 | Piece | Concept | What it is |
 |---|---|---|
-| **Machine** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/machine.png?v=2" height="56" alt=""> | One agent | Runs one headless agent (Claude Code or Codex) with a role and a contract. The step ends when the process exits. |
+| **Machine** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/machine.png?v=2" height="56" alt=""> | One agent | Runs one headless agent (Claude Code) with a role and a contract. The step ends when the process exits. |
 | **Box** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/box.png?v=2" height="56" alt=""> | Outcome | The output of a machine, validated against its contract. It is the unit of progress that travels along the line. |
 | **Belt** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/belt.png?v=2" height="56" alt=""> | Routing | Carries boxes from one piece to the next. A splitter belt routes each box by one of its fields; a return belt sends it back for rework. |
 | **Signal** <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/pieces/signal.png?v=2" height="56" alt=""> | Eval | A script that checks a box. Exit code 0 lets it pass; anything else stops the line. |
@@ -67,7 +67,7 @@ A run starts when a work order enters at an **intake**, and every run follows th
 
 ## What you can do today
 
-- **Run lines** with simulated, Claude Code or Codex agents, on target repositories with one git worktree per machine.
+- **Run lines** with simulated or Claude Code agents, on target repositories with one git worktree per machine.
 
   <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/line.png?v=2" alt="A line at work: an intake, machines, a signal, a gate and a pallet" width="900">
 
@@ -89,7 +89,7 @@ A run starts when a work order enters at an **intake**, and every run follows th
 
 ## Getting started
 
-**Requirements:** Node 22.12 or later and git. To run real agents you also need [Claude Code](https://claude.com/claude-code) or [Codex](https://github.com/openai/codex) installed and signed in. Roboratory runs on macOS, Windows and Linux; on Windows, signals run through `sh` (install Git for Windows) and agent CLIs must be native executables. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#platform-notes).
+**Requirements:** Node 22.12 or later and git. To run real agents you also need [Claude Code](https://claude.com/claude-code) installed and signed in. Roboratory runs on macOS, Windows and Linux; on Windows, signals run through `sh` (install Git for Windows) and agent CLIs must be native executables. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#platform-notes).
 
 ```sh
 npm ci
@@ -99,7 +99,7 @@ npm ci
 npm start
 ```
 
-Choose **Open the demo factory** on the welcome screen. It creates a factory in `~/Roboratory/Demo Factory` with three sectors and two demo target repositories. Its machines use the simulated agent, so it runs offline and costs nothing. To build or change lines, press **Build** on the Floor. To run a real agent, choose `claude` (or `codex`) as a machine's agent. **Real agents spend money**, so check a line with the simulated agent first.
+Choose **Open the demo factory** on the welcome screen. It creates a factory in `~/Roboratory/Demo Factory` with three sectors and two demo target repositories. Its machines use the simulated agent, so it runs offline and costs nothing. To build or change lines, press **Build** on the Floor. To run a real agent, choose `claude` as a machine's agent. **Real agents spend money**, so check a line with the simulated agent first.
 
 ## Documentation
 

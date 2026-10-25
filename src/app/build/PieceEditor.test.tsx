@@ -323,8 +323,8 @@ describe('A machine', () => {
   it('picks its agent, and says when it is the free simulated one', async () => {
     const { op, user } = await edit('build');
     expect(await screen.findByText('The simulated agent costs nothing.')).toBeInTheDocument();
-    await user.selectOptions(screen.getByLabelText('Agent'), 'codex');
-    expect(op).toHaveBeenCalledWith({ op: 'setMachine', lineId: LINE_ID, pieceId: 'build', conf: { agent: 'codex' } });
+    await user.selectOptions(screen.getByLabelText('Agent'), 'sim');
+    expect(op).toHaveBeenCalledWith({ op: 'setMachine', lineId: LINE_ID, pieceId: 'build', conf: { agent: 'sim' } });
   });
 
   it('warns that real agents cost money', async () => {

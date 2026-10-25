@@ -1,6 +1,6 @@
 // Writes a ready-to-run demo factory. Its machines use the simulated agent,
 // so the demo costs nothing and works offline. Swap `agent: sim` for
-// `agent: claude` (or codex) in any machine.yaml to run real agents.
+// `agent: claude` in any machine.yaml to run real agents.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';

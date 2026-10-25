@@ -50,6 +50,10 @@ export interface PieceDef {
   goal?: string;
 }
 
+/** The agents a machine or manager can use: one adapter each, behind the AgentRunner port (D45). */
+export const AGENTS = ['claude', 'sim'] as const;
+export type AgentName = (typeof AGENTS)[number];
+
 export interface MachineDef {
   name: string;
   /** folder the machine is defined in */

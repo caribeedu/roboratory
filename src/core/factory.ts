@@ -8,6 +8,7 @@ import { columnsAndLanes } from '../shared/layout';
 import type {
   Direction, FactoryDef, InputField, IntakeKind, LineDef, LineModel, LoadProblem, MachineDef, ManagerDef, Need, PieceDef, Policy, SectorDef,
 } from '../shared/types';
+import { AGENTS } from '../shared/types';
 import { diskFs, type Vfs } from './vfs';
 import { expandHome } from './paths';
 
@@ -54,10 +55,17 @@ function parsePolicy(v: unknown): Policy {
   return out;
 }
 
+/** An agent is one the app has an adapter for (D45); anything else is a structural problem, found when the factory loads. */
+function agentName(io: LoadIo, v: unknown, fallback: string, whose: string): string {
+  const name = str(v, fallback);
+  if (!(AGENTS as readonly string[]).includes(name)) problem(io, `${whose}: agent "${name}" is not one of ${AGENTS.join(', ')}`);
+  return name;
+}
+
 function parseManager(io: LoadIo, v: unknown, roleFile: string, fallbackAgent: string): ManagerDef {
   const o = isObj(v) ? v : {};
   return {
-    agent: str(o.agent, fallbackAgent),
+    agent: agentName(io, o.agent, fallbackAgent, roleFile),
     model: o.model ? str(o.model) : undefined,
     role: readText(io, roleFile, ''),
     tools: Array.isArray(o.tools) ? o.tools.map((t) => str(t)) : [],
@@ -108,7 +116,7 @@ function loadMachine(io: LoadIo, name: string, dirs: { dir: string; shared: bool
       effort: conf.effort ? str(conf.effort) : undefined,
       goal: conf.goal !== undefined && str(conf.goal).trim() ? str(conf.goal).trim() : undefined,
       contract,
-      agent: str(conf.agent, 'claude'),
+      agent: agentName(io, conf.agent, 'claude', `machine "${name}"`),
       model: conf.model ? str(conf.model) : undefined,
       attempts: Math.max(1, Number(conf.attempts ?? 3)),
       timeoutMs: parseDuration(conf.timeout, 10 * 60000),

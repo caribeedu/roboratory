@@ -159,8 +159,8 @@ describe('Factory settings', () => {
 
   it('configures the General Manager and the factory culture', async () => {
     const { op, user } = open(factory);
-    await user.selectOptions(await screen.findByLabelText('Manager agent'), 'codex');
-    expect(op).toHaveBeenLastCalledWith({ op: 'setFactory', generalManager: { agent: 'codex' } });
+    await user.selectOptions(await screen.findByLabelText('Manager agent'), 'sim');
+    expect(op).toHaveBeenLastCalledWith({ op: 'setFactory', generalManager: { agent: 'sim' } });
     await user.click(screen.getByRole('button', { name: /Culture/ }));
     const culture = await screen.findByLabelText('Factory culture');
     await user.type(culture, 'Be kind.');

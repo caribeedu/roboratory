@@ -42,7 +42,6 @@ The engine moves out of the app. It runs as its own process, one per factory, an
 ### Known limits
 - Build mode stays in the app; the command does not edit lines.
 - The permissions, the checkers that prove their work and the manager's investigations come next ([docs/ROADMAP.md](docs/ROADMAP.md)).
-- The Codex agent is exercised against a fake CLI, not yet against a real run.
 - The archives are not signed or notarized.
 
 ## v0.7.0
@@ -56,7 +55,7 @@ The first release. A factory is a git repository; Roboratory draws it as a pixel
 - **The demo factory** (three sectors, two demo target repositories) and the simulated agent (`agent: sim`) that runs it offline for free (D28).
 
 ### Lines
-- **Headless machines** (D8): Claude Code and Codex adapters, Ajv contract validation with an attempt budget, a fire when the attempts run out, and a retry with a hint.
+- **Headless machines** (D8): a Claude Code adapter, Ajv contract validation with an attempt budget, a fire when the attempts run out, and a retry with a hint.
 - **Chained git worktrees, one per machine,** on target repositories: a safety-net commit after each machine, and merges at joins where a conflict sets the next machine on fire (D10).
 - **Signals**: scripts that pass the box on exit code 0. A loading bar shows while one runs, and a signal can have its own time limit (D19).
 - **Gates**: human gates with optional confirmations (D16), decision gates with choices and a note (D17), and rule gates over box fields.

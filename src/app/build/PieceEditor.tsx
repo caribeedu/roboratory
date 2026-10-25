@@ -2,7 +2,7 @@
 import { useContext, useEffect, useState } from 'react';
 import YAML from 'yaml';
 import type { BuildOp, BuildView, FieldInfo, MachineConf } from '../../shared/build';
-import type { Snapshot } from '../../shared/types';
+import { AGENTS, type Snapshot } from '../../shared/types';
 import { Markdown } from '../Markdown';
 import { Head, Rule, Section } from '../panels/Inspector';
 import { api } from '../store';
@@ -239,7 +239,6 @@ function SignalForm({ view, line, piece, op }: { view: BuildView; line: Line; pi
 
 // ---------- machine ----------
 
-const AGENTS = ['claude', 'codex', 'sim'];
 const EFFORTS = ['', 'low', 'medium', 'high', 'xhigh', 'max'];
 
 function MachineForms({ view, line, piece, op }: { view: BuildView; line: Line; piece: Piece; op: Op }) {

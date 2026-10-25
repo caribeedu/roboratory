@@ -30,3 +30,9 @@ export interface AgentRequest {
 }
 
 export interface AgentResult { output?: unknown; text?: string; error?: string; costUsd?: number }
+
+/**
+ * The port the engine and the managers call (D45): one adapter per agent. What is specific to an agent's CLI
+ * (its command line, how it holds the answer to the contract, its stream, cost and MCP names) stays in the adapter.
+ */
+export interface AgentRunner { run(req: AgentRequest): Promise<AgentResult> }

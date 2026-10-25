@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import YAML from 'yaml';
 import type { BuildView, ManagerConf } from '../../shared/build';
-import type { Policy, Snapshot, VerbName } from '../../shared/types';
+import { AGENTS, type Policy, type Snapshot, type VerbName } from '../../shared/types';
 import { Head, Section } from '../panels/Inspector';
 import { api } from '../store';
 import { Commit, ListField, Row, slug, useDraftFile, useRefusal } from './forms';
@@ -85,7 +85,7 @@ function LineSettings({ view, line, op, onClose }: { view: BuildView; line?: Lin
 function ManagerForm({ value, onCommit }: { value: Record<string, unknown>; onCommit: (m: ManagerConf) => void }) {
   return (
     <>
-      <Row label="Agent"><select aria-label="Manager agent" value={String(value.agent ?? 'claude')} onChange={(e) => onCommit({ agent: e.target.value })}><option>claude</option><option>codex</option><option>sim</option></select></Row>
+      <Row label="Agent"><select aria-label="Manager agent" value={String(value.agent ?? 'claude')} onChange={(e) => onCommit({ agent: e.target.value })}>{AGENTS.map((a) => <option key={a}>{a}</option>)}</select></Row>
       <Row label="Model"><Commit label="Manager model" value={String(value.model ?? '')} placeholder="sonnet" onCommit={(v) => onCommit({ model: v || null })} /></Row>
       <Row label="Tools" hint="Read tools only: managers propose, you decide."><ListField label="Manager tools" value={Array.isArray(value.tools) ? value.tools.map(String) : []} onCommit={(tools) => onCommit({ tools })} /></Row>
     </>
