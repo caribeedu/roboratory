@@ -502,3 +502,52 @@ A rework drops the arrivals and skips that the last lap left downstream (D15).
 **Why:** the files are the product's contract with the people who write factories, so they are specified once and checked the same way everywhere.
 
 **Related:** D4 (the factory repository is the source of truth), D41 (build mode writes these files).
+
+# Measuring and rehearsing
+
+## D47. Metrics per piece version, calculated by the engine
+**Decision:**
+- **The version of a piece.** A piece is a machine in a line. Its version is a short hash (8 characters) of everything the agent is given that does not change from run to run: the whole role (with the factory's and the sector's culture and the shared roles), the contract, the model, the effort, `allow`, `deny`, `read_only`, `tools`, `dirs`, the attempts, the time limit and the line-context text (the piece's place and its neighbours' goals, D25). A change to any of them is a new version; a change to anything else in the factory is not. Each `piece.start` records it.
+- **What a run records.** The `cost` event carries the model and the tokens (input, output, cache) as well as the dollars, and every cost is shown as an estimate, since the agent CLI works the value out itself. There is no tolerance for runs written before: the calculation reads the current shape.
+- **One calculation, three outputs.** The engine answers a `stats` call, and three callers show it: the `roboratory stats` command (with `--json`, `--sector`, `--line`, `--since`, `--run` and `--all-versions`), a **Metrics** tab beside the Floor and the Ledger, and one line of history in a piece's panel. The Ledger answers what happened in a run; Metrics answers how a piece usually behaves.
+- **Rows and columns.** A row is a piece in a line, in one version, over all the runs of that version. By default only the current version (the one on disk, or in the draft in build mode); `--all-versions` and a selector in the tab add the earlier ones, each with when it was first seen and how many runs it has. Columns: cost, duration (median and longest), attempts, reworks, questions, blocks, fires, and permission requests (total, repeated, denied, the wait before an answer). A line has a total row. A piece with no runs of its current version says so and shows the version before it.
+- **Checkers are read from the line.** A checker is a piece with a return belt leaving it (D15), so no key marks it. A pass is **proved wrong** when, in the same run, it is followed by a rework sent by another checker, or by a question, a block or a fire at a piece further down.
+- **The repeated allows are the measure for permissions.** Over a run, the share of `allow` verbs that repeat a command already allowed in it is what decides whether an allowance wider than one call (D44) is worth designing. The threshold is set from real runs, not before them.
+
+**Alternatives:**
+- Grouping by the factory's commit (it changes with any edit, and a dirty tree has no commit); by the machine's name only (it mixes the behavior of different roles into an average that describes none).
+- A key that marks checkers (the line already says it).
+- A price table to turn tokens into dollars (it ages, and it is a list inside the app).
+- Metrics only in the command (the product is meant to be seen, and information on the screen is the third problem of the assessment).
+
+**Why:** the assessment found that the flow is deterministic and its quality is not, and a checker's pass looks the same whether it verified everything or nothing. Quality has to be measured per version of a piece before checkers are changed (v0.11), or the change cannot be judged.
+
+**Related:** D5 and D30 (the runtime files and the audit are the data), D15 (return belts), D18 (checkers), D25 (the context that belongs to the version), D40 (the Ledger), D43 (the engine is where the calculation lives), D44 (permission requests).
+
+## D48. The rehearsal
+**Decision:**
+- **What it is.** `roboratory rehearse <line>`, or the **Rehearse** button in build mode, runs a line once on a copy of the factory with nobody to answer, to find defects of roles and permissions for cents. It finds defects of roles, permissions and wiring, not of quality.
+- **Two modes.** **Real** runs the Claude machines with Haiku and a low effort, with the real roles, contracts and lists; machines whose agent is `sim` stay as they are. **Simulation** (`--simulation`) is free: every agent becomes the simulated one, signals become `true` and gates release themselves, as the dry run of `e2e/tools/factory-sim-check.mjs` did. That script goes, and the dry run in the end-to-end suite uses the command.
+- **Signals run for real in the Real mode,** in the copy, after a confirmation that lists each command that will run; `--skip-signals` makes them `true`.
+- **What acts outside.** A machine may list, in `outward:` in its `machine.yaml`, the commands and tools of its own that act outside the machine (`git push`, `gh pr create`, `mcp__slack__post`). In a normal run the key does nothing. In a rehearsal each item is refused. What the machine has in `allow` or `tools` and does not list there runs for real, and the confirmation shows the list. The key is optional, and adding it does not change `schema_version`: D46 gives a changed format the next number, and this one key is the exception, decided here. It sets no rule for later keys, each of which is decided on its own.
+- **Nobody answers.** A permission request that the lists do not cover is denied with "rehearsal: nobody answers". A question of a machine is answered with its own recommendation, or its first option. A gate releases on the first choice that is not a rework. Each of these is recorded.
+- **Findings.** Every event of the rehearsal that says something about the factory is a finding, in one of two classes. A **defect** is a fire, a contract that ran out of attempts, a block, a rework that ran out of laps, and a request for a command that no list covers. A **note** is a question, a gate released for it, an `outward` item held back, and a rework within its limit. Only defects make the command exit with 1. Each finding names the piece, what happened and where to look (`role.md`, `allow`, the contract).
+- **A finding is not stored.** It is calculated by each rehearsal from the copy's run. Agreeing with one means changing the files; the next rehearsal shows whether it is gone. There is no way to dismiss a finding: "this is fine" is a decision about the factory, and the factory is the files. The two ways to say it are in the files: fix the cause, or list the command in `outward`. In the window, a finding of an uncovered command offers both as buttons that edit the draft (which can be undone): **Allow it** adds the command to the machine's `allow`, and **It acts outside** adds it to `outward`. When a piece's version changes after a rehearsal, its findings stay but are marked as from an earlier version.
+- **A copy, and a report.** The rehearsal works on a copy of the factory in a temporary folder, with the target repositories cloned locally, so neither the factory nor the repositories change; `--keep` keeps the copy. The report goes to the terminal, one line per piece and the findings, and to `.runs/rehearsals/<id>/report.json` in the factory (runtime, outside git). Rehearsal runs are not in the Ledger or in the metrics. A list of earlier rehearsals is not built yet.
+- **The budget.** `--max-cost` (US$ 1.00 by default) is a ceiling the engine enforces for any run it is given: once the cost passes it, no new step is dispatched, and the ones running finish. Before it spends, the rehearsal shows what will run, the models, the signals' commands, the `outward` items and the ceiling, with the median cost of a real run of the line as a reference when there is one, and waits for a yes (`--yes` skips it). In the window, that confirmation is the dialog, and in Simulation the ceiling is off.
+- **The window.** In build mode, the line's settings have a **Rehearse** button. The dialog asks for the line's inputs, the mode and the ceiling, lists what will run, and shows the progress piece by piece and then the findings; picking one selects the piece on the Floor. After it closes, the pieces with findings carry a mark on the Floor, the button shows the number of findings, and the piece's panel has a "Rehearsal" section. It rehearses the draft, saved or not.
+- **A verb.** `rehearse` is audited like every verb (D30), as you, from the app or the command. It is never automatic and a manager cannot propose it, since it spends money.
+- **Where it lives.** The service prepares the copy, from the disk or from the draft (`Draft.export`), and `Rehearsal.run(folder)` runs it on a second engine in the same process, pushing its progress as events to the client. The rehearsal does not know about drafts; it is given a folder it may use up. A stop button ends it.
+
+**Alternatives:**
+- A process of its own for each rehearsal (an engine per rehearsal, with its own lock and socket, to carry what is already in this process).
+- A list of outward commands inside the app (a list in the app is what D44 decided against), or the rehearsal refusing every `allow` entry (it would hide the role-and-list mismatches the rehearsal exists to find).
+- A way to dismiss a finding in the app (it would keep, outside the repository, a decision about the factory).
+- A price table to estimate the cost (D47).
+- Listing rehearsals in the Ledger (it is not work, and it would pollute the metrics).
+- Real signals replaced always by `true` (a wrong path or command in a signal is a defect the rehearsal should find).
+- A button outside build mode (the point of the button is to try a change before saving it; outside build mode there is the command).
+
+**Why:** a real run costs real money and only a real run found the defects of the first one: an ambiguous role, a command the list did not cover, a wrong plan. The rehearsal finds the first two for cents, and the metrics (D47) say whether the third is getting better.
+
+**Related:** D4 and D5 (the factory is the files, and the app never writes its git), D8 (headless machines), D28 (the simulated agent), D30 (verbs), D41 (build mode and its draft), D43 (the engine and its calls), D44 (requests and the lists), D46 (the formats), D47.
