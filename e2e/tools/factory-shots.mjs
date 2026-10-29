@@ -2,12 +2,40 @@
 // return belts and questions. Usage: node e2e/tools/factory-shots.mjs <factory-dir> <out-dir>
 import { appExecutable } from './exe.mjs';
 import { _electron as electron } from 'playwright';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const root = execFileSync('node', ['e2e/tools/factory-sim-check.mjs', process.argv[2], '--prepare-only']).toString().trim();
+/** A copy of a factory in which every agent is the simulated one and every signal passes, to take pictures of without spending anything. */
+function simulatedCopy(src) {
+  src = path.resolve(src);
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'factory-shots-'));
+  const copy = path.join(tmp, 'factory');
+  fs.cpSync(src, copy, { recursive: true, filter: (p) => !p.includes(`${path.sep}.runs`) });
+  // lines point at target repositories next to the factory (../repos/<name>), so those come along
+  for (const name of ['repos', 'demo-repos']) {
+    const repos = path.join(path.dirname(src), name);
+    if (fs.existsSync(repos)) fs.cpSync(repos, path.join(tmp, name), { recursive: true });
+  }
+  const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
+  for (const f of walk(copy)) {
+    if (f.endsWith('machine.yaml')) {
+      const contract = JSON.parse(fs.readFileSync(path.join(path.dirname(f), 'contract.json'), 'utf8'));
+      const props = contract.properties ?? {};
+      const sample = (k, s) => (s.enum ? s.enum[0] : s.type === 'array' ? [] : s.type === 'boolean' ? true : s.type === 'integer' || s.type === 'number' ? 1 : s.type === 'object' ? {} : s.pattern ? 'https://github.com/acme-corp/demo/pull/1' : `${k} (simulated)`);
+      const out = Object.fromEntries(Object.entries(props).map(([k, s]) => [k, sample(k, s)]));
+      const lines = ['schema_version: 1', 'agent: sim', 'attempts: 2', 'sim:', '  seconds: 1'];
+      if (props.verdict) lines.push('  outputs:', `    - ${JSON.stringify({ ...out, verdict: 'fail', top_finding: 'simulated finding' })}`, `    - ${JSON.stringify({ ...out, verdict: 'pass' })}`);
+      else lines.push(`  output: ${JSON.stringify(out)}`);
+      fs.writeFileSync(f, lines.join('\n') + '\n');
+    }
+    if (f.endsWith('line.yaml')) fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace(/signal: \{ run: "[^"]*"[^}]*\}/g, 'signal: { run: "true" }'));
+  }
+  for (const f of walk(copy)) if (f.endsWith('sector.yaml') || f.endsWith('factory.yaml')) fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace(/agent: claude/g, 'agent: sim'));
+  return copy;
+}
+
+const root = simulatedCopy(process.argv[2]);
 const out = process.argv[3]; fs.mkdirSync(out, { recursive: true });
 const app = await electron.launch({ executablePath: appExecutable(), env: { ...process.env, ROBORATORY_USER_DATA: fs.mkdtempSync(path.join(os.tmpdir(), 'ud-')), ROBORATORY_SIM_SPEED: '3' } });
 const win = await app.firstWindow();
