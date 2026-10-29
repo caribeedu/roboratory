@@ -955,12 +955,21 @@ export class Engine extends EventEmitter {
 
   runSummaries(): RunSummary[] { return [...this.runs.values()].map((r) => r.summary).sort((a, b) => b.startedAt - a.startedAt); }
 
+  /** A run's events. The metrics read every run on each call, so a run file is parsed again only when it has changed. */
   runEvents(runId: string): Record<string, unknown>[] {
     const run = this.runs.get(runId);
     if (!run) return [];
     const file = path.join(run.dir, 'run.jsonl');
-    return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
+    let st: fs.Stats;
+    try { st = fs.statSync(file); } catch { return []; }
+    const key = `${st.mtimeMs}:${st.size}`;
+    const hit = this.eventCache.get(file);
+    if (hit?.key === key) return hit.events;
+    const events = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+    this.eventCache.set(file, { key, events });
+    return events;
   }
+  private eventCache = new Map<string, { key: string; events: Record<string, unknown>[] }>();
 
   runDiff(runId: string): string | undefined {
     const run = this.runs.get(runId);

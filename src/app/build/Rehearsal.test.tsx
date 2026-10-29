@@ -11,7 +11,7 @@ const factory = makeFactory();
 const plan = (over: Partial<RehearsalPlan> = {}): RehearsalPlan => ({
   lineId: LINE_ID, lineName: 'orders-api releases', mode: 'simulation', source: 'draft',
   inputs: [{ name: 'tag', label: 'Release tag', required: true, placeholder: 'v1.2.3' }],
-  machines: [{ pieceId: 'build', label: 'Build', agent: 'sim', allow: ['npm test'], tools: [], outward: ['git push'] }],
+  machines: [{ pieceId: 'build', label: 'Build', agent: 'sim', allow: ['npm test'], tools: [], outward: ['git push'], dirs: ['/repos/shared'] }],
   signals: [{ pieceId: 'checks', label: 'Checks', command: 'make test', runs: false }, { pieceId: 'lint', label: 'Lint', command: 'make lint', runs: true }],
   ...over,
 });
@@ -25,7 +25,7 @@ let op: ReturnType<typeof vi.fn>;
 async function open(o: { plan?: RehearsalPlan | ((req: unknown) => RehearsalPlan); result?: RehearsalReport | Error } = {}) {
   const planFor = o.plan ?? plan();
   bridge = installBridge({
-    rehearsalPlan: vi.fn(async (req: unknown) => (typeof planFor === 'function' ? planFor(req) : planFor)),
+    rehearsalPlan: vi.fn(async (req: { mode: 'real' | 'simulation' }) => (typeof planFor === 'function' ? planFor(req) : { ...planFor, mode: req.mode })),
     rehearse: vi.fn(async () => { if (o.result instanceof Error) throw o.result; return o.result ?? report([]); }),
     rehearsalStop: vi.fn(async () => {}),
   });

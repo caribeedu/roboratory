@@ -272,7 +272,7 @@ describe('The plan shown before it spends', () => {
     });
     const f = loadFactory(b.root);
     const real = planOf(f, req({ mode: 'real', maxCostUsd: 2 }), { runs: 3, medianUsd: 1.5 });
-    expect(real.machines).toEqual([{ pieceId: 'a', label: 'A', agent: 'claude', model: 'haiku', allow: expect.arrayContaining(['npm test']), tools: [], outward: ['git push'] }]);
+    expect(real.machines).toEqual([{ pieceId: 'a', label: 'A', agent: 'claude', model: 'haiku', allow: expect.arrayContaining(['npm test']), tools: [], outward: ['git push'], dirs: [] }]);
     expect(real.signals).toEqual([{ pieceId: 'check', label: 'Check', command: 'make test', runs: true }]);
     expect(real).toMatchObject({ maxCostUsd: 2, reference: { runs: 3, medianUsd: 1.5 }, lineName: expect.any(String) });
     const free = planOf(f, req({ mode: 'simulation', maxCostUsd: 2 }));

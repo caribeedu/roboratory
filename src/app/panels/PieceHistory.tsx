@@ -1,5 +1,5 @@
 // One line in a machine's panel: what this version of the piece usually costs and takes (D47).
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PieceStats } from '../../shared/types';
 import { duration, money } from '../../shared/statsview';
 import { api } from '../store';
@@ -7,8 +7,12 @@ import { api } from '../store';
 /** `draft`: the version is the one in the build-mode draft. `rev` makes it read again when the draft or the runs change. */
 export function PieceHistory({ lineId, pieceId, draft = false, rev }: { lineId: string; pieceId: string; draft?: boolean; rev?: unknown }) {
   const [piece, setPiece] = useState<PieceStats | null | undefined>(undefined);
+  const shown = useRef('');
   useEffect(() => {
     let alive = true;
+    // another piece must not show the figures of the one before while it loads
+    const key = `${lineId}:${pieceId}`;
+    if (shown.current !== key) { shown.current = key; setPiece(undefined); }
     void api().stats({ lineId, draft, allVersions: true }).then(
       (s) => { if (alive) setPiece(s?.lines?.find((l) => l.lineId === lineId)?.pieces.find((p) => p.pieceId === pieceId) ?? null); },
       () => { if (alive) setPiece(null); },

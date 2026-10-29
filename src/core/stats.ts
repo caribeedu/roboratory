@@ -41,13 +41,22 @@ function visitsOf(line: LineDef, events: Event[]): Map<string, Visit> {
   const visits = new Map<string, Visit>();
   const version = new Map<string, string>(); // the version each piece last started in
   const open = new Map<string, number>(); // when its current span of work began
+  const lastSeen = new Map<string, number>(); // the last thing recorded about a piece
   const allowed = new Set<string>(); // commands allowed so far in the run
   const at = (piece: string) => { const v = version.get(piece); return v ? visits.get(`${piece}@${v}`) : undefined; };
 
   events.forEach((e, i) => {
+    if (e.piece && e.type !== 'piece.start') lastSeen.set(e.piece, e.t);
     switch (e.type) {
       case 'piece.start': {
         if (!e.version) break; // a signal, which has no version
+        // a first attempt while a span is open: the engine closed in between and the step was started again, so the span ends where the record does
+        const t0 = open.get(e.piece);
+        if (t0 !== undefined && (e.attempt ?? 1) <= 1) {
+          const gone = at(e.piece);
+          if (gone) gone.durationMs += Math.max(0, (lastSeen.get(e.piece) ?? t0) - t0);
+          open.delete(e.piece);
+        }
         version.set(e.piece, e.version);
         const key = `${e.piece}@${e.version}`;
         let v = visits.get(key);

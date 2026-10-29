@@ -21,6 +21,20 @@ const loop = line(
 );
 
 describe('Metrics', () => {
+  it('ends the time of a step an engine restart interrupted where its record ends, not when it was started again', () => {
+    const b = buildFactory(line('  - { id: a, machine: a }'), { a: simMachine() });
+    const version = pieceVersion(b.f, b.f.sectors[0].lines[0], 'a');
+    const events = [
+      { t: 1000, type: 'piece.start', piece: 'a', attempt: 1, version },
+      { t: 2000, type: 'cost', piece: 'a', usd: 0 },
+      // the engine closed here; the step was started again a long time later
+      { t: 100_000, type: 'piece.start', piece: 'a', attempt: 1, version },
+      { t: 103_000, type: 'piece.done', piece: 'a' },
+    ] as never[];
+    const s = computeStats(b.f, [{ summary: { id: 'r', lineId: LINE, startedAt: 0 } as never, events }]);
+    expect(row(s, 'a')).toMatchObject({ attempts: { mean: 2 }, duration: { median: 4000 } });
+  });
+
   it('counts the attempts, the rework and the passes of a line that sent work back once', async () => {
     const b = buildFactory(loop, { dev: simMachine({ output: { built: true } }), qa: checker(['fail', 'pass']) });
     const e = startEngine(b.f);

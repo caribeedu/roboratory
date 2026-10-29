@@ -239,7 +239,7 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
     rehearse: (c: net.Socket, req: Parameters<FactoryService['rehearse']>[0]) => {
       const stop = () => service.rehearsalStop();
       c.once('close', stop);
-      return service.rehearse(req).finally(() => c.off('close', stop));
+      return service.rehearse(req).finally(() => { c.off('close', stop); drained(); });
     },
     // a stream of what is worth acting on, for `roboratory watch`
     watch: (c: net.Socket) => { watchers.add(c); return true; },
@@ -304,7 +304,7 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
   });
 
   // deferred so the reply to the call that caused it is written first
-  function drained() { setImmediate(() => { if (restarting && !closed && (service.engine?.runningCount() ?? 0) === 0) void close(); }); }
+  function drained() { setImmediate(() => { if (restarting && !closed && (service.engine?.runningCount() ?? 0) === 0 && !service.rehearsalRunning) void close(); }); }
   service.engine?.on('change', drained);
 
   // ends by itself once nothing is running and nobody is connected

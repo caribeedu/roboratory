@@ -18,6 +18,7 @@ You can now see how each piece of a line behaves over its runs, and try a line b
 - **Rehearse in build mode.** The Rehearse button in the line's settings shows what will run and the cost ceiling, then the findings, which mark the pieces on the Floor and appear in their panels. **Allow it** and **It acts outside** answer a finding in the draft.
 - **`outward:` in `machine.yaml`.** Commands that act outside the factory; the rehearsal removes them from the machine's tools.
 - **A cost ceiling.** `--max-cost` (US$ 1.00 by default): once an engine has spent it, no new step starts and the running ones finish. A real rehearsal is refused without one, and it ends with the connection that asked for it (Ctrl-C in the command).
+- **Folders it cannot replace.** The `dirs` of a machine are listed in what will run, since the copy does not stand in for them.
 - **The copy cannot push.** The cloned repository has no `origin`, so a machine allowed to `git push` cannot reach the real one.
 - **`rehearse` is a verb:** audited, never automatic and not proposable by a manager.
 

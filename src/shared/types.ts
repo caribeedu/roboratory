@@ -403,7 +403,7 @@ export interface RehearsalPlan {
   mode: RehearsalMode;
   source: 'disk' | 'draft';
   inputs: { name: string; label?: string; required: boolean; placeholder?: string; multiline?: boolean }[];
-  machines: { pieceId: string; label: string; agent: string; /** the model it will run with */ model?: string; allow: string[]; tools: string[]; outward: string[] }[];
+  machines: { pieceId: string; label: string; agent: string; /** the model it will run with */ model?: string; allow: string[]; tools: string[]; outward: string[]; /** folders outside the copy that the machine may reach; the copy does not replace them */ dirs: string[] }[];
   signals: { pieceId: string; label: string; command: string; runs: boolean }[];
   maxCostUsd?: number;
   /** what a real run of this line has cost, as a median of the runs there are */

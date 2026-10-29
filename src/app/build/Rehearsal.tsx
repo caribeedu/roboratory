@@ -154,6 +154,7 @@ export function RehearsalDialog({ lineId, factory, op, onClose, onReport, onPiec
                   {plan.machines.map((m) => (
                     <li key={m.pieceId}><b>{m.label}</b>: {m.agent}{m.model ? ` (${m.model})` : ''}{m.allow.length ? `, allowed ${m.allow.join(', ')}` : ''}
                       {m.outward.length > 0 && <div className="small muted">refused, because it acts outside: {m.outward.join(', ')}</div>}
+                      {m.dirs.length > 0 && <div className="small muted">can reach these folders, which the copy does not replace: {m.dirs.join(', ')}</div>}
                     </li>
                   ))}
                   {plan.signals.map((s) => <li key={s.pieceId}><b>{s.label}</b>: {s.runs ? <>runs <code>{s.command}</code> for real, in the copy</> : 'passes without running'}</li>)}
@@ -162,7 +163,7 @@ export function RehearsalDialog({ lineId, factory, op, onClose, onReport, onPiec
               </div>
             )}
             <div className="actions">
-              <button className="btn primary" disabled={!plan || !ceilingOk || missing.length > 0} onClick={() => void start()}>
+              <button className="btn primary" disabled={!plan || plan.mode !== mode || !ceilingOk || missing.length > 0} onClick={() => void start()}>
                 {mode === 'simulation' ? 'Start (free)' : `Start (spends up to US$ ${Number(ceiling || 0).toFixed(2)})`}
               </button>
               <button className="btn ghost" onClick={onClose}>Close</button>

@@ -70,6 +70,14 @@ describe('A rehearsal asked of the engine', () => {
     svc.close();
   });
 
+  it('ends a rehearsal that is running when the factory is closed', async () => {
+    const { svc } = open(line('  - { id: a, machine: a }'), { a: simMachine({ seconds: 600 }) });
+    const running = svc.rehearse(req({ mode: 'real', approved: true, maxCostUsd: 0.5 }));
+    await until(() => svc.rehearsalRunning);
+    svc.close();
+    expect((await running).status).toBe('aborted');
+  });
+
   it('runs one at a time, and a stop ends the one that runs', async () => {
     const { svc } = open(line('  - { id: a, machine: a }'), { a: simMachine({ seconds: 600 }) });
     const first = svc.rehearse(req({ mode: 'real', approved: true, maxCostUsd: 0.5 }));

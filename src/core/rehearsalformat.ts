@@ -8,6 +8,7 @@ export function formatPlan(p: RehearsalPlan): string {
   for (const m of p.machines) {
     out.push(`  ${m.label}: ${m.agent}${m.model ? ` (${m.model})` : ''}${m.allow.length ? `, allowed ${m.allow.join(', ')}` : ''}${m.tools.length ? `, tools ${m.tools.join(', ')}` : ''}`);
     if (m.outward.length) out.push(`    refused, because it acts outside: ${m.outward.join(', ')}`);
+    if (m.dirs.length) out.push(`    can reach these folders, which the copy does not replace: ${m.dirs.join(', ')}`);
   }
   if (p.signals.length) {
     out.push('', 'Signals:');

@@ -90,6 +90,7 @@ export class FactoryService {
   }
 
   close() {
+    this.rehearsing?.stop.abort(); // it spends money and its copy is a temporary folder: it does not outlive the factory it was asked of
     this.session = null;
     this.out.build?.(null);
     this.watcher?.close();

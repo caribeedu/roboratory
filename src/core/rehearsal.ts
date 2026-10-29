@@ -107,7 +107,7 @@ export function planOf(f: FactoryDef, req: RehearsalRequest, reference?: Rehears
     inputs: line.model.intake.inputs.map((i) => ({ name: i.name, label: i.label, required: !!i.required, placeholder: i.placeholder, multiline: i.multiline })),
     machines: line.model.pieces.filter((p) => p.machine).map((p) => {
       const m = line.model.machines[p.machine!];
-      return { pieceId: p.id, label: p.label, agent: m.agent, model: m.model, allow: m.allow, tools: m.tools, outward: original.model.machines[p.machine!].outward };
+      return { pieceId: p.id, label: p.label, agent: m.agent, model: m.model, allow: m.allow, tools: m.tools, outward: original.model.machines[p.machine!].outward, dirs: m.dirs };
     }),
     signals: original.model.pieces.filter((p) => p.kind === 'signal').map((p) => ({ pieceId: p.id, label: p.label, command: p.run ?? '', runs: !(req.mode === 'simulation' || req.skipSignals) })),
     maxCostUsd: req.mode === 'real' ? req.maxCostUsd : undefined,
