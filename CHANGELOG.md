@@ -16,8 +16,8 @@ You can now see how each piece of a line behaves over its runs, and try a line b
 - **Try a line before a real run.** It runs once on a copy, with nobody to answer: *Real with Haiku* keeps the real roles, contracts, lists and signals on a cheap model; *Simulation* is free and finds shape defects. A command no list covers is denied and reported, a question is answered with its recommendation, a gate is released on the first choice that does not send work back.
 - **Findings** are defects (a fire, a command no list covers, a block) or notes (a question asked, an action held back). `roboratory rehearse` exits 1 on defects; the report is under `.runs/rehearsals/<id>/`.
 - **Rehearse in build mode.** The Rehearse button in the line's settings shows what will run and the cost ceiling, then the findings, which mark the pieces on the Floor and appear in their panels. **Allow it** and **It acts outside** answer a finding in the draft.
-- **`outward:` in `machine.yaml`.** Commands that act outside the factory; the rehearsal removes them from the machine's tools.
-- **A cost ceiling.** `--max-cost` (US$ 1.00 by default): once an engine has spent it, no new step starts and the running ones finish. A real rehearsal is refused without one, and it ends with the connection that asked for it (Ctrl-C in the command).
+- **`outward:` in `machine.yaml`.** Commands and tools that act outside the factory; the rehearsal refuses the commands and takes the tools away. A machine's version does not include it.
+- **A cost ceiling.** `--max-cost` (US$ 1.00 by default): once an engine has spent it, no new step starts and the running ones finish. A real rehearsal is refused without one.
 - **Folders it cannot replace.** The `dirs` of a machine are listed in what will run, since the copy does not stand in for them.
 - **A rehearsal ends with whoever asked.** Stop, Ctrl-C in the command, leaving build mode, a closed connection or a closed factory end it; only the connection that started it ends it, and no retry of a step starts after that or after the ceiling. A real rehearsal of a line whose repository is not a git repository is an error; the simulation goes on without it.
 - **The copy cannot push.** The cloned repository has no `origin`, so a machine allowed to `git push` cannot reach the real one.
@@ -27,6 +27,7 @@ You can now see how each piece of a line behaves over its runs, and try a line b
 - **On Windows, Claude Code's PowerShell tool walked around the engine's list.** A machine whose commands the engine decides is no longer given that tool, so every shell command goes through Bash and is read by the engine (D44).
 
 ### Tests
+- **The suite covers the new areas at each layer:** the calculation and the command (`stats`), the rehearsal in the engine and through the process, the dialog, and two end-to-end specs (`metrics`, `rehearsal`).
 - **Rehearsal in simulation replaces `e2e/tools/factory-sim-check.mjs`.** The end-to-end specs use `rehearse --simulation`.
 
 ### Upgrading
@@ -70,7 +71,7 @@ A machine now asks before it runs a command outside its list, and what the facto
 
 ### Known limits
 - **The engine reads commands, not what they do.** A script a listed program runs, and the read-only commands Claude Code allows by itself, are out of its reach, and `read_only` is not a sandbox. With an open shell (`Bash` in `allow`) the denials are a best effort. A flag spelled another way is another word (list `git push -f` as well as `git push --force`). Containers would close this (docs/ROADMAP.md §3).
-- **A permission is for one call.** Whether a wider allowance is worth having is measured first (docs/ROADMAP.md, v0.10).
+- **A permission is for one call.** Whether a wider allowance is worth having is measured by the Metrics tab of v0.10 (repeated allows per line).
 - **The checkers that prove their work and the manager's investigations come next** (docs/ROADMAP.md).
 - The archives are not signed or notarized.
 
