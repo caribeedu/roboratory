@@ -71,6 +71,8 @@ const NEEDS_HUMAN = {
 
 export interface EngineOptions {
   beltMs?: number; now?: () => number; signalTimeoutMs?: number;
+  /** a ceiling on what the runs of this engine may cost (D48): once their cost passes it, no new step starts and the ones running finish */
+  maxCostUsd?: number;
   /** how to start `roboratory permission-tool`, for agents that ask through a tool of their own (D44) */
   permissionTool?: PermissionAccess['tool'];
 }
@@ -101,6 +103,9 @@ export class Engine extends EventEmitter {
   private seq = 0;
   private simFailed = new Set<string>();
   private paused = false;
+  private maxCostUsd?: number;
+  private spent = 0;
+  private overBudget = false;
   private permissionTool?: PermissionAccess['tool'];
   /** the permission requests of the machines running now, by the session each one was started with */
   private sessions = new Map<string, (call: PermissionCall, gone?: AbortSignal) => Promise<PermissionDecision>>();
@@ -115,6 +120,7 @@ export class Engine extends EventEmitter {
     this.now = opts.now ?? Date.now;
     this.signalTimeoutMs = opts.signalTimeoutMs ?? 10 * 60000;
     this.permissionTool = opts.permissionTool;
+    this.maxCostUsd = opts.maxCostUsd;
     for (const s of factory.sectors) for (const l of s.lines) this.lines.set(l.id, this.makeLine(l));
   }
 
@@ -603,6 +609,8 @@ export class Engine extends EventEmitter {
     if (line.halted || p.current || !p.queue.length) return;
     // while the engine waits to restart (D43), nothing new starts; gates still take boxes, they run no process
     if (this.paused && p.def.kind !== 'gate') return;
+    // past the cost ceiling (D48) nothing new starts either
+    if (this.overBudget && p.def.kind !== 'gate') return;
     const work = p.queue.shift()!;
     const run = this.runs.get(work.runId);
     if (!run) return;
@@ -744,6 +752,7 @@ export class Engine extends EventEmitter {
         this.settleAsks(run.summary.id, def.id, 'The machine stopped before an answer came.');
       }
       p.abort = undefined;
+      if (res.costUsd !== undefined) this.spend(run, def.label, res.costUsd);
       if (res.costUsd !== undefined) this.record(run, { type: 'cost', piece: def.id, usd: res.costUsd, model: res.model ?? machine.model ?? machine.agent, tokens: res.tokens ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } });
       // whatever came back (an answer, a question, a block, an error) is about an input that has since been replaced
       if (this.staleInput(run, w, def.id)) { this.dropStale(line, run, p); return; }
@@ -898,6 +907,21 @@ export class Engine extends EventEmitter {
       items.push({ id: `${a.lineId}#${a.pieceId}!${a.id}`, requestId: a.id, severity: 3, kind: 'permission', sectorId: l.def.sectorId, lineId: a.lineId, pieceId: a.pieceId, runId: a.runId, since: a.since, title: `${l.pieces.get(a.pieceId)!.def.label} asks to run a command`, detail: `${l.def.name} · ${a.summary}` });
     }
     return items.sort((a, b) => b.severity - a.severity || a.since - b.since);
+  }
+
+  /** What the runs of this engine have cost so far, as the agents report it (estimates). */
+  get costSoFar() { return this.spent; }
+
+  /** Whether the cost ceiling stopped new work. */
+  get costCeilingHit() { return this.overBudget; }
+
+  private spend(run: RunRt, label: string, usd: number) {
+    this.spent += usd;
+    if (this.maxCostUsd === undefined || this.overBudget || this.spent < this.maxCostUsd) return;
+    this.overBudget = true;
+    this.log({ level: 'factory', sectorId: run.line.sectorId, lineId: run.line.id, runId: run.summary.id, kind: 'warn', text: `${label}: the cost ceiling of US$ ${this.maxCostUsd.toFixed(2)} is reached (US$ ${this.spent.toFixed(2)} so far); no new step starts, and the ones running finish` });
+    this.emit('budget', this.spent);
+    this.changed();
   }
 
   /** Stops starting machines and signals; the ones running finish. Queued work is rebuilt from the run files after a restart. */
