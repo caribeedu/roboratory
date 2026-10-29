@@ -13,11 +13,12 @@ import { Minimap } from './panels/Minimap';
 import { LiveLog } from './panels/LiveLog';
 import { Megaphone } from './panels/Megaphone';
 import { Ledger } from './panels/Ledger';
+import { Metrics } from './panels/Metrics';
 import { Welcome } from './panels/Welcome';
 import { api, chirp, errText, useRoboratory } from './store';
 import logo from '../../assets/logo-64.png';
 
-export type View = 'floor' | 'ledger';
+export type View = 'floor' | 'ledger' | 'metrics';
 
 export function App() {
   const { snapshot, logs, recent, demoPath, msgTick, refreshRecent, engine, cli } = useRoboratory();
@@ -142,6 +143,7 @@ export function App() {
       if (e.key === 'n') nextAttention();
       if (e.key === '1') setView('floor');
       if (e.key === '2') { if (build) leaveBuild('Save or discard your build changes to open the Ledger.', () => setView('ledger')); else setView('ledger'); }
+      if (e.key === '3') { if (build) leaveBuild('Save or discard your build changes to open Metrics.', () => setView('metrics')); else setView('metrics'); }
       if (e.key === '/') { e.preventDefault(); document.getElementById('megaphone-input')?.focus(); }
     };
     window.addEventListener('keydown', h);
@@ -188,6 +190,7 @@ export function App() {
         <nav className="views" role="tablist" aria-label="Views">
           <button role="tab" aria-selected={view === 'floor'} onClick={() => setView('floor')}>Floor <kbd>1</kbd></button>
           <button role="tab" aria-selected={view === 'ledger'} onClick={() => (build ? leaveBuild('Save or discard your build changes to open the Ledger.', () => setView('ledger')) : setView('ledger'))}>Ledger <kbd>2</kbd></button>
+          <button role="tab" aria-selected={view === 'metrics'} onClick={() => (build ? leaveBuild('Save or discard your build changes to open Metrics.', () => setView('metrics')) : setView('metrics'))}>Metrics <kbd>3</kbd></button>
         </nav>
         <div className="topbar-right">
           {factory.warnings.length > 0 && (
@@ -286,6 +289,7 @@ export function App() {
         </main>
       )}
       {view === 'ledger' && <Ledger factory={factory} runId={ledgerRun} onRun={setLedgerRun} notify={notify} onPiece={goTo} />}
+      {view === 'metrics' && <Metrics factory={factory} onPiece={goTo} />}
 
       {build && saving && (
         <SaveDialog view={build} reason={saving.reason} onClose={() => setSaving(null)}

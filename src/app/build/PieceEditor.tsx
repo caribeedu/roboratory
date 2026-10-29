@@ -7,6 +7,7 @@ import { Markdown } from '../Markdown';
 import { Head, Rule, Section } from '../panels/Inspector';
 import { api } from '../store';
 import { Commit, DraftRev, GoalField, ListField, Row, useDraftFile, useRefusal } from './forms';
+import { PieceHistory } from '../panels/PieceHistory';
 import { RuleBuilder } from './RuleBuilder';
 
 type Line = NonNullable<Snapshot['factory']>['sectors'][number]['lines'][number];
@@ -250,6 +251,7 @@ function MachineForms({ view, line, piece, op }: { view: BuildView; line: Line; 
   const arr = (k: string) => (Array.isArray(conf[k]) ? (conf[k] as unknown[]).map(String) : []);
   return (
     <>
+      <PieceHistory lineId={line.id} pieceId={piece.id} draft rev={view} />
       <Section title="Agent">
         <Row label="Agent" hint={String(conf.agent ?? 'claude') === 'sim' ? 'The simulated agent costs nothing.' : 'Real agents spend money on every run.'}>
           <select aria-label="Agent" value={String(conf.agent ?? 'claude')} onChange={(e) => set({ agent: e.target.value })}>{AGENTS.map((a) => <option key={a}>{a}</option>)}</select>

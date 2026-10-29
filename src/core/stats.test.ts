@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { buildFactory, checker, LINE, line, simMachine, startEngine, whenDone, whenState, type Built } from '../test/harness';
 import type { Stats, StatsFilter } from '../shared/types';
-import { computeStats, visibleRows } from './stats';
+import { visibleRows } from '../shared/statsview';
+import { computeStats } from './stats';
 import { pieceVersion } from './version';
 import { loadFactory } from './factory';
 

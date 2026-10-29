@@ -74,6 +74,19 @@ describe('Views and keys', () => {
     expect(screen.queryByTestId('floor')).not.toBeInTheDocument();
   });
 
+  it('opens Metrics with its tab and with 3, and goes back to the Floor with 1', async () => {
+    const user = await open();
+    await screen.findByTestId('floor');
+    await user.click(screen.getByRole('tab', { name: /Metrics/ }));
+    expect(screen.queryByTestId('floor')).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Metrics/ })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByText('No lines match.')).toBeInTheDocument();
+    await user.keyboard('1');
+    expect(await screen.findByTestId('floor')).toBeInTheDocument();
+    await user.keyboard('3');
+    expect(screen.getByRole('tab', { name: /Metrics/ })).toHaveAttribute('aria-selected', 'true');
+  });
+
   it('does not take the keys while you are typing in a field', async () => {
     const user = await open();
     await screen.findByTestId('floor');
@@ -220,6 +233,14 @@ describe('Build mode', () => {
     await user.keyboard('2');
     const dialog = await screen.findByRole('dialog', { name: 'Save build changes' });
     expect(dialog).toHaveTextContent('Save or discard your build changes to open the Ledger.');
+  });
+
+  it('will not open Metrics over unsaved changes either', async () => {
+    const user = await open(start(buildView({ changes: [{ path: 'a.yaml', status: 'changed' }] })));
+    await user.click(await screen.findByRole('button', { name: 'Build' }));
+    await screen.findByText('Building');
+    await user.keyboard('3');
+    expect(await screen.findByRole('dialog', { name: 'Save build changes' })).toHaveTextContent('Save or discard your build changes to open Metrics.');
   });
 
   it('undoes with the keyboard', async () => {

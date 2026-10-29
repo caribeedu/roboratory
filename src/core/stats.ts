@@ -158,10 +158,3 @@ export function computeStats(f: FactoryDef, runs: RunEvents[], filter: StatsFilt
   }
   return { lines };
 }
-
-/** The rows to show for a piece: its current version, or when that has no runs, the newest one before; all of them with `allVersions`. */
-export function visibleRows(p: PieceStats, allVersions = false): VersionRow[] {
-  if (allVersions) return p.rows;
-  const current = p.rows.filter((r) => r.current);
-  return current.length ? current : p.rows.slice(0, 1);
-}

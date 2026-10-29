@@ -1,5 +1,6 @@
 import type { Stats, VersionRow } from '../shared/types';
-import { duration, formatStats, money, parsePeriod } from './statsformat';
+import { duration, money } from '../shared/statsview';
+import { formatStats, parsePeriod } from './statsformat';
 
 const row = (over: Partial<VersionRow> = {}): VersionRow => ({
   version: 'ab12cd34', current: true, firstSeen: 0, runs: 3, models: ['haiku'], tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },

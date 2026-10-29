@@ -432,3 +432,16 @@ input.mono, textarea.mono { font-family: var(--mono); font-size: 12px; }
 .st { font-family: var(--display); font-size: 11px; padding: 1px 5px; border: 1px solid #000; min-width: 60px; text-align: center; }
 .st-added { background: #24401c; color: #a6f08a; } .st-changed { background: #3a3014; color: var(--warn); } .st-removed { background: #46160c; color: #ff9d88; }
 .save-dialog .diffbox { max-height: 340px; }
+
+/* metrics (D47) */
+.metrics { display: flex; flex-direction: column; gap: 12px; padding: 12px; min-height: 0; overflow: auto; background: radial-gradient(ellipse at 50% 0%, #1a1510, #0b0907 70%); }
+.metrics-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px; }
+.metrics-line { padding: 10px 12px; }
+.metrics-line header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+.metrics-line h2 { margin: 0; font-family: var(--display); font-size: 18px; }
+.metrics table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.metrics th { text-align: left; font-weight: 600; color: var(--muted); font-size: 11.5px; padding: 4px 8px; border-bottom: 2px solid var(--edge); white-space: nowrap; }
+.metrics td { padding: 5px 8px; border-bottom: 1px solid var(--edge); vertical-align: top; }
+.metrics tr.earlier td { color: var(--muted); }
+.metrics .chip { margin-left: 6px; }
+.piece-history { margin: 0 0 6px; }

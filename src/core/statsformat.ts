@@ -1,16 +1,6 @@
 // The metrics as text for a terminal (D47): one table per line, a row for each piece in the version shown.
 import type { Stats, VersionRow } from '../shared/types';
-import { visibleRows } from './stats';
-
-export function duration(ms: number): string {
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  return m < 60 ? `${m}m${String(s % 60).padStart(2, '0')}s` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}m`;
-}
-
-/** The dollars are the agent CLI's estimate, so they carry a tilde. */
-export const money = (usd: number) => (usd >= 10 ? `~US$ ${usd.toFixed(2)}` : `~US$ ${usd.toFixed(usd >= 0.01 ? 2 : 3)}`);
+import { duration, money, visibleRows } from '../shared/statsview';
 
 /** A period like 90m, 12h or 7d as milliseconds. */
 export function parsePeriod(text: string): number {
