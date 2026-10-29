@@ -20,9 +20,15 @@ function demo() {
 }
 
 /** Types a command; returns the exit code and what it printed. */
+/** What the person at the terminal answers when the command asks a question; unset means there is no one to ask. */
+let answer: boolean | undefined;
+const asked: string[] = [];
+beforeEach(() => { answer = undefined; asked.length = 0; });
+
 async function run(root: string | null, ...argv: string[]) {
   let out = '', err = '';
-  const code = await main(root ? [...argv, '--factory', root] : argv, { version: '1.2.3', build: 'b1', script: 'engine.js', out: (s) => { out += s; }, err: (s) => { err += s; } });
+  const ask = answer === undefined ? undefined : async (q: string) => { asked.push(q); return answer!; };
+  const code = await main(root ? [...argv, '--factory', root] : argv, { version: '1.2.3', build: 'b1', script: 'engine.js', out: (s) => { out += s; }, err: (s) => { err += s; }, ask });
   return { code, out, err };
 }
 
@@ -127,7 +133,8 @@ describe('The roboratory command', () => {
     it('shows how each piece behaves over the runs, as a table or as JSON, and narrows it by line, period and version', async () => {
       const root = await engine();
       await run(root, 'run', ENGINEERING, '--input', 'ticket=T-9');
-      expect(await statusSays(root, /needs you: Review/)).toBe(true);
+      // the first machine has finished once the metrics have a run of it (the ticket may go either way after it)
+      expect(await statsHas(root, ENGINEERING, 'triage')).toBe(true);
 
       const table = await run(root, 'stats', '--line', ENGINEERING, '--sector', 'engineering');
       expect(table.code).toBe(0);
@@ -145,6 +152,60 @@ describe('The roboratory command', () => {
       const bad = await run(root, 'stats', '--since', 'soon');
       expect(bad.code).toBe(1);
       expect(bad.err).toContain('like 90m, 12h, 7d or 2w');
+    });
+
+    describe('rehearse', () => {
+      const rehearsals = (root: string) => path.join(root, '.runs', 'rehearsals');
+
+      it('rehearses a line in simulation with no question and no cost, fills in the inputs, and leaves the factory without a run of it', async () => {
+        const root = await engine();
+        const r = await run(root, 'rehearse', ENGINEERING, '--simulation');
+        expect(r.err).toBe('');
+        expect(r.out).toContain('Rehearsal of orders-api tickets (engineering/orders-api), in simulation, which is free');
+        expect(r.out).toContain('reached the pallet');
+        expect(r.out).toMatch(/Report: \.runs\/rehearsals\/\d+-\w+\/report\.json/);
+        expect(r.code).toBe(0);
+        expect(asked).toEqual([]);
+        expect(fs.readdirSync(rehearsals(root))).toHaveLength(1);
+        expect(fs.existsSync(path.join(root, '.runs', ENGINEERING))).toBe(false);
+      });
+
+      it('shows what it will run, asks before it spends, and does nothing when the answer is no', async () => {
+        const root = await engine();
+        answer = false;
+        const r = await run(root, 'rehearse', ENGINEERING);
+        expect(r.out).toContain('real, with Haiku');
+        expect(r.out).toContain('Ceiling: US$ 1.00.');
+        expect(r.out).toContain('Not run.');
+        expect(r.code).toBe(1);
+        expect(asked).toEqual(['Run it?']);
+        expect(fs.existsSync(rehearsals(root))).toBe(false);
+      });
+
+      it('goes on with a yes, or with --yes, and with no one to ask it says to pass --yes', async () => {
+        const root = await engine();
+        answer = true;
+        expect((await run(root, 'rehearse', ENGINEERING, '--input', 'ticket=T-1', '--max-cost', '2')).out).toContain('Ceiling: US$ 2.00.');
+        expect(asked).toEqual(['Run it?']);
+        answer = undefined;
+        asked.length = 0;
+        const none = await run(root, 'rehearse', ENGINEERING, '--input', 'ticket=T-1');
+        expect(none.code).toBe(1);
+        expect(none.err).toContain('Pass --yes');
+        const yes = await run(root, 'rehearse', ENGINEERING, '--input', 'ticket=T-1', '--yes');
+        expect(yes.out).toContain('Report:');
+        expect(asked).toEqual([]);
+      });
+
+      it('wants a ceiling that is an amount, and the line to rehearse', async () => {
+        const root = await engine();
+        const bad = await run(root, 'rehearse', ENGINEERING, '--max-cost', 'lots');
+        expect(bad.code).toBe(1);
+        expect(bad.err).toContain('--max-cost wants an amount');
+        const none = await run(root, 'rehearse');
+        expect(none.code).toBe(1);
+        expect(none.err).toContain('Usage: roboratory rehearse <line>');
+      });
     });
 
     it('prints the id of the run it starts', async () => {
@@ -197,6 +258,16 @@ describe('The roboratory command', () => {
 });
 
 /** Waits until `roboratory status` says something. */
+async function statsHas(root: string, line: string, piece: string, ms = 20_000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    const s = JSON.parse((await run(root, 'stats', '--json', '--line', line)).out) as { lines: { pieces: { pieceId: string; rows: { runs: number }[] }[] }[] };
+    if (s.lines[0]?.pieces.find((p) => p.pieceId === piece)?.rows.some((r) => r.runs > 0)) return true;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return false;
+}
+
 async function statusSays(root: string, re: RegExp, ms = 20_000) {
   const t0 = Date.now();
   while (Date.now() - t0 < ms) {

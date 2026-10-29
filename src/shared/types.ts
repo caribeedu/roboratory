@@ -153,7 +153,7 @@ export interface FactoryDef {
 
 export interface LoadProblem { model?: string; pieceId?: string; message: string }
 
-export type VerbName = 'run' | 'retry' | 'release' | 'halt' | 'resume' | 'apply' | 'answer' | 'allow' | 'deny';
+export type VerbName = 'run' | 'retry' | 'release' | 'halt' | 'resume' | 'apply' | 'answer' | 'allow' | 'deny' | 'rehearse';
 
 // ---------- runtime state ----------
 
@@ -375,3 +375,72 @@ export interface LineStats {
 }
 
 export interface Stats { lines: LineStats[] }
+
+// ---------- the rehearsal (D48) ----------
+
+export type RehearsalMode = 'real' | 'simulation';
+
+/** What a caller asks of a rehearsal. `source` is where the factory comes from: the files on disk, or the build-mode draft. */
+export interface RehearsalRequest {
+  lineId: string;
+  input: Record<string, string>;
+  mode: RehearsalMode;
+  source: 'disk' | 'draft';
+  /** the signals become `true` instead of running (real mode) */
+  skipSignals?: boolean;
+  /** the cost ceiling, in dollars; only the real mode spends */
+  maxCostUsd?: number;
+  /** keep the copy of the factory when it ends */
+  keep?: boolean;
+  /** a person has seen what will run and agreed to what it may cost; the real mode refuses to start without it (invariant 8) */
+  approved?: boolean;
+}
+
+/** What a rehearsal will run, shown before it spends anything. */
+export interface RehearsalPlan {
+  lineId: string;
+  lineName: string;
+  mode: RehearsalMode;
+  source: 'disk' | 'draft';
+  inputs: { name: string; label?: string; required: boolean; placeholder?: string; multiline?: boolean }[];
+  machines: { pieceId: string; label: string; agent: string; /** the model it will run with */ model?: string; allow: string[]; tools: string[]; outward: string[] }[];
+  signals: { pieceId: string; label: string; command: string; runs: boolean }[];
+  maxCostUsd?: number;
+  /** what a real run of this line has cost, as a median of the runs there are */
+  reference?: { runs: number; medianUsd: number };
+}
+
+export type FindingKind = 'fire' | 'contract' | 'blocked' | 'rework-exhausted' | 'uncovered-command' | 'forbidden-command' | 'ceiling' | 'timeout' | 'question' | 'gate' | 'outward' | 'rework';
+
+/** Something a rehearsal found. A defect is a fault of the factory; a note is something to know. */
+export interface Finding {
+  id: string;
+  class: 'defect' | 'note';
+  kind: FindingKind;
+  pieceId: string;
+  message: string;
+  /** where to look */
+  where: string;
+  /** for a command no list covers: the command, and the prefix a list would take */
+  command?: string;
+  suggestion?: string;
+  /** the version of the piece when it was found; it is out of date once the piece's version changes */
+  version?: string;
+}
+
+export interface RehearsalProgress { pieces: Record<string, string>; costUsd: number; findings: Finding[] }
+
+export interface RehearsalReport {
+  id: string;
+  lineId: string;
+  mode: RehearsalMode;
+  startedAt: number;
+  endedAt: number;
+  status: 'done' | 'stopped' | 'ceiling' | 'timeout' | 'aborted';
+  costUsd: number;
+  runId?: string;
+  pieces: { pieceId: string; label: string; version?: string; attempts: number; reworks: number; questions: number; denied: number; costUsd: number }[];
+  findings: Finding[];
+  /** the copy of the factory, when it was kept */
+  kept?: string;
+}

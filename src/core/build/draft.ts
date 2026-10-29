@@ -86,6 +86,25 @@ export class Draft {
     this.write(p, preserve(this.exists(p) ? this.read(p) : '', doc));
   }
 
+  /**
+   * Writes the factory as the draft has it into a folder, without touching the factory: files the draft did not change are copied from
+   * the disk as they are, and the ones it wrote are written, executable where it says so. `.git`, `.runs` and `node_modules` are left out.
+   */
+  export(target: string) {
+    const walk = (dir: string, out: string) => {
+      fs.mkdirSync(out, { recursive: true });
+      for (const name of this.fs.list(dir)) {
+        if (dir === this.root && ['.git', '.runs', 'node_modules'].includes(name)) continue;
+        const from = path.join(dir, name), to = path.join(out, name);
+        if (this.fs.isDir(from)) { walk(from, to); continue; }
+        const written = this.files.get(from);
+        if (typeof written === 'string') fs.writeFileSync(to, written, { mode: this.isExecutable(from) ? 0o755 : 0o644 });
+        else fs.copyFileSync(from, to);
+      }
+    };
+    walk(this.root, target);
+  }
+
   /** The factory as the draft would load it, keeping structural problems instead of failing. */
   load(): FactoryDef { return loadFactory(this.root, { fs: this.fs, tolerant: true }); }
 

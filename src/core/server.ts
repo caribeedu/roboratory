@@ -146,6 +146,9 @@ const calls: Record<string, Handler> = {
   resume: (s, l) => s.resume(l),
   runs: (s) => s.runs(),
   stats: (s, filter) => s.stats(filter),
+  rehearsalPlan: (s, req) => s.rehearsalPlan(req),
+  rehearse: (s, req) => s.rehearse(req),
+  rehearsalStop: (s) => s.rehearsalStop(),
   runDetail: (s, id) => s.runDetail(id),
   ask: (s, scope, q) => s.ask(scope, q),
   messages: (s, scope) => s.messages(scope),
@@ -184,6 +187,7 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
     logs: (l) => push('logs', l),
     messages: (k) => push('messages', k),
     build: (v) => push('build', v),
+    rehearsal: (p) => push('rehearsal', p),
   }, { permissionTool: opts.permissionTool });
   let closed = false;
   let failed = false;
@@ -301,7 +305,7 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
   const grace = opts.idleGraceMs ?? 60_000;
   let idleSince = Date.now();
   idleTimer = setInterval(() => {
-    const busy = clients.size > 0 || (service.engine?.activeLineIds().size ?? 0) > 0;
+    const busy = clients.size > 0 || (service.engine?.activeLineIds().size ?? 0) > 0 || service.rehearsalRunning;
     if (busy) idleSince = Date.now();
     else if (Date.now() - idleSince >= grace) void close();
   }, Math.min(5000, Math.max(20, grace / 4)));

@@ -75,6 +75,8 @@ export interface EngineOptions {
   maxCostUsd?: number;
   /** how to start `roboratory permission-tool`, for agents that ask through a tool of their own (D44) */
   permissionTool?: PermissionAccess['tool'];
+  /** the factory whose engine serves the permission tool's calls, when that is not this engine's own factory (a rehearsal on a copy, D48) */
+  serverRoot?: string;
 }
 
 /** A permission request waiting on a person (D44). */
@@ -107,6 +109,7 @@ export class Engine extends EventEmitter {
   private spent = 0;
   private overBudget = false;
   private permissionTool?: PermissionAccess['tool'];
+  private serverRoot?: string;
   /** the permission requests of the machines running now, by the session each one was started with */
   private sessions = new Map<string, (call: PermissionCall, gone?: AbortSignal) => Promise<PermissionDecision>>();
   private asks = new Map<string, AskRt>();
@@ -120,6 +123,7 @@ export class Engine extends EventEmitter {
     this.now = opts.now ?? Date.now;
     this.signalTimeoutMs = opts.signalTimeoutMs ?? 10 * 60000;
     this.permissionTool = opts.permissionTool;
+    this.serverRoot = opts.serverRoot;
     this.maxCostUsd = opts.maxCostUsd;
     for (const s of factory.sectors) for (const l of s.lines) this.lines.set(l.id, this.makeLine(l));
   }
@@ -151,6 +155,9 @@ export class Engine extends EventEmitter {
   private sectorOf(line: LineDef) { return this.factory.sectors.find((s) => s.id === line.sectorId)!; }
 
   // ---------- permission requests (D44) ----------
+
+  /** Whether a machine of this engine is running under `session`. */
+  hasSession(session: string) { return this.sessions.has(session); }
 
   /** The engine's decision on a tool call of the machine started with `session`; the permission tool process asks it over the socket. */
   permitSession(session: string, call: PermissionCall, gone?: AbortSignal): Promise<PermissionDecision> {
@@ -741,7 +748,7 @@ export class Engine extends EventEmitter {
         simCtx: { box: w.box.payload, params: run.line.params, run: { id: run.summary.id }, git: { branch }, call },
         prompt: machinePrompt(run, this.factory.lineContext ? def.id : undefined, def.label, w.box.payload, machine.contract, siblings, lastError, w.hint, boxFile),
         signal: abort.signal,
-        permission: { session, root: this.factory.root, tool: this.permissionTool, decide, waits },
+        permission: { session, root: this.serverRoot ?? this.factory.root, tool: this.permissionTool, decide, waits },
         onEvent: (e: AgentEvent) => {
           this.record(run, { type: 'agent', piece: def.id, attempt, kind: e.kind, text: e.text });
           this.log({ level: 'machine', sectorId: run.line.sectorId, lineId: run.line.id, pieceId: def.id, runId: run.summary.id, kind: e.kind === 'ret' ? 'text' : e.kind === 'tool' ? 'tool' : 'text', text: e.kind === 'ret' ? `◂ ${e.text}` : e.kind === 'tool' ? `▸ ${e.text}` : e.text });

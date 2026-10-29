@@ -4,12 +4,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ScopeArg, RunDetail } from '../shared/api';
 import type { BuildOp, BuildView } from '../shared/build';
-import type { FactoryDef, LogEntry, Snapshot, Stats, StatsFilter } from '../shared/types';
+import type { FactoryDef, LogEntry, RehearsalPlan, RehearsalProgress, RehearsalReport, RehearsalRequest, Snapshot, Stats, StatsFilter } from '../shared/types';
 import { claudeMcpServers, mcpServerOf, type PermissionCall } from './agents';
 import { Engine, type EngineOptions } from './engine';
 import { loadFactory } from './factory';
 import { BuildSession } from './build/session';
 import { Managers } from './managers';
+import { planOf, prepareCopy, runRehearsal, loadSource, type RehearsalSource } from './rehearsal';
 import { computeStats } from './stats';
 import { factoryView } from './view';
 
@@ -23,10 +24,12 @@ export class FactoryService {
   private pendingLogs: LogEntry[] = [];
   private toolWarnings: string[] = [];
   private session: BuildSession | null = null;
+  /** the rehearsal that is running, and the engine it works on (permission calls from its agents find it there) */
+  private rehearsing: { stop: AbortController; engine?: Engine } | null = null;
   private mcpServers: Promise<string[] | null> | null = null;
 
   constructor(
-    private out: { snapshot(s: Snapshot): void; logs(l: LogEntry[]): void; messages(key: string): void; build?(v: BuildView | null): void },
+    private out: { snapshot(s: Snapshot): void; logs(l: LogEntry[]): void; messages(key: string): void; build?(v: BuildView | null): void; rehearsal?(p: RehearsalProgress): void },
     private opts: Pick<EngineOptions, 'permissionTool'> = {},
   ) {}
 
@@ -136,7 +139,68 @@ export class FactoryService {
   /** Refuses it; the reason goes back to the agent. */
   deny(requestId: string, reason = '') { this.need().e.deny(requestId, reason); }
   /** The decision on a call of the machine started with `session`; asked by an agent's permission tool. */
-  permit(session: string, call: PermissionCall, gone?: AbortSignal) { return this.need().e.permitSession(session, call, gone); }
+  permit(session: string, call: PermissionCall, gone?: AbortSignal) {
+    const rehearsal = this.rehearsing?.engine;
+    return (rehearsal?.hasSession(session) ? rehearsal : this.need().e).permitSession(session, call, gone);
+  }
+
+  /** Whether a rehearsal is running, which keeps the engine from ending as idle. */
+  get rehearsalRunning() { return !!this.rehearsing; }
+
+  private sourceOf(req: RehearsalRequest): RehearsalSource {
+    if (req.source === 'draft') {
+      if (!this.session) throw new Error('Build mode is not open, so there is no draft to rehearse.');
+      return { kind: 'draft', draft: this.session.draft };
+    }
+    return { kind: 'disk', root: this.need().f.root };
+  }
+
+  /** In the simulation, a required input nobody gave is filled in, as the dry run always did. */
+  private withInputs(req: RehearsalRequest, f: FactoryDef): RehearsalRequest {
+    if (req.mode !== 'simulation') return req;
+    const line = f.sectors.flatMap((s) => s.lines).find((l) => l.id === req.lineId);
+    const input = { ...req.input };
+    for (const i of line?.model.intake.inputs ?? []) if (i.required && !String(input[i.name] ?? '').trim()) input[i.name] = i.placeholder || 'x';
+    return { ...req, input };
+  }
+
+  /** What a rehearsal would run, with what a real run of the line has cost for reference (D48). */
+  rehearsalPlan(req: RehearsalRequest): RehearsalPlan {
+    const { e } = this.need();
+    const { f } = loadSource(this.sourceOf(req));
+    const costs = e.runSummaries().filter((r) => r.lineId === req.lineId).map((r) => e.runEvents(r.id).filter((x) => x.type === 'cost').reduce((a: number, x) => a + Number(x.usd ?? 0), 0)).filter((c) => c > 0).sort((a, b) => a - b);
+    const reference = costs.length ? { runs: costs.length, medianUsd: costs.length % 2 ? costs[costs.length >> 1] : (costs[costs.length / 2 - 1] + costs[costs.length / 2]) / 2 } : undefined;
+    return planOf(f, this.withInputs(req, f), reference);
+  }
+
+  /** Rehearses a line on a copy (D48). It is a verb: audited, and never automatic. */
+  async rehearse(req: RehearsalRequest): Promise<RehearsalReport> {
+    const { e, f } = this.need();
+    if (this.rehearsing) throw new Error('A rehearsal is already running.');
+    if (req.mode === 'real' && !req.approved) throw new Error('A real rehearsal spends money: show what it will run and ask first (invariant 8).');
+    const source = this.sourceOf(req);
+    const { f: of } = loadSource(source);
+    const line = of.sectors.flatMap((s) => s.lines).find((l) => l.id === req.lineId);
+    if (!line) throw new Error(`Unknown line ${req.lineId}`);
+    const run = this.withInputs(req, of);
+    const missing = line.model.intake.inputs.filter((i) => i.required && !String(run.input[i.name] ?? '').trim()).map((i) => i.label || i.name);
+    if (missing.length) throw new Error(`Missing input: ${missing.join(', ')}`);
+    const stop = new AbortController();
+    this.rehearsing = { stop };
+    try {
+      const copy = await prepareCopy(source, req.lineId);
+      e.audit(line.sectorId, { verb: 'rehearse', actor: 'you', lineId: req.lineId, mode: req.mode, from: req.source, ...(req.mode === 'real' ? { maxCostUsd: req.maxCostUsd } : {}) });
+      return await runRehearsal(copy, run, {
+        sourceRoot: f.root, permissionTool: this.opts.permissionTool, serverRoot: f.root, signal: stop.signal,
+        onProgress: (p) => this.out.rehearsal?.(p), onEngine: (engine) => { if (this.rehearsing) this.rehearsing.engine = engine; },
+      });
+    } finally { this.rehearsing = null; }
+  }
+
+  /** Stops the rehearsal that is running. */
+  rehearsalStop() { this.rehearsing?.stop.abort(); }
+
+  /** Lets a machine make the call it asked for, this once (D44). */
   halt(lineId: string) { this.need().e.halt(lineId); }
   resume(lineId: string) { this.need().e.resume(lineId); }
   runs() { return this.engine?.runSummaries() ?? []; }
