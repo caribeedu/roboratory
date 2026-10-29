@@ -9,6 +9,7 @@ import { startServer, type EngineServer } from './server';
 import { until } from '../test/harness';
 
 const RELEASES = 'releases/orders-api';
+const ENGINEERING = 'engineering/orders-api';
 
 let server: EngineServer | null = null;
 afterEach(async () => { await server?.close(); server = null; vi.restoreAllMocks(); });
@@ -121,6 +122,29 @@ describe('The roboratory command', () => {
       const bad = await run(root, 'run', RELEASES, '--input', 'tag');
       expect(bad.code).toBe(1);
       expect(bad.err).toContain('--input wants key=value');
+    });
+
+    it('shows how each piece behaves over the runs, as a table or as JSON, and narrows it by line, period and version', async () => {
+      const root = await engine();
+      await run(root, 'run', ENGINEERING, '--input', 'ticket=T-9');
+      expect(await statusSays(root, /needs you: Review/)).toBe(true);
+
+      const table = await run(root, 'stats', '--line', ENGINEERING, '--sector', 'engineering');
+      expect(table.code).toBe(0);
+      expect(table.out).toContain('orders-api tickets (engineering/orders-api)');
+      expect(table.out).toContain('1 run');
+      expect(table.out).toContain('Costs are estimates made by the agent CLI.');
+
+      const json = JSON.parse((await run(root, 'stats', '--json', '--line', ENGINEERING)).out) as { lines: { lineId: string; runs: number; pieces: { rows: { version: string; runs: number }[] }[] }[] };
+      expect(json.lines.map((l) => [l.lineId, l.runs])).toEqual([[ENGINEERING, 1]]);
+      expect(json.lines[0].pieces.some((p) => p.rows.some((r) => r.runs === 1 && /^[0-9a-f]{8}$/.test(r.version)))).toBe(true);
+
+      expect(JSON.parse((await run(root, 'stats', '--json', '--line', ENGINEERING, '--since', '1m')).out).lines[0].runs).toBe(1);
+      expect((await run(root, 'stats', '--line', ENGINEERING, '--all-versions')).code).toBe(0);
+      expect((await run(root, 'stats', '--sector', 'nowhere')).out).toBe('No lines match.\n');
+      const bad = await run(root, 'stats', '--since', 'soon');
+      expect(bad.code).toBe(1);
+      expect(bad.err).toContain('like 90m, 12h, 7d or 2w');
     });
 
     it('prints the id of the run it starts', async () => {

@@ -308,3 +308,68 @@ export interface Snapshot {
   attention: AttentionItem[];
   now: number;
 }
+
+// ---------- metrics (D47) ----------
+
+/** What a step used, as the agent's CLI reports it. The dollar figure that goes with it is the CLI's own estimate. */
+export interface Tokens { input: number; output: number; cacheRead: number; cacheWrite: number }
+
+export interface StatsFilter {
+  sectorId?: string;
+  lineId?: string;
+  /** only runs that started at or after this time (ms) */
+  since?: number;
+  runId?: string;
+  /** the earlier versions of a piece too, not only its current one */
+  allVersions?: boolean;
+  /** the current version is the one in the build-mode draft, not the one on disk */
+  draft?: boolean;
+}
+
+/** A piece in one version, over every run of that version. */
+export interface VersionRow {
+  version: string;
+  current: boolean;
+  /** when a run first started this version */
+  firstSeen: number;
+  runs: number;
+  models: string[];
+  tokens: Tokens;
+  /** estimates: the agent CLI works the dollars out itself */
+  cost: { total: number; median: number };
+  /** the agent's working time in a run, without the time spent waiting for you (ms) */
+  duration: { median: number; max: number };
+  attempts: { mean: number; max: number };
+  reworks: number;
+  questions: number;
+  blocks: number;
+  fires: number;
+  /** passes of a checker, and those a later event proved wrong */
+  passes: number;
+  provedWrong: number;
+  permissions: { requests: number; repeated: number; denied: number; waitMedianMs: number };
+}
+
+export interface PieceStats {
+  pieceId: string;
+  label: string;
+  machine: string;
+  /** a piece with a return belt leaving it (D15) */
+  checker: boolean;
+  /** the version on disk (or in the draft) right now */
+  currentVersion: string;
+  /** newest first */
+  rows: VersionRow[];
+}
+
+export interface LineStats {
+  lineId: string;
+  sectorId: string;
+  name: string;
+  /** runs of the line that the rows come from */
+  runs: number;
+  total: Pick<VersionRow, 'tokens' | 'reworks' | 'questions' | 'blocks' | 'fires' | 'passes' | 'provedWrong'> & { cost: number; permissions: Omit<VersionRow['permissions'], 'waitMedianMs'> };
+  pieces: PieceStats[];
+}
+
+export interface Stats { lines: LineStats[] }

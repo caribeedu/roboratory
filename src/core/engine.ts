@@ -6,15 +6,17 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import Ajv, { type ValidateFunction } from 'ajv';
-import { describe, evaluate } from '../shared/expr';
+import { evaluate } from '../shared/expr';
 import type {
   AttentionItem, BoxView, FactoryDef, HumanQuestion, LineDef, LineView, LogEntry, MachineDef, PieceDef, PieceState, PieceView, RunStatus, RunSummary, VerbName,
 } from '../shared/types';
 import { runAgent, type AgentEvent, type PermissionAccess, type PermissionCall, type PermissionDecision } from './agents';
 import { Waits } from './agents/waits';
 import { addWorktree, commitLeftovers, factoryVersion, git, headOf, mergeInto, removeWorktree } from './git';
-import { decideTool, effectiveRules, type Rules } from './permissions';
+import { linePlace } from './lineplace';
+import { decideTool, type Rules } from './permissions';
 import { renderCommand } from './template';
+import { composedRole, machineRules, pieceVersion } from './version';
 
 export const RUNS_DIR = '.runs';
 const ajv = new Ajv({ allErrors: true, strict: false });
@@ -205,15 +207,6 @@ export class Engine extends EventEmitter {
     const why = reason.trim();
     this.decided(a, 'deny', actor, why);
     a.settle({ behavior: 'deny', message: why || 'A person denied this command.' });
-  }
-
-  /** What a machine may run (D44): its own lists and the defaults, with every level's hard denials added. */
-  private rulesFor(line: LineDef, machine: MachineDef) {
-    const rules = effectiveRules({
-      allow: machine.allow, readOnly: machine.readOnly, shell: true,
-      deny: [...this.factory.deny, ...(this.sectorOf(line)?.deny ?? []), ...line.model.deny, ...machine.deny],
-    });
-    return { ...rules, readOnly: machine.readOnly, shell: true };
   }
 
   // ---------- verbs (D30): every action goes through here and is audited ----------
@@ -715,19 +708,19 @@ export class Engine extends EventEmitter {
     const simFail = !!machine.sim?.fail_first_run && !this.simFailed.has(key) && !w.hint;
     const call = run.calls.get(def.id) ?? 0;
     run.calls.set(def.id, call + 1);
-    const sector = this.sectorOf(run.line);
-    const role = [machine.role, this.factory.culture, sector?.culture].filter((x) => x && x.trim()).join('\n\n');
+    const role = composedRole(this.factory, run.line, machine);
+    const version = pieceVersion(this.factory, run.line, def.id);
 
     let lastError = '';
     for (let attempt = w.attempt ?? 1; attempt <= machine.attempts; attempt++) {
       if (line.halted) { w.attempt = attempt; line.deferred.push(() => { p.current = undefined; p.queue.unshift(w); p.state = 'idle'; this.pump(line, p); }); p.state = 'idle'; this.changed(); return; }
       p.attempt = attempt;
-      this.record(run, { type: 'piece.start', piece: def.id, attempt, box: w.box.payload });
+      this.record(run, { type: 'piece.start', piece: def.id, attempt, version, box: w.box.payload });
       this.log({ level: 'sector', sectorId: run.line.sectorId, lineId: run.line.id, pieceId: def.id, runId: run.summary.id, kind: 'info', text: `${def.label}: attempt ${attempt}/${machine.attempts} (${machine.agent})` });
       this.changed();
       const abort = new AbortController();
       p.abort = abort;
-      const rules = this.rulesFor(run.line, machine);
+      const rules = machineRules(this.factory, run.line, machine);
       const waits = new Waits();
       const session = crypto.randomUUID();
       const decide = (call: PermissionCall, gone?: AbortSignal) => this.permit(run, def, rules, waits, call, gone);
@@ -751,7 +744,7 @@ export class Engine extends EventEmitter {
         this.settleAsks(run.summary.id, def.id, 'The machine stopped before an answer came.');
       }
       p.abort = undefined;
-      if (res.costUsd !== undefined) this.record(run, { type: 'cost', piece: def.id, usd: res.costUsd });
+      if (res.costUsd !== undefined) this.record(run, { type: 'cost', piece: def.id, usd: res.costUsd, model: res.model ?? machine.model ?? machine.agent, tokens: res.tokens ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } });
       // whatever came back (an answer, a question, a block, an error) is about an input that has since been replaced
       if (this.staleInput(run, w, def.id)) { this.dropStale(line, run, p); return; }
       const ask = (res.output as { needs_human?: HumanQuestion } | undefined)?.needs_human;
@@ -1083,31 +1076,6 @@ function reopen(run: RunRt, target: string, reopened: string[], reset: string[])
   for (const id of sources) { run.done.delete(id); run.skippedPieces.delete(id); }
   for (const [id, arr] of run.arrivals) if (id !== target && !run.done.has(id)) for (const src of [...arr.keys()]) if (sources.has(src)) arr.delete(src);
   for (const k of [...run.skipped]) { const [src, dst] = k.split('>'); if (sources.has(src) && !run.done.has(dst)) run.skipped.delete(k); }
-}
-
-/**
- * Where a machine stands in its line, for its prompt: the line in order, what feeds it, where its
- * box goes (rules in plain words) and which machines come after it, so it does its own step only.
- */
-export function linePlace(line: LineDef, pieceId: string): string {
-  const pieces = line.model.pieces;
-  const name = (id: string) => { const p = pieces.find((x) => x.id === id); return p ? (p.kind === 'intake' ? `${line.model.intake.label || 'Intake'} (intake)` : p.kind === 'pallet' ? `${p.label} (pallet)` : `${p.label} (${p.kind})`) : id; };
-  const me = pieces.find((p) => p.id === pieceId);
-  if (!me) return '';
-  const goalOf = (p: typeof me) => p.goal ?? (p.machine ? line.model.machines[p.machine]?.goal : undefined);
-  const ins = me.needs.map((n) => `- ${n.back ? 'sent back by' : 'from'} ${name(n.from)}${n.when ? ` when ${describe(n.when)}` : ''}`);
-  const outs = pieces.flatMap((p) => p.needs.filter((n) => n.from === pieceId).map((n) => `- ${n.back ? 'back to' : 'to'} ${name(p.id)}${n.when ? ` when ${describe(n.when)}` : ''}`));
-  const after = new Set<string>(); const stack = [pieceId];
-  while (stack.length) { const id = stack.pop()!; for (const p of pieces) if (p.needs.some((n) => n.from === id && !n.back) && !after.has(p.id)) { after.add(p.id); stack.push(p.id); } }
-  const later = pieces.filter((p) => after.has(p.id) && p.kind !== 'pallet').map((p) => `- ${name(p.id)}${goalOf(p) ? `: ${goalOf(p)}` : ''}`);
-  return [
-    `Your place in the line "${line.name}":`,
-    `The line, in order: ${pieces.map((p) => (p.id === pieceId ? `${name(p.id)} ← you` : name(p.id))).join(' → ')}`,
-    goalOf(me) ? `Your goal: ${goalOf(me)}` : '',
-    ins.length ? `Your box comes:\n${ins.join('\n')}` : '',
-    outs.length ? `Your box goes:\n${outs.join('\n')}` : '',
-    later.length ? `After you, each piece does its own step:\n${later.join('\n')}\nDo only your step; leave theirs to them.` : '',
-  ].filter(Boolean).join('\n');
 }
 
 /** The human actions of a run so far, in order, for every machine of the run (D26). */

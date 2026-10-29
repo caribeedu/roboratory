@@ -1,6 +1,6 @@
 // The bridge between the renderer and the main process (exposed by preload.ts).
 import type { BuildOp, BuildView, FieldInfo } from './build';
-import type { LogEntry, ManagerMessage, RunSummary, Snapshot } from './types';
+import type { LogEntry, ManagerMessage, RunSummary, Snapshot, Stats, StatsFilter } from './types';
 
 export type ScopeArg = { kind: 'sector'; sectorId: string } | { kind: 'factory' };
 
@@ -36,6 +36,8 @@ export interface RoboratoryApi {
   halt(lineId: string): Promise<void>;
   resume(lineId: string): Promise<void>;
   runs(): Promise<RunSummary[]>;
+  /** How the pieces behave over the factory's runs (D47). */
+  stats(filter?: StatsFilter): Promise<Stats>;
   runDetail(runId: string): Promise<RunDetail | null>;
   ask(scope: ScopeArg, question: string): Promise<void>;
   messages(scope: ScopeArg): Promise<ManagerMessage[]>;

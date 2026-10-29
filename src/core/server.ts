@@ -145,6 +145,7 @@ const calls: Record<string, Handler> = {
   halt: (s, l) => s.halt(l),
   resume: (s, l) => s.resume(l),
   runs: (s) => s.runs(),
+  stats: (s, filter) => s.stats(filter),
   runDetail: (s, id) => s.runDetail(id),
   ask: (s, scope, q) => s.ask(scope, q),
   messages: (s, scope) => s.messages(scope),

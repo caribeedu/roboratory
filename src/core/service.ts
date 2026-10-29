@@ -4,12 +4,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ScopeArg, RunDetail } from '../shared/api';
 import type { BuildOp, BuildView } from '../shared/build';
-import type { FactoryDef, LogEntry, Snapshot } from '../shared/types';
+import type { FactoryDef, LogEntry, Snapshot, Stats, StatsFilter } from '../shared/types';
 import { claudeMcpServers, mcpServerOf, type PermissionCall } from './agents';
 import { Engine, type EngineOptions } from './engine';
 import { loadFactory } from './factory';
 import { BuildSession } from './build/session';
 import { Managers } from './managers';
+import { computeStats } from './stats';
 import { factoryView } from './view';
 
 export class FactoryService {
@@ -123,6 +124,13 @@ export class FactoryService {
   retry(lineId: string, pieceId: string, hint: string) { this.need().e.retry(lineId, pieceId, hint); }
   release(lineId: string, pieceId: string, c: number, decision?: { choice: string; note: string }) { this.need().e.release(lineId, pieceId, c, 'you', decision); }
   answer(lineId: string, pieceId: string, text: string) { this.need().e.answer(lineId, pieceId, text); }
+  /** How the pieces behave over the runs of the factory (D47); with `draft`, the versions are those of the build-mode draft. */
+  stats(filter: StatsFilter = {}): Stats {
+    const { e, f } = this.need();
+    const factory = filter.draft && this.session ? this.session.draft.load() : f;
+    return computeStats(factory, e.runSummaries().map((summary) => ({ summary, events: e.runEvents(summary.id) })), filter);
+  }
+
   /** Lets a machine make the call it asked for, this once (D44). */
   allow(requestId: string) { this.need().e.allow(requestId); }
   /** Refuses it; the reason goes back to the agent. */

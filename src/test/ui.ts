@@ -80,7 +80,7 @@ export function installBridge(over: Record<string, unknown> = {}): FakeBridge {
   const api: Record<string, unknown> = {
     state: call('state', { snapshot: snapshot(), logs: [], recent: [], demoPath: '/demo', engine: { state: 'running', appVersion: '1.0.0', version: '1.0.0' } }),
     openFactory: call('openFactory', true), openFactoryAt: call('openFactoryAt'), createDemo: call('createDemo'), closeFactory: call('closeFactory'),
-    run: call('run', 'run-1'), retry: call('retry'), release: call('release'), answer: call('answer'), allow: call('allow'), deny: call('deny'), halt: call('halt'), resume: call('resume'),
+    run: call('run', 'run-1'), retry: call('retry'), release: call('release'), answer: call('answer'), allow: call('allow'), deny: call('deny'), stats: call('stats'), halt: call('halt'), resume: call('resume'),
     runs: call('runs', []), runDetail: call('runDetail', null), ask: call('ask'), messages: call('messages', []),
     acceptProposal: call('acceptProposal'), rejectProposal: call('rejectProposal'), reveal: call('reveal'),
     buildStart: call('buildStart'), buildApply: call('buildApply'), buildUndo: call('buildUndo'), buildRedo: call('buildRedo'),

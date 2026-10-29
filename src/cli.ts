@@ -6,7 +6,8 @@ import { EngineClient, launchFor } from './core/client';
 import { engineIsOlder } from './core/buildid';
 import { runPermissionTool } from './core/permission-tool';
 import { liveLock, startServer } from './core/server';
-import type { Snapshot } from './shared/types';
+import { formatStats, parsePeriod } from './core/statsformat';
+import type { Snapshot, Stats } from './shared/types';
 
 export const USAGE = `roboratory <command> [options]
 
@@ -21,6 +22,8 @@ export const USAGE = `roboratory <command> [options]
   retry <line> <machine> [--hint h]
   halt <line>
   resume <line>
+  stats [--sector s] [--line l] [--since 7d] [--run id] [--all-versions] [--json]
+                                how each piece behaves over the runs: cost (estimated), time, attempts, reworks, asks, fires, permissions
   restart --when-idle           restart the engine once no machine or signal is running
   watch                         print what needs you (gates, questions, fires, reworks) and the end of runs
 
@@ -41,7 +44,7 @@ function parse(argv: string[]): Parsed {
     if (a.startsWith('--')) {
       const eq = a.indexOf('=');
       const key = eq > 0 ? a.slice(2, eq) : a.slice(2);
-      const bool = key === 'when-idle' || key === 'json';
+      const bool = key === 'when-idle' || key === 'json' || key === 'all-versions';
       const val = eq > 0 ? a.slice(eq + 1) : bool ? 'true' : rest[++i];
       if (val === undefined) throw new Error(`--${key} needs a value`);
       (flags[key] ??= []).push(val);
@@ -81,7 +84,7 @@ export async function main(argv: string[], env: CliEnv): Promise<number> {
   try { p = parse(argv); } catch (e) { env.err(`${(e as Error).message}\n`); return 2; }
   if (!p.cmd || p.cmd === 'help' || p.cmd === '--help' || p.cmd === '-h') { env.out(USAGE); return p.cmd ? 0 : 2; }
   if (p.cmd === '--version' || p.cmd === 'version') { env.out(`${env.version}\n`); return 0; }
-  const known = ['serve', 'stop', 'status', 'run', 'release', 'answer', 'allow', 'deny', 'retry', 'halt', 'resume', 'restart', 'watch', 'permission-tool'];
+  const known = ['serve', 'stop', 'status', 'run', 'release', 'answer', 'allow', 'deny', 'retry', 'halt', 'resume', 'restart', 'watch', 'stats', 'permission-tool'];
   if (!known.includes(p.cmd)) { env.err(`Unknown command "${p.cmd}".\n\n${USAGE}`); return 2; }
 
   try {
@@ -171,6 +174,18 @@ export async function main(argv: string[], env: CliEnv): Promise<number> {
           }
           return 0;
         case 'watch': return await watch(c, snapshot, env);
+        case 'stats': {
+          const allVersions = !!p.flags['all-versions'];
+          const sector = p.flags.sector?.[0];
+          const lineName = p.flags.line?.[0];
+          const stats = await c.call<Stats>('stats', {
+            allVersions, runId: p.flags.run?.[0], sectorId: sector,
+            lineId: lineName ? resolveLine(snapshot, lineName) : undefined,
+            since: p.flags.since ? Date.now() - parsePeriod(p.flags.since[0]) : undefined,
+          });
+          env.out(p.flags.json ? JSON.stringify(stats, null, 2) + '\n' : formatStats(stats, allVersions));
+          return 0;
+        }
       }
     } finally { c.close(); }
     return 0;
