@@ -24,7 +24,7 @@ npm start
 | `npm run package` | Builds the app into `out/` |
 | `npm run make` | Builds the distributable archives into `out/make/` |
 | `npm run cli -- <command>` | Runs the engine and the `roboratory` command from source (bundled with esbuild into `.vite/cli/`) |
-| `node e2e/tools/factory-sim-check.mjs <path>` | Dry-runs every line of a factory with the simulated agent, for free; it starts a real engine and drives it over the socket |
+| `roboratory rehearse <line> --simulation` | Rehearses a line with the simulated agent, for free (the `e2e/tools/factory-shots.mjs` tool does it for every line of the demo) |
 | `node e2e/tools/shoot.mjs <dir>`, `factory-shots.mjs` | Drive the packaged app and save screenshots |
 | `node e2e/tools/readme-shots.mjs`, `piece-images.mjs`, `render-svg.mjs` | Regenerate the README's images: a line at work and build mode, one picture per piece drawn with the app's own sprites, and an SVG rendered to PNG |
 | `node e2e/tools/scenario.mjs`, `real-agent-check.mjs` | A staged demo day, and a paid run with the real Claude agent |
@@ -97,7 +97,7 @@ The CI (`.github/workflows/tests.yml`) runs the Vitest layers and the e2e suite 
 
 ## Layout
 
-- `src/core/`: the logic that runs in the engine process, free of Electron and tested with Vitest: the loader, the engine, agents, git, managers, the service, the socket server (`server.ts`) and its client (`client.ts`). `src/engine.ts` bundles the server and the command (`src/cli.ts`) into `engine.js`. `src/core/build/` is build mode (the draft, its edits, checks and sessions). `src/core/agents/` has one adapter per agent behind the `AgentRunner` port (Claude Code, the simulated agent; D45). `src/core/permissions.ts` reads a machine's lists and its shell commands (D44), `src/core/permission-tool.ts` is the process an agent's CLI starts to ask the engine, and `src/core/formats.ts` checks `line.yaml` and `machine.yaml` against `schemas/` (D46).
+- `src/core/`: the logic that runs in the engine process, free of Electron and tested with Vitest: the loader, the engine, agents, git, managers, the service, the socket server (`server.ts`) and its client (`client.ts`). `src/engine.ts` bundles the server and the command (`src/cli.ts`) into `engine.js`. `src/core/build/` is build mode (the draft, its edits, checks and sessions). `src/core/agents/` has one adapter per agent behind the `AgentRunner` port (Claude Code, the simulated agent; D45). `src/core/permissions.ts` reads a machine's lists and its shell commands (D44), `src/core/permission-tool.ts` is the process an agent's CLI starts to ask the engine, and `src/core/stats.ts` and `src/core/version.ts` are the metrics (D47), `src/core/rehearsal.ts` is the rehearsal (D48), and `src/core/formats.ts` checks `line.yaml` and `machine.yaml` against `schemas/` (D46).
 - `schemas/`: the JSON Schemas of `line.yaml` and `machine.yaml`; `docs/FORMATS.md` is their specification. Change them together, and the version only with a decision.
 - `src/shared/`: code and types used by both sides (layout, rule expressions, API types).
 - `src/app/`: the renderer: React panels, the PixiJS floor and its procedural sprites. `src/app/build/` holds build mode's panels.
@@ -115,7 +115,7 @@ The CI (`.github/workflows/tests.yml`) runs the Vitest layers and the e2e suite 
 
 ## Real agents cost money
 
-Tests, the demo and dry runs use `agent: sim`. Do not run a line with `agent: claude`, or `e2e/tools/real-agent-check.mjs`, `e2e/tools/permission-check.mjs` or `e2e/tools/real-permissions-check.mjs`, without a cost estimate and approval. To keep an unavoidable real call to cents, use `--model haiku --tools "" --strict-mcp-config --mcp-config '{"mcpServers":{}}'`.
+Tests, the demo and simulated rehearsals use `agent: sim`. Do not run a line with `agent: claude`, or `e2e/tools/real-agent-check.mjs`, `e2e/tools/permission-check.mjs` or `e2e/tools/real-permissions-check.mjs`, without a cost estimate and approval. To keep an unavoidable real call to cents, use `--model haiku --tools "" --strict-mcp-config --mcp-config '{"mcpServers":{}}'`.
 
 ## Lessons about the agent CLIs
 

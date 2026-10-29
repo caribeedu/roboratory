@@ -148,6 +148,8 @@ describe('Defects and notes', () => {
     const b = buildFactory(line('  - { id: a, machine: a }'), { a: simMachine({ output: { blocked: { reason: 'the shared environment is down' } } }) });
     const { report } = await rehearse(b.root, { mode: 'real' });
     expect(find(report, 'blocked')).toMatchObject({ class: 'defect', message: 'Blocked: the shared environment is down' });
+    // the fire that follows a block says the same, so it is not a second finding
+    expect(report.findings.filter((x) => x.pieceId === 'a')).toHaveLength(1);
   });
 });
 

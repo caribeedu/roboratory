@@ -145,7 +145,11 @@ export class Engine extends EventEmitter {
     this.emit('log', entry);
   }
 
+  private disposed = false;
+
   private record(run: RunRt, ev: Record<string, unknown>) {
+    // an engine that was disposed may have its folder removed under it (a rehearsal's copy); what is still unwinding writes nothing
+    if (this.disposed) return;
     const from = ev.type === 'verb' && this.source ? { source: this.source } : {};
     const full = { t: this.now(), ...ev, ...from };
     fs.appendFileSync(path.join(run.dir, 'run.jsonl'), JSON.stringify(full) + '\n');
@@ -1090,6 +1094,7 @@ export class Engine extends EventEmitter {
   }
 
   dispose() {
+    this.disposed = true;
     for (const l of this.lines.values()) {
       for (const b of l.belts) clearTimeout(b.timer);
       for (const p of l.pieces.values()) p.abort?.abort();

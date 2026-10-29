@@ -136,7 +136,8 @@ console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false
       // no shell rules go to the CLI, so none can be walked around; its tools and the tool denials still do
       expect(m.value('--allowedTools').split(',')).not.toEqual(expect.arrayContaining([expect.stringMatching(/^Bash/)]));
       expect(m.value('--allowedTools')).toContain('Edit');
-      expect(m.value('--disallowedTools')).toBe('Agent,WebFetch');
+      // PowerShell is another shell the engine does not read, so the machine is left with Bash
+      expect(m.value('--disallowedTools')).toBe('Agent,PowerShell,WebFetch');
       expect(m.prompt).toContain('Any other command is asked of a person');
       expect(m.prompt).toContain('`npm test`');
     });

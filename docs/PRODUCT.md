@@ -149,6 +149,11 @@ The history of every run, filterable by sector, line, state and period. Opening 
 
 Replaying a past run on the Floor is planned.
 
+### 3.7.1 Metrics (D47)
+The **Metrics** tab (key `3`) shows how each piece usually behaves. A row is a piece in a line in one **version**: a short hash of what the agent is given (agent, model, effort, role with its cultures, contract, rules, tools, folders, attempts, timeout and the line's context), so a changed role starts a new row instead of blurring an average. The columns are runs, cost (always an estimate, `~US$`), duration, attempts, reworks, questions, blocks, fires and permission requests, and for a checker the passes later proved wrong. Under each line, a total and the permission figures: requests, allows that repeat a command already allowed in the same run, denied requests and the median wait. The filters are sector, line and period; older versions are hidden until asked for. A click on a row opens the piece's panel, which has the same figures as a line of history for its current version.
+
+`roboratory stats [--sector s] [--line l] [--since 7d] [--run <id>] [--all-versions] [--json]` prints the same table. The cost of a piece's version is read from the runs on disk, never sent anywhere.
+
 ### 3.8 Build mode
 Where you build and change the factory, on the Floor itself, one sector at a time.
 
@@ -177,6 +182,16 @@ Where you build and change the factory, on the Floor itself, one sector at a tim
 - If files change on disk during a session, the diff marks them, and you keep your version or take the one on disk, file by file.
 - The sector keeps working during a session: runs continue, and their gates, questions and retries are handled from their live panels, which the attention queue and each piece's "Open the live panel" link open. Dispatching is disabled only on lines the draft changes, since they would run the files on disk, not what the Floor shows.
 
+### 3.8.1 Rehearsal (D48)
+In build mode, the line's settings have a **Rehearse** button. It runs the line once on a copy of the draft, with nobody to answer, and reports what it found before anything is saved or spent on a real run.
+- **Two modes.** *Real with Haiku* keeps the real roles, contracts, lists and signals and switches the Claude machines to Haiku at low effort, for cents; it asks for a cost ceiling and shows the estimate, and nothing runs until you confirm. *Simulation* changes every agent for a simulated one and every signal to a pass: it is free, and finds shape defects (a broken wire, a contract nobody can meet).
+- **What it refuses.** A machine's `outward:` list names the commands that act outside the factory and the copy; the rehearsal removes them from the machine's tools.
+- **Nobody answers.** A command no list covers is denied and reported; a question is answered with its recommendation; a gate is released on the first choice that does not send work back.
+- **Findings** are defects (a fire, a command no list covers, a block) or notes (a question asked, an action held back). The dialog lists them; picking one selects the piece on the Floor, where pieces carry a mark, and the piece's panel has a Rehearsal section. A finding about a piece whose version has since changed turns grey. **Allow it** adds the command to the machine's `allow` in the draft; **It acts outside** adds it to `outward`. Rehearse again to check.
+- **Stop** ends the rehearsal; the ceiling stops new steps once spent.
+
+`roboratory rehearse <line> [--simulation] [--skip-signals] [--max-cost <usd>] [--keep] [--yes] [--input k=v]` does the same from a terminal. It exits 1 when there are defects. The report is written under `.runs/rehearsals/<id>/`, and the copy is deleted unless `--keep`.
+
 ### 3.9 Proposals as ghosts (planned)
 A manager's proposed change appears on the Floor as translucent ghost pieces: additions in blue, removals in red, and the line as it would look. A floating card offers Accept, Reject and View diff.
 - A new sector proposed by the General Manager appears as a ghost room in the Andon.
@@ -197,12 +212,13 @@ A floating radio log with three levels:
 | Machine | The detailed transcript of one machine's agent |
 
 ### 3.12 Actions and audit
-Every action is a verb: run, retry, release, answer, allow, deny, halt, resume, and accepting a change. `allow` and `deny` are never automatic and a manager cannot propose them. Buttons, manager proposals and the `roboratory` command call the same verbs. Every verb lands in the audit log with who triggered it and when, for example "you approved the gate *Mitigation OK* at 14:02"; verbs from the command also record the source `cli`.
+Every action is a verb: run, retry, release, answer, allow, deny, halt, resume, rehearse, and accepting a change. `allow`, `deny` and `rehearse` are never automatic and a manager cannot propose them. Buttons, manager proposals and the `roboratory` command call the same verbs. Every verb lands in the audit log with who triggered it and when, for example "you approved the gate *Mitigation OK* at 14:02"; verbs from the command also record the source `cli`.
 
 ### 3.14 The engine and the command line
 The app is a window onto the factory's engine, a separate process that keeps your runs going when you quit or rebuild the app (D43). It starts when you open a factory and ends by itself a minute after the last run and the last window are gone.
 - **`roboratory serve | stop | status`** start, stop and inspect the engine of the factory you are in (or `--factory <dir>`).
 - **`roboratory run <line> --input k=v`, `release <line> <gate>`, `answer`, `allow <request>`, `deny <request> --reason …`, `retry`, `halt`, `resume`** are the buttons of the Floor, for a terminal or a script. A gate that asks for several confirmations is released with `--confirm <n>`, so each "are you sure?" is still yours to give. A line that the open build-mode draft changes is refused here too.
+- **`roboratory stats`** and **`roboratory rehearse <line>`** are the Metrics tab and the Rehearse button (3.7.1, 3.8.1).
 - **`roboratory watch`** prints what needs you: gates waiting, questions, fires, reworks and the end of each run, with the cost so far.
 - **`roboratory restart --when-idle`**, or the banner when the app is newer than the engine: no new work starts, the running machines and signals finish, and the engine comes back as the new version with every gate, question and fire where it was.
 - **File → Install command-line tool** puts `roboratory` in `~/.local/bin` when you confirm. The menu shows whether it is installed, outdated (the app moved or updated) or missing, and when it is not installed the top bar shows an Install CLI (or Update CLI) button. Build mode stays in the app.

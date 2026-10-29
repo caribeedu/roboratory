@@ -118,7 +118,7 @@ Choose **Open the demo factory** on the welcome screen. It creates a factory in 
 
 ## Status
 
-Roboratory is an early release (v0.9): the factory, the Floor, headless machines that ask before they run a command outside their list, managers, build mode, versioned file formats and an engine that runs without the app (with a `roboratory` command) are built; checkers that prove their work and automatic intakes are planned ([docs/ROADMAP.md](docs/ROADMAP.md)).
+Roboratory is an early release (v0.10): the factory, the Floor, headless machines that ask before they run a command outside their list, managers, build mode, versioned file formats, metrics per piece version, a cheap rehearsal of a line, and an engine that runs without the app (with a `roboratory` command) are built; checkers that prove their work and automatic intakes are planned ([docs/ROADMAP.md](docs/ROADMAP.md)).
 
 ## Contributing and security
 

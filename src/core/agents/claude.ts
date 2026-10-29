@@ -56,7 +56,8 @@ export function claudeArgs(req: AgentRequest): string[] {
   const bash = (c: string) => `Bash(${c}:*)`;
   const tools = req.allow.filter((a) => isToolName(a) && !(perm && a === 'Bash'));
   const allowed = req.shell ? [...tools, ...(perm ? [] : commands.map(bash)), ...req.tools] : [...READ_TOOLS, ...req.tools];
-  const disallowed = ['Agent', ...req.deny.filter((d) => isToolName(d) || !perm).map((d) => (isToolName(d) ? d : bash(d)))];
+  // the engine reads shell commands as Bash does (D44); Claude Code's PowerShell tool would walk around that, so the machine is left with Bash
+  const disallowed = ['Agent', ...(perm ? ['PowerShell'] : []), ...req.deny.filter((d) => isToolName(d) || !perm).map((d) => (isToolName(d) ? d : bash(d)))];
   const rules = req.shell ? shellRules(commands, req.allow.includes('Bash'), !!perm) : '';
   // no sub-agents: a step's work stays in one clean context, one folder and one transcript (D9)
   const args = ['-p', rules ? `${req.prompt}\n\n${rules}` : req.prompt, '--output-format', 'stream-json', '--verbose', '--json-schema', JSON.stringify(req.schema), '--permission-mode', perm ? 'default' : 'dontAsk', '--allowedTools', allowed.join(','), '--disallowedTools', [...new Set(disallowed)].join(','), '--append-system-prompt', req.role];

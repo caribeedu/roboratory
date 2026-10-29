@@ -121,6 +121,7 @@ tools: [mcp__claude_ai_Atlassian, mcp__newrelic]   # a whole server, or mcp__<se
 allow: ["gh pr view"]            # commands it may run besides the defaults, as prefixes (D44)
 deny: ["gh pr merge"]             # commands it must never run; adds to the factory's, the sector's and the line's
 read_only: false                  # true: no file edits, no git push
+outward: ["gh pr create"]         # commands that act outside the factory; a rehearsal removes them (D48)
 ```
 
 Both `machine.yaml` and `line.yaml` are specified in [FORMATS.md](FORMATS.md) and checked against the JSON Schemas in `schemas/` when a factory loads: the version is required and a key the schema does not know is an error (D46).
@@ -189,7 +190,7 @@ Roboratory reads the factory repository's git state and never writes to it. (Tar
 - Lines run from the files on disk. Each run records in its `run.jsonl` the commit it started from and, when the working tree has uncommitted changes, the exact diff in effect.
 
 ### 3.6 Verbs
-All actions go through one engine API: `run`, `retry`, `release`, `answer`, `allow`, `deny`, `halt` and `resume`, plus accepting a manager's change.
+All actions go through one engine API: `run`, `retry`, `release`, `answer`, `allow`, `deny`, `halt`, `resume` and `rehearse`, plus accepting a manager's change.
 - UI buttons, manager proposals and the `roboratory` command (D43) call it. Calls from the command also carry `source: "cli"`.
 - Every call is appended with the actor and the time: to each affected run's `run.jsonl`, and for halts, resumes and accepted changes also to `.runs/<sector>/audit.jsonl`.
 - A halted line stays halted across restarts (`.runs/<sector>/<line>/HALTED`).
@@ -221,6 +222,16 @@ The engine runs in its own process, one per factory. The app and the `roboratory
 - **Lifetime.** The engine ends with `roboratory stop`, or by itself after a minute with no run open and no client connected. Runs, build-mode drafts and their locks, managers and proposals live in the engine; a draft lasts as long as the engine does.
 - **New versions.** A client that finds an engine of another version, or of another build of the same version (a hash of the bundle, `src/core/buildid.ts`: a rebuilt app does not wait for ⌘Q to take effect), offers "Restart when idle". `restartWhenIdle` pauses dispatch for every line: queued work waits, and nothing new starts, but gates still take boxes. When no machine or signal is running, the engine leaves and a client starts the new one: the app does it by itself, and `roboratory restart --when-idle` stays connected until the new engine is up. A client that connects to an engine already waiting to restart takes over that job. Everything the new engine needs is in `run.jsonl`: gates come back holding, questions asking, fires on fire, and boxes that were queued are rebuilt from the belts that had delivered them. During the pause new runs, answers and retries are refused (an answer or a retry hint lives in memory until its step starts, so a restart would lose it), and so is the request itself while build mode holds a draft, which also lives only in the engine.
 - **Windows.** A pipe closed by the server drops what the client has not read, so the engine waits a moment before closing connections. An engine started by a process that holds pipes (a test harness) inherits them; this only matters to a parent that waits for those pipes to close.
+
+### 3.12 Metrics (D47)
+- **What a run records.** `piece.start` carries the piece's `version`: the first 8 characters of a sha256 over what the agent is given (`src/core/version.ts`: agent, model, effort, composed role with cultures, contract, effective rules, tools, dirs, attempts, timeout and the line's context from `src/core/lineplace.ts`; `outward` is not part of it). A `cost` event carries the model and the tokens (`input`, `output`, `cacheRead`, `cacheWrite`) that the adapter reads from the agent's result (`usageOf` in `src/core/agents/claude.ts`).
+- **One calculation.** `computeStats(factory, runs, filter)` in `src/core/stats.ts` reads the runs on disk and returns the rows; the `stats` call of the service, `roboratory stats`, the Metrics tab and the piece's history line all show its result (`src/shared/statsview.ts` and `src/core/statsformat.ts` only format). Checkers are read from the line: a piece with a return belt leaving it.
+- **The ceiling.** `EngineOptions.maxCostUsd`: once an engine has spent that much, `pump` dispatches no new step except gates, the running ones finish, and a `budget` event and a log line say why.
+
+### 3.13 The rehearsal (D48)
+- **Preparation** (`prepareCopy` in `src/core/rehearsal.ts`). The service copies the factory from the disk, or exports the draft (`Draft.export`), into a temporary folder and clones the line's target repository there. `adapt` rewrites the copy for the mode: Claude machines to Haiku at low effort, or every agent to `sim`; `outward` commands removed from `tools`; signals run or made `true`.
+- **The run** (`runRehearsal`). A second `Engine` in the same process runs the line on the copy with `maxCostUsd`. Nobody answers: a permission request is denied as "rehearsal: nobody answers", a question gets its recommendation or first option, a gate is released on the first choice that does not send work back. Permission calls of the copy's agents reach the right engine through `Engine.hasSession` and `serverRoot`.
+- **The report.** Findings of class defect or note, written with the copied runs to `.runs/rehearsals/<id>/report.json`. `rehearse` is an audited verb, never automatic, and real mode needs `approved: true`; one rehearsal runs at a time and `rehearsalStop` aborts it. Progress is pushed to clients as `rehearsal` events.
 
 ### 3.11 Permissions (D44)
 What a machine may run is decided by the engine, from files, and a person is asked about the rest.

@@ -467,7 +467,7 @@ A rework drops the arrivals and skips that the last lap left downstream (D15).
 - Leaving the rules to the CLI: deny and allow rules passed as flags. The check found they miss the `git -C` form, so a hard denial would hold only for the plain command.
 - Answering over the agent's standard input with the control protocol of its SDK. Its messages are not documented for the CLI, so it would break with an update.
 - A hook on every tool call. It costs a process per call and repeats the rules outside the engine.
-- Allowing a command for the rest of the run. It is left for v0.10, which measures how often the same command is allowed again within a run.
+- Allowing a command for the rest of the run. It is left for a later version; the Metrics tab (D47) measures how often the same command is allowed again within a run.
 - Denying by time. A person may take longer than any limit, and a denial by timeout reads to the agent as a refusal of the command.
 - A build-mode warning when a role names a command its `allow` list does not permit. It would be a guess over prose that is wrong in both directions; the request at run time shows the same defect with the real command.
 
@@ -511,7 +511,7 @@ A rework drops the arrivals and skips that the last lap left downstream (D15).
 - **What a run records.** The `cost` event carries the model and the tokens (input, output, cache) as well as the dollars, and every cost is shown as an estimate, since the agent CLI works the value out itself. There is no tolerance for runs written before: the calculation reads the current shape.
 - **One calculation, three outputs.** The engine answers a `stats` call, and three callers show it: the `roboratory stats` command (with `--json`, `--sector`, `--line`, `--since`, `--run` and `--all-versions`), a **Metrics** tab beside the Floor and the Ledger, and one line of history in a piece's panel. The Ledger answers what happened in a run; Metrics answers how a piece usually behaves.
 - **Rows and columns.** A row is a piece in a line, in one version, over all the runs of that version. By default only the current version (the one on disk, or in the draft in build mode); `--all-versions` and a selector in the tab add the earlier ones, each with when it was first seen and how many runs it has. Columns: cost, duration (median and longest), attempts, reworks, questions, blocks, fires, and permission requests (total, repeated, denied, the wait before an answer). A line has a total row. A piece with no runs of its current version says so and shows the version before it.
-- **Checkers are read from the line.** A checker is a piece with a return belt leaving it (D15), so no key marks it. A pass is **proved wrong** when, in the same run, it is followed by a rework sent by another checker, or by a question, a block or a fire at a piece further down.
+- **Checkers are read from the line.** A checker is a piece with a return belt leaving it (D15), so no key marks it. A pass is **proved wrong** when, in the same run, it is followed by a rework sent by another checker that sends the box back through it, or by a question, a block or a fire at a piece further down.
 - **The repeated allows are the measure for permissions.** Over a run, the share of `allow` verbs that repeat a command already allowed in it is what decides whether an allowance wider than one call (D44) is worth designing. The threshold is set from real runs, not before them.
 
 **Alternatives:**

@@ -126,7 +126,8 @@ function findingsOf(f: FactoryDef, line: LineDef, events: Event[], status: Rehea
   const version = new Map<string, string>();
   const seen = new Set<string>();
   const add = (x: Omit<Finding, 'id'>) => {
-    const key = `${x.kind}|${x.pieceId}|${x.command ?? x.message}`;
+    // a block ends in a fire with the same words: one finding, not two
+    const key = `${x.kind === 'fire' ? 'blocked' : x.kind}|${x.pieceId}|${x.command ?? x.message.replace(/^Blocked: /, '')}`;
     if (seen.has(key)) return;
     seen.add(key);
     out.push({ id: `f${out.length + 1}`, ...x });
