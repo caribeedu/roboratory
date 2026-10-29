@@ -125,8 +125,17 @@ describe('The rehearsal dialog', () => {
       expect(bridge.api.rehearsalStop).toHaveBeenCalledTimes(1);
     });
 
-    it('stops nothing when the dialog goes away before it started or after it ended', async () => {
+    it('stops nothing when the dialog goes away before it started', async () => {
       const { unmount } = await open();
+      unmount();
+      expect(bridge.api.rehearsalStop).not.toHaveBeenCalled();
+    });
+
+    it('stops nothing when the dialog goes away after the rehearsal ended', async () => {
+      const { user, unmount } = await open();
+      await user.click(screen.getByRole('button', { name: 'Start (free)' }));
+      await settle();
+      expect(await screen.findByText('The line reached the pallet.')).toBeInTheDocument();
       unmount();
       expect(bridge.api.rehearsalStop).not.toHaveBeenCalled();
     });
