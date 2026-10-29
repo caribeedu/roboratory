@@ -445,3 +445,30 @@ input.mono, textarea.mono { font-family: var(--mono); font-size: 12px; }
 .metrics tr.earlier td { color: var(--muted); }
 .metrics .chip { margin-left: 6px; }
 .piece-history { margin: 0 0 6px; }
+
+/* the rehearsal in build mode (D48) */
+.rehearsal-dialog { max-width: 640px; width: 92vw; max-height: 86vh; overflow: auto; }
+.rehearsal-dialog h3 { font-size: 13px; margin: 10px 0 4px; color: var(--muted); }
+.rehearsal-mode { border: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin: 8px 0; }
+.rehearsal-mode legend { font-size: 11.5px; color: var(--muted); padding: 0; margin-bottom: 4px; }
+.rehearsal-mode .ceiling { display: flex; gap: 6px; align-items: center; font-size: 12.5px; margin-left: auto; }
+.rehearsal-mode .ceiling input { width: 72px; }
+.rehearsal-mode .ceiling input:disabled { opacity: .6; text-align: center; }
+.rehearsal-inputs { display: grid; gap: 6px; margin: 6px 0; }
+.rehearsal-inputs label { display: grid; gap: 2px; font-size: 12.5px; }
+.rehearsal-plan ul, .rehearsal-progress, .findings { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.rehearsal-progress li { display: flex; gap: 8px; }
+.rehearsal-progress li.s-busy b { color: var(--warn); }
+.rehearsal-progress li.s-fire b { color: var(--fail); }
+.finding { display: grid; grid-template-columns: 22px minmax(0,1fr); gap: 8px; padding: 6px 8px; border: 1px solid var(--edge); background: var(--panel-2); font-size: 13px; }
+.finding.defect { border-left: 3px solid var(--fail); }
+.finding.note { border-left: 3px solid var(--muted); }
+.finding.stale { opacity: .55; filter: grayscale(1); }
+.finding-icon { width: 20px; height: 20px; display: grid; place-items: center; font-family: var(--display); font-size: 12px; border: 1px solid var(--edge); }
+.finding.defect .finding-icon { background: var(--fail); color: #fff; }
+.finding .actions { margin-top: 4px; }
+.piece-label.found-defect::before, .piece-label.found-note::before, .piece-label.found-stale::before { content: "R"; position: absolute; top: -9px; left: -7px; font-size: 7px; color: #fff; padding: 0 2px; border: 0.5px solid #000; }
+.piece-label.found-defect::before { background: var(--fail); }
+.piece-label.found-note::before { background: #3f7fbf; }
+.piece-label.found-stale::before { background: #6b6358; }
+.piece-label.found-defect, .piece-label.found-note, .piece-label.found-stale { pointer-events: auto; cursor: help; }

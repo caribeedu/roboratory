@@ -175,6 +175,18 @@ describe('build-mode edits', () => {
     expect(d.load().problems?.filter((p) => /schema_version/.test(p.message))).toEqual([]);
   });
 
+  it('adds a command to the allow or the outward list of a machine, once, keeping the rest of the file', () => {
+    const root = factory(LINE, { build: { ...machine(), 'machine.yaml': 'schema_version: 1\n# the builder\nagent: sim\nallow: [npm test]\n' }, check: machine() });
+    const d = new Draft(root);
+    const file = path.join(root, 'sectors/s/models/m/machines/build/machine.yaml');
+    apply(d, { op: 'addCommand', lineId: 's/a', pieceId: 'build', list: 'allow', command: 'gh pr view' });
+    apply(d, { op: 'addCommand', lineId: 's/a', pieceId: 'build', list: 'allow', command: 'gh pr view' });
+    apply(d, { op: 'addCommand', lineId: 's/a', pieceId: 'build', list: 'outward', command: ' git push ' });
+    expect(d.read(file)).toBe('schema_version: 1\n# the builder\nagent: sim\nallow: [npm test, gh pr view]\noutward: [git push]\n');
+    expect(() => apply(d, { op: 'addCommand', lineId: 's/a', pieceId: 'ghost', list: 'allow', command: 'x' })).toThrow(/not a machine/);
+    expect(() => apply(d, { op: 'addCommand', lineId: 's/a', pieceId: 'build', list: 'allow', command: '  ' })).toThrow(/Write the command/);
+  });
+
   it('writing back what the disk holds drops the change', () => {
     const root = factory(LINE, { build: machine(), check: machine() });
     const d = new Draft(root);

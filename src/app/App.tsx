@@ -4,6 +4,7 @@ import { isBurning, type AttentionItem } from '../shared/types';
 import { DraftRev } from './build/forms';
 import { PieceEditor } from './build/PieceEditor';
 import { SaveDialog } from './build/SaveDialog';
+import { RehearsalCtx, RehearsalDialog, marksOf, type RehearsalState } from './build/Rehearsal';
 import { Settings, type SettingsPanel } from './build/Settings';
 import { Floor, type Selection } from './floor/Floor';
 import { EngineBanner, InstallCliButton } from './panels/EngineBanner';
@@ -39,7 +40,20 @@ export function App() {
   const [saving, setSaving] = useState<{ reason?: string; then?: () => void } | null>(null);
   const [rev, setRev] = useState(0);
   useEffect(() => { setRev((r) => r + 1); }, [build]);
-  useEffect(() => api().onBuild((v) => { setBuild(v); if (!v) { setConnectFrom(null); setPanel(null); setSaving(null); } }), []);
+  // the rehearsal of a line in the draft (D48): its dialog, its last report, and the versions the draft's pieces have now
+  const [rehearsing, setRehearsing] = useState<string | null>(null);
+  const [rehearsal, setRehearsal] = useState<RehearsalState | null>(null);
+  useEffect(() => api().onBuild((v) => { setBuild(v); if (!v) { setConnectFrom(null); setPanel(null); setSaving(null); setRehearsing(null); setRehearsal(null); } }), []);
+  const rehearsedLine = rehearsal?.lineId;
+  useEffect(() => {
+    if (!rehearsedLine || !build) return;
+    let alive = true;
+    void api().stats({ lineId: rehearsedLine, draft: true, allVersions: true }).then((s) => {
+      const versions = Object.fromEntries((s?.lines?.find((l) => l.lineId === rehearsedLine)?.pieces ?? []).map((p) => [p.pieceId, p.currentVersion]));
+      if (alive) setRehearsal((r) => (r && r.lineId === rehearsedLine ? { ...r, versions } : r));
+    }, () => {});
+    return () => { alive = false; };
+  }, [rehearsedLine, rehearsal?.report.id, build]);
 
   const notify = (text: string, kind: 'ok' | 'fail' | 'info' = 'info') => {
     setToast({ text, kind });
@@ -168,6 +182,7 @@ export function App() {
   if (build && selectedPiece && !selectedPiece.live && !draftPiece) queueMicrotask(() => setSelection(null));
 
   return (
+    <RehearsalCtx.Provider value={{ state: rehearsal, open: setRehearsing, marks: marksOf(rehearsal) }}>
     <div className={`app${firePanel ? ' alarm' : ''}`}>
       <header className="topbar">
         <div className="brand"><img className="logo" src={logo} alt="" width={26} height={26} />Roboratory</div>
@@ -227,6 +242,7 @@ export function App() {
               onInsert: (l, at, k) => void insert(l, at, k),
               onConnect: (l, to) => void connect(l, to),
               onLineSettings: (lineId) => { setSelection(null); setPanel({ kind: 'line', lineId }); },
+              marks: marksOf(rehearsal),
             } : undefined}
           />
           <div className="sector-title">
@@ -296,7 +312,13 @@ export function App() {
           onDiscard={() => { const then = saving.then; void endBuild().then(then); }}
           onSave={(r) => { const then = saving.then; void api().buildSave(r).then(() => { setBuild(null); setSaving(null); setSelection(null); setPanel(null); notify('Saved. Commit the files when you are ready.', 'ok'); then?.(); }, (e) => notify(errText(e), 'fail')); }} />
       )}
+      {build && rehearsing && (
+        <RehearsalDialog lineId={rehearsing} factory={build.factory} op={op} onClose={() => setRehearsing(null)}
+          onReport={(report) => setRehearsal({ lineId: rehearsing, report, versions: {} })}
+          onPiece={(pieceId) => { setPanel(null); setSelection({ kind: 'piece', lineId: rehearsing, pieceId }); }} />
+      )}
       {toast && <div className={`toast ${toast.kind}`} role="status">{toast.text}</div>}
     </div>
+    </RehearsalCtx.Provider>
   );
 }

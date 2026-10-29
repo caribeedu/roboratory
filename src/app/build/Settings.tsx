@@ -1,5 +1,5 @@
 // Build mode's settings above pieces (D41): a line, its sector, the factory, and new lines and sectors.
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import YAML from 'yaml';
 import type { BuildView, ManagerConf } from '../../shared/build';
 import { AGENTS, type Policy, type Snapshot, type VerbName } from '../../shared/types';
@@ -7,6 +7,7 @@ import { Head, Section } from '../panels/Inspector';
 import { api } from '../store';
 import { Commit, ListField, Row, slug, useDraftFile, useRefusal } from './forms';
 import { modelDir, type Op } from './PieceEditor';
+import { RehearsalCtx } from './Rehearsal';
 
 type Factory = NonNullable<Snapshot['factory']>;
 type Line = Factory['sectors'][number]['lines'][number];
@@ -52,6 +53,8 @@ function LineSettings({ view, line, op, onClose }: { view: BuildView; line?: Lin
   const modelRaw = useDraftFile(`${modelDir(line)}/line.yaml`, view);
   let modelConf: Record<string, unknown> = {};
   try { modelConf = YAML.parse(modelRaw ?? '') ?? {}; } catch { /* shown by the checks */ }
+  const rehearsal = useContext(RehearsalCtx);
+  const found = rehearsal.state?.lineId === line.id ? rehearsal.state.report.findings.length : 0;
   const copies = view.factory.sectors.flatMap((s) => s.lines).filter((l) => l.model === line.model && l.sharedModel === line.sharedModel);
   return (
     <>
@@ -63,6 +66,9 @@ function LineSettings({ view, line, op, onClose }: { view: BuildView; line?: Lin
       </Row>
       <Row label="Target repository" hint="Machines get chained worktrees of it. Leave empty for lines that pick repositories themselves.">
         <Commit label="Target repository" value={line.repo ?? ''} placeholder="~/repos/my-service" onCommit={(v) => void op({ op: 'setLine', lineId: line.id, repo: v || null })} />
+      </Row>
+      <Row label="Rehearsal" hint="Runs this line once on a copy of the draft, with nobody to answer, and lists what it finds.">
+        <button className="btn" onClick={() => rehearsal.open(line.id)}>Rehearse{found ? ` (${found})` : ''}</button>
       </Row>
       <Row label="Model" hint={copies.length > 1 ? `Shared with ${copies.filter((c) => c.id !== line.id).map((c) => c.name).join(', ')}. Select a piece to separate it.` : undefined}><code>{modelDir(line)}</code></Row>
       <Row label="Never allowed" hint="Commands no machine of this line's model may run, added to the sector's and the factory's."><ListField label="Line never allowed" value={listOf(modelConf.deny)} onCommit={(deny) => void op({ op: 'setModel', lineId: line.id, deny })} /></Row>

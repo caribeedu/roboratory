@@ -44,6 +44,8 @@ export type BuildOp =
   | { op: 'setPiece'; lineId: string; pieceId: string; label?: string; goal?: string; gate?: GateSpec; run?: string; /** signal time limit; empty removes it (D19) */ timeout?: string }
   | { op: 'setIntake'; lineId: string; label?: string; inputs?: InputField[] }
   | { op: 'setMachine'; lineId: string; pieceId: string; conf: MachineConf }
+  /** adds one command to a machine's `allow` or `outward` list, unless it is there (D48: what a finding of an uncovered command offers) */
+  | { op: 'addCommand'; lineId: string; pieceId: string; list: 'allow' | 'outward'; command: string }
   | { op: 'writeFile'; path: string; content: string; executable?: boolean }
   | { op: 'setLine'; lineId: string; name?: string; direction?: Direction; params?: Record<string, string>; repo?: string | null }
   /** commands no machine of the line's model may run (D44); an empty list removes the key */

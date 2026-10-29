@@ -8,6 +8,7 @@ import { Head, Rule, Section } from '../panels/Inspector';
 import { api } from '../store';
 import { Commit, DraftRev, GoalField, ListField, Row, useDraftFile, useRefusal } from './forms';
 import { PieceHistory } from '../panels/PieceHistory';
+import { PieceRehearsal } from './Rehearsal';
 import { RuleBuilder } from './RuleBuilder';
 
 type Line = NonNullable<Snapshot['factory']>['sectors'][number]['lines'][number];
@@ -34,6 +35,7 @@ export function PieceEditor({ view, line, piece, op, onConnect, onClose, onLive 
           const mine = view.issues.filter((i) => i.pieceId === piece.id && i.lineIds.includes(line.id));
           return mine.length ? <ul className="issue-list" aria-label="Problems">{mine.map((i, k) => <li key={k}>{i.message}</li>)}</ul> : null;
         })()}
+        <PieceRehearsal lineId={line.id} pieceId={piece.id} label={(id) => labelOf(line, id)} op={op} />
         {onLive && <button className="link small live-link" onClick={onLive}>Open the live panel (runs, gates, dispatch)</button>}
         {sameModel.length > 1 && (
           <div className="reach-note">

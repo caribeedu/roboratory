@@ -66,7 +66,7 @@ type Listener<T> = (v: T) => void;
 export interface FakeBridge {
   api: { [K in keyof RoboratoryApi]: RoboratoryApi[K] extends (...a: infer A) => infer R ? ((...a: A) => R) & ReturnType<typeof vi.fn> : never };
   /** push something from the main process, as the real bridge would */
-  emit: { snapshot(s: Snapshot): void; logs(l: unknown[]): void; messages(key: string): void; build(v: unknown): void; engine(s: unknown): void; cli(s: string): void };
+  emit: { snapshot(s: Snapshot): void; logs(l: unknown[]): void; messages(key: string): void; build(v: unknown): void; engine(s: unknown): void; cli(s: string): void; rehearsal(p: unknown): void };
 }
 
 /**
@@ -95,7 +95,7 @@ export function installBridge(over: Record<string, unknown> = {}): FakeBridge {
   afterEach(() => { for (const k of Object.keys(listeners)) delete listeners[k]; delete (window as unknown as { roboratory?: unknown }).roboratory; });
   return {
     api: api as FakeBridge['api'],
-    emit: { snapshot: emitter('snapshot'), logs: emitter('logs'), messages: emitter('messages'), build: emitter('build'), engine: emitter('engine'), cli: emitter('cli') },
+    emit: { snapshot: emitter('snapshot'), logs: emitter('logs'), messages: emitter('messages'), build: emitter('build'), engine: emitter('engine'), cli: emitter('cli'), rehearsal: emitter('rehearsal') },
   };
 }
 

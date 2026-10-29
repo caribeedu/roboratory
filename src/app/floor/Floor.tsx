@@ -23,6 +23,8 @@ export interface FloorBuild {
   onInsert: (lineId: string, at: Slot, kind: 'machine' | 'signal' | 'gate') => void;
   onConnect: (lineId: string, to: string) => void;
   onLineSettings: (lineId: string) => void;
+  /** what the last rehearsal found, by `lineId#pieceId` (D48); `stale` is a finding of an earlier version of the piece */
+  marks?: Record<string, 'defect' | 'note' | 'stale'>;
 }
 
 export interface FloorProps {
@@ -398,8 +400,9 @@ export function Floor(props: FloorProps) {
                 const pv = lv?.pieces[n.id];
                 const selected = sel?.kind === 'piece' && sel.lineId === l.id && sel.pieceId === n.id;
                 const problems = broken(l.id, n.id);
+                const found = b?.marks?.[`${l.id}#${n.id}`];
                 return (
-                  <div key={n.id} className={`piece-label k-${n.kind} s-${pv?.state ?? 'idle'}${selected ? ' selected' : ''}${problems.length ? ' broken' : ''}`} style={{ left: n.x, top: n.y + (n.kind === 'pallet' ? 12 : 10) }} title={problems.map((x) => x.message).join('\n') || undefined}>
+                  <div key={n.id} className={`piece-label k-${n.kind} s-${pv?.state ?? 'idle'}${selected ? ' selected' : ''}${problems.length ? ' broken' : ''}${found ? ` found-${found}` : ''}`} style={{ left: n.x, top: n.y + (n.kind === 'pallet' ? 12 : 10) }} title={problems.map((x) => x.message).join('\n') || (found ? { defect: 'The rehearsal found a defect here', note: 'The rehearsal left a note here', stale: 'The rehearsal found something here, in an earlier version of this piece' }[found] : undefined)}>
                     <b>{n.kind === 'intake' ? (line.intake.label || 'Intake') : def.label}</b>
                     {n.kind === 'machine' && <i>{def.agent}</i>}
                     {n.kind === 'gate' && <i>{def.rule ? 'automatic' : def.choices ? `${def.choices.length} choices` : 'you release'}</i>}
