@@ -732,6 +732,9 @@ export class Engine extends EventEmitter {
 
     let lastError = '';
     for (let attempt = w.attempt ?? 1; attempt <= machine.attempts; attempt++) {
+      // a stopped engine starts no more agents, and a spent budget starts no retry
+      if (this.disposed) return;
+      if (this.overBudget && attempt > (w.attempt ?? 1)) { this.stop(run, p, `Stopped at the cost ceiling after ${attempt - 1}/${machine.attempts} attempts. Last error: ${lastError}`); return; }
       if (line.halted) { w.attempt = attempt; line.deferred.push(() => { p.current = undefined; p.queue.unshift(w); p.state = 'idle'; this.pump(line, p); }); p.state = 'idle'; this.changed(); return; }
       p.attempt = attempt;
       this.record(run, { type: 'piece.start', piece: def.id, attempt, version, box: w.box.payload });
@@ -964,12 +967,17 @@ export class Engine extends EventEmitter {
     try { st = fs.statSync(file); } catch { return []; }
     const key = `${st.mtimeMs}:${st.size}`;
     const hit = this.eventCache.get(file);
-    if (hit?.key === key) return hit.events;
-    const events = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+    if (hit?.key === key) { this.eventCache.delete(file); this.eventCache.set(file, hit); return hit.events; }
+    const lines = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean);
+    // a line that is still being written is read on the next call
+    const events = lines.flatMap((l, i) => { try { return [JSON.parse(l)]; } catch (e) { if (i === lines.length - 1) return []; throw e; } });
+    this.eventCache.delete(file);
     this.eventCache.set(file, { key, events });
+    if (this.eventCache.size > Engine.CACHED_RUNS) this.eventCache.delete(this.eventCache.keys().next().value!);
     return events;
   }
   private eventCache = new Map<string, { key: string; events: Record<string, unknown>[] }>();
+  private static readonly CACHED_RUNS = 64;
 
   runDiff(runId: string): string | undefined {
     const run = this.runs.get(runId);

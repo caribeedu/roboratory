@@ -150,6 +150,18 @@ describe('Metrics', () => {
       return { b, e };
     };
 
+    it('counts what the runs of earlier versions cost in the line total, whichever versions are shown', async () => {
+      const b = buildFactory(line('  - { id: a, machine: a }'), { a: simMachine({ role: 'Be brief.', cost: 0.2 }) });
+      const e = startEngine(b.f);
+      await e.run(LINE, {});
+      await whenDone(e);
+      fs.writeFileSync(path.join(b.root, 'sectors/s/models/m/machines/a/role.md'), 'Be thorough.');
+      const changed = loadFactory(b.root);
+      const shown = computeStats(changed, runsOf(e));
+      expect(shown.lines[0].total.cost).toBeCloseTo(0.2);
+      expect(computeStats(changed, runsOf(e), { allVersions: true }).lines[0].total.cost).toBeCloseTo(0.2);
+    });
+
     it('starts a new version when the role changes, and keeps the earlier one as a row of its own', async () => {
       const { b, e } = await ranBefore();
       const before = row(statsOf(e, b), 'a').version;

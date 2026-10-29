@@ -17,6 +17,17 @@ function open(lineYaml: string, machines: Record<string, Record<string, string>>
 }
 
 describe('A rehearsal asked of the engine', () => {
+  it('keeps where the call came from in the audit, though the copy is made before it is written', async () => {
+    const { b, svc } = open(line('  - { id: a, machine: a }'), { a: simMachine() });
+    svc.engine!.source = 'cli'; // as the server sets it while it handles the call
+    const done = svc.rehearse(req());
+    svc.engine!.source = undefined;
+    await done;
+    const audit = fs.readFileSync(path.join(b.root, '.runs', 's', 'audit.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    expect(audit[0]).toMatchObject({ verb: 'rehearse', source: 'cli' });
+    svc.close();
+  });
+
   it('refuses to spend without a yes, and says why', async () => {
     const { svc } = open(line('  - { id: a, machine: a }'), { a: simMachine() });
     await expect(svc.rehearse(req({ mode: 'real' }))).rejects.toThrow(/spends money/);

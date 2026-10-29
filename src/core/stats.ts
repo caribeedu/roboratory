@@ -127,6 +127,7 @@ export function computeStats(f: FactoryDef, runs: RunEvents[], filter: StatsFilt
       for (const r of kept) for (const [key, v] of visitsOf(line, r.events)) { const arr = byKey.get(key) ?? []; arr.push(v); byKey.set(key, arr); }
       const checkers = checkersOf(line);
       const pieces: PieceStats[] = [];
+      const everything: VersionRow[] = []; // every version, whatever is shown: the line's cost is that of its runs
       for (const p of line.model.pieces) {
         if (!p.machine) continue;
         const current = pieceVersion(f, line, p.id)!;
@@ -150,10 +151,11 @@ export function computeStats(f: FactoryDef, runs: RunEvents[], filter: StatsFilt
         }
         rows.sort((a, b) => b.firstSeen - a.firstSeen);
         // the current version, or while it has no runs the newest one before it; every version on request
+        everything.push(...rows);
         const now = rows.filter((r) => r.current);
         pieces.push({ pieceId: p.id, label: p.label, machine: p.machine, checker: checkers.has(p.id), currentVersion: current, rows: filter.allVersions ? rows : now.length ? now : rows.slice(0, 1) });
       }
-      const shown = pieces.flatMap((p) => p.rows);
+      const shown = everything;
       const tokens = zero(); shown.forEach((r) => add(tokens, r.tokens));
       const sum = (pick: (r: VersionRow) => number) => shown.reduce((a, r) => a + pick(r), 0);
       lines.push({

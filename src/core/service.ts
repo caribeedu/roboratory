@@ -187,11 +187,12 @@ export class FactoryService {
     const run = this.withInputs(req, of);
     const missing = line.model.intake.inputs.filter((i) => i.required && !String(run.input[i.name] ?? '').trim()).map((i) => i.label || i.name);
     if (missing.length) throw new Error(`Missing input: ${missing.join(', ')}`);
+    const via = e.source; // set only while the call that came in is handled, so it is kept for the audit
     const stop = new AbortController();
     this.rehearsing = { stop };
     try {
       const copy = await prepareCopy(source, req.lineId);
-      e.audit(line.sectorId, { verb: 'rehearse', actor: 'you', lineId: req.lineId, mode: req.mode, from: req.source, ...(req.mode === 'real' ? { maxCostUsd: req.maxCostUsd } : {}) });
+      e.audit(line.sectorId, { verb: 'rehearse', actor: 'you', lineId: req.lineId, mode: req.mode, from: req.source, ...(via ? { source: via } : {}), ...(req.mode === 'real' ? { maxCostUsd: req.maxCostUsd } : {}) });
       return await runRehearsal(copy, run, {
         sourceRoot: f.root, permissionTool: this.opts.permissionTool, serverRoot: f.root, signal: stop.signal,
         onProgress: (p) => this.out.rehearsal?.(p), onEngine: (engine) => { if (this.rehearsing) this.rehearsing.engine = engine; },

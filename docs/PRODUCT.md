@@ -189,7 +189,7 @@ In build mode, the line's settings have a **Rehearse** button. It runs the line 
 - **What it refuses.** A machine's `outward:` list names the commands and tools that act outside the factory and the copy; the rehearsal refuses the commands and removes the tools from the machine.
 - **Nobody answers.** A command no list covers is denied and reported; a question is answered with its recommendation; a gate is released on the first choice that does not send work back.
 - **Findings** are defects (a fire, a command no list covers, a block) or notes (a question asked, an action held back). The dialog lists them; picking one selects the piece on the Floor, where pieces carry a mark, and the piece's panel has a Rehearsal section. A finding about a piece whose version has since changed turns grey. **Allow it** adds the command to the machine's `allow` in the draft; **It acts outside** adds it to `outward`. Rehearse again to check.
-- **Stop** ends the rehearsal; the ceiling stops new steps once spent.
+- **Stop** ends the rehearsal, and so does the connection that started it ending; the ceiling stops new steps and retries once spent.
 
 `roboratory rehearse <line> [--simulation] [--skip-signals] [--max-cost <usd>] [--keep] [--yes] [--input k=v]` does the same from a terminal. It exits 1 when there are defects. The report is written under `.runs/rehearsals/<id>/`, and the copy is deleted unless `--keep`.
 

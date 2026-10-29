@@ -293,7 +293,7 @@ describe('The plan shown before it spends', () => {
     expect(suggestionFor('npm test --silent')).toBe('npm test');
     expect(suggestionFor('gh pr view 12')).toBe('gh pr');
     expect(suggestionFor('cat notes.md')).toBe('cat');
-    expect(suggestionFor('git -C x status')).toBe('git');
+    expect(suggestionFor('git -C x status')).toBe('git -C x status');
     expect(suggestionFor('make')).toBe('make');
     // a program that runs whatever it is given is not offered bare
     expect(suggestionFor('python script.py')).toBe('python script.py');

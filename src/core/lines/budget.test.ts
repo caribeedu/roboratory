@@ -1,5 +1,5 @@
 // The cost ceiling (D48): once what the runs of an engine have cost passes it, no new step starts, and the ones running finish.
-import { buildFactory, LINE, line, piecesRun, quietFor, simMachine, startEngine, stateOf, until, whenDone } from '../../test/harness';
+import { buildFactory, strictMachine, LINE, line, piecesRun, quietFor, simMachine, startEngine, stateOf, until, whenDone } from '../../test/harness';
 
 const steps = (n: number) => Array.from({ length: n }, (_, i) => `  - { id: s${i}, machine: s${i} }`).join('\n');
 const machines = (n: number, cost: number) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`s${i}`, simMachine({ cost })]));
@@ -27,6 +27,25 @@ describe('The cost ceiling', () => {
     expect(e.runSummaries()[0].status).toBe('running');
     expect(e.costCeilingHit).toBe(true);
     expect(e.logs.some((l) => /cost ceiling of US\$ 0\.50 is reached/.test(l.text))).toBe(true);
+  });
+
+  it('starts no retry of a step once the cost has passed it', async () => {
+    const { f } = buildFactory(line('  - { id: a, machine: a }'), { a: strictMachine({ cost: 0.6, attempts: 3, output: { ok: false } }) });
+    const e = startEngine(f, { beltMs: 5, maxCostUsd: 0.5 });
+    await e.run(LINE, {});
+    await until(() => stateOf(e, 'a') === 'fire');
+    expect(e.costSoFar).toBeCloseTo(0.6);
+    expect(e.lineView(LINE).pieces.a.error).toMatch(/Stopped at the cost ceiling after 1\/3 attempts/);
+  });
+
+  it('starts no retry of a step once the engine is disposed', async () => {
+    const { f } = buildFactory(line('  - { id: a, machine: a }'), { a: strictMachine({ seconds: 1, attempts: 3, output: { ok: false } }) });
+    const e = startEngine(f, { beltMs: 5 });
+    await e.run(LINE, {});
+    await until(() => stateOf(e, 'a') === 'busy');
+    e.dispose();
+    await quietFor(400);
+    expect(e.logs.filter((l) => /attempt 2\/3/.test(l.text))).toEqual([]);
   });
 
   it('lets the steps that were running when the ceiling was reached finish', async () => {

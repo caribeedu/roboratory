@@ -117,13 +117,13 @@ export function planOf(f: FactoryDef, req: RehearsalRequest, reference?: Rehears
 
 // ---------- the findings ----------
 
-const BROAD = new Set(['python', 'python3', 'node', 'sh', 'bash', 'zsh', 'pwsh', 'powershell', 'perl', 'ruby', 'rm', 'curl', 'wget', 'sudo', 'npx', 'xargs', 'env', 'eval']);
+const BROAD = new Set(['find', 'docker', 'ssh', 'scp', 'bun', 'deno', 'php', 'cmd', 'make', 'python', 'python3', 'node', 'sh', 'bash', 'zsh', 'pwsh', 'powershell', 'perl', 'ruby', 'rm', 'curl', 'wget', 'sudo', 'npx', 'xargs', 'env', 'eval']);
 
 /** The prefix of a command that a list would take: its first word, and a second when that looks like a subcommand. */
 export function suggestionFor(part: string): string {
   const w = part.trim().split(/\s+/);
   // a program that runs whatever it is given is offered whole, so one click does not allow all of it
-  if (w.length > 1 && BROAD.has(w[0])) return part.trim();
+  if (w.length > 1 && (BROAD.has(w[0]) || w[1].startsWith('-'))) return part.trim();
   return w.length > 1 && /^[a-z][\w-]*$/i.test(w[1]) ? `${w[0]} ${w[1]}` : w[0] ?? part;
 }
 
@@ -201,6 +201,8 @@ async function rehearseCopy(copy: RehearsalCopy, req: RehearsalRequest, env: Reh
   const loaded = loadFactory(copy.folder);
   if (loaded.warnings.length && !loaded.sectors.some((s) => s.lines.some((l) => l.id === req.lineId))) throw new Error(`The copy does not load: ${loaded.warnings[0]}`);
   const { f, line } = adapt(loaded, req.lineId, req);
+  // a simulation never reaches the repository; a real rehearsal must not run against the real one
+  if (line.repo && !copy.repo && req.mode === 'simulation') line.repo = undefined;
   if (line.repo && !copy.repo) throw new Error(`The line's repository ${line.repo} is not a git repository, so there is nothing to clone for the rehearsal.`);
   if (copy.repo) line.repo = copy.repo;
   const original = lineOf(loaded, req.lineId);
