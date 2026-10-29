@@ -94,7 +94,9 @@ export function RehearsalDialog({ lineId, factory, op, onClose, onReport, onPiec
   const [error, setError] = useState('');
   const [planError, setPlanError] = useState('');
   const alive = useRef(true);
-  useEffect(() => () => { alive.current = false; }, []);
+  const spending = useRef(false);
+  // leaving build mode closes the dialog, and a rehearsal nobody can see or stop must not go on spending
+  useEffect(() => () => { alive.current = false; if (spending.current) void api().rehearsalStop(); }, []);
 
   const request = (): RehearsalRequest => ({ lineId, input, mode, source: 'draft', maxCostUsd: mode === 'real' ? Number(ceiling) : undefined, approved: mode === 'real' });
   const ceilingOk = mode === 'simulation' || Number(ceiling) > 0;
@@ -112,11 +114,12 @@ export function RehearsalDialog({ lineId, factory, op, onClose, onReport, onPiec
   const start = async () => {
     setPhase('running'); setError(''); setProgress(null);
     const off = api().onRehearsal((p) => { if (alive.current) setProgress(p); });
+    spending.current = true;
     try {
       const r = await api().rehearse(request());
       if (!alive.current) return;
       setReport(r); setPhase('done'); onReport(r);
-    } catch (e) { if (alive.current) { setError(errText(e)); setPhase('setup'); } } finally { off(); }
+    } catch (e) { if (alive.current) { setError(errText(e)); setPhase('setup'); } } finally { spending.current = false; off(); }
   };
 
   const findings = report?.findings ?? [];

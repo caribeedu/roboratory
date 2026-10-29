@@ -238,6 +238,8 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
     // a rehearsal spends money, so it ends with the connection that asked for it (Ctrl-C in the command, the window closing)
     rehearse: (c: net.Socket, req: Parameters<FactoryService['rehearse']>[0]) => {
       if (restarting) throw new Error('The engine is restarting and starts no rehearsal. Try again in a moment.');
+      // only the connection that owns the rehearsal ends it: a call refused because one is running must not carry its stop
+      if (service.rehearsalRunning) return service.rehearse(req);
       const stop = () => service.rehearsalStop();
       c.once('close', stop);
       return service.rehearse(req).finally(() => { c.off('close', stop); drained(); });

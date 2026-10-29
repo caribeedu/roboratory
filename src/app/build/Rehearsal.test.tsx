@@ -31,9 +31,9 @@ async function open(o: { plan?: RehearsalPlan | ((req: unknown) => RehearsalPlan
   });
   op = vi.fn(async (_o: BuildOp) => true);
   const onClose = vi.fn(), onReport = vi.fn(), onPiece = vi.fn();
-  render(<RehearsalDialog lineId={LINE_ID} factory={factory} op={op as never} onClose={onClose} onReport={onReport} onPiece={onPiece} />);
+  const view = render(<RehearsalDialog lineId={LINE_ID} factory={factory} op={op as never} onClose={onClose} onReport={onReport} onPiece={onPiece} />);
   await settle();
-  return { onClose, onReport, onPiece, user: userEvent.setup() };
+  return { unmount: view.unmount, onClose, onReport, onPiece, user: userEvent.setup() };
 }
 const dialog = () => screen.getByRole('dialog', { name: 'Rehearse orders-api releases' });
 
@@ -115,6 +115,20 @@ describe('The rehearsal dialog', () => {
       expect(bridge.api.rehearsalStop).toHaveBeenCalled();
       await act(async () => { finish(report([], { status: 'aborted' })); });
       expect(await screen.findByText('The rehearsal was stopped.')).toBeInTheDocument();
+    });
+
+    it('stops a rehearsal that is running when the dialog goes away, since nobody could stop it then', async () => {
+      const { user, unmount } = await open();
+      (bridge.api.rehearse as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => new Promise(() => {}));
+      await user.click(screen.getByRole('button', { name: 'Start (free)' }));
+      unmount();
+      expect(bridge.api.rehearsalStop).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops nothing when the dialog goes away before it started or after it ended', async () => {
+      const { unmount } = await open();
+      unmount();
+      expect(bridge.api.rehearsalStop).not.toHaveBeenCalled();
     });
 
     it('starts the real mode with your approval, and shows what it has cost so far', async () => {

@@ -19,7 +19,7 @@ You can now see how each piece of a line behaves over its runs, and try a line b
 - **`outward:` in `machine.yaml`.** Commands that act outside the factory; the rehearsal removes them from the machine's tools.
 - **A cost ceiling.** `--max-cost` (US$ 1.00 by default): once an engine has spent it, no new step starts and the running ones finish. A real rehearsal is refused without one, and it ends with the connection that asked for it (Ctrl-C in the command).
 - **Folders it cannot replace.** The `dirs` of a machine are listed in what will run, since the copy does not stand in for them.
-- **A rehearsal ends with whoever asked.** Stop, Ctrl-C in the command, a closed connection or a closed factory end it, and no retry of a step starts after that or after the ceiling. A real rehearsal of a line whose repository is not a git repository is an error; the simulation goes on without it.
+- **A rehearsal ends with whoever asked.** Stop, Ctrl-C in the command, leaving build mode, a closed connection or a closed factory end it; only the connection that started it ends it, and no retry of a step starts after that or after the ceiling. A real rehearsal of a line whose repository is not a git repository is an error; the simulation goes on without it.
 - **The copy cannot push.** The cloned repository has no `origin`, so a machine allowed to `git push` cannot reach the real one.
 - **`rehearse` is a verb:** audited, never automatic and not proposable by a manager.
 
