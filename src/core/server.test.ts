@@ -85,6 +85,21 @@ describe('engine server', () => {
     expect(c.events.slice(before).filter((e) => e.event === 'snapshot')).toEqual([]);
   });
 
+  it('ends a rehearsal when the connection that asked for it ends, since it may be spending', async () => {
+    const { root } = factory();
+    const srv = await startServer(root, { version: '1.0.0' });
+    const c = await connect(srv.socket, srv.token);
+    // sent, and the connection ends before the copy is made
+    void c.call('rehearse', { lineId: 'engineering/orders-api', input: { ticket: 'T-1' }, mode: 'simulation', source: 'disk' }).catch(() => undefined);
+    c.end();
+    const reports = path.join(root, '.runs/rehearsals');
+    await until(() => fs.existsSync(reports) && fs.readdirSync(reports).length > 0, 30_000);
+    const report = JSON.parse(fs.readFileSync(path.join(reports, fs.readdirSync(reports)[0], 'report.json'), 'utf8'));
+    expect(report.status).toBe('aborted');
+    const again = await connect(srv.socket, srv.token);
+    await again.call('stop');
+  });
+
   it('replaces a stale lock without touching the file the lock names', async () => {
     const { dir, root } = factory();
     fs.mkdirSync(path.join(root, '.runs'), { recursive: true });

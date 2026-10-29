@@ -235,6 +235,12 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
       c.once('close', () => ended.abort());
       return service.permit(session, call, ended.signal);
     },
+    // a rehearsal spends money, so it ends with the connection that asked for it (Ctrl-C in the command, the window closing)
+    rehearse: (c: net.Socket, req: Parameters<FactoryService['rehearse']>[0]) => {
+      const stop = () => service.rehearsalStop();
+      c.once('close', stop);
+      return service.rehearse(req).finally(() => c.off('close', stop));
+    },
     // a stream of what is worth acting on, for `roboratory watch`
     watch: (c: net.Socket) => { watchers.add(c); return true; },
     cancelRestart: () => { restarting = false; service.engine?.resumeDispatch(); return true; },

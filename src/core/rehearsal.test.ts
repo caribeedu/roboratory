@@ -9,6 +9,7 @@ import type { Finding, RehearsalReport, RehearsalRequest } from '../shared/types
 import { apply } from './build/ops';
 import { Draft } from './build/draft';
 import { loadFactory } from './factory';
+import { pieceVersion } from './version';
 import { adapt, planOf, prepareCopy, runRehearsal, suggestionFor } from './rehearsal';
 
 const req = (over: Partial<RehearsalRequest> = {}): RehearsalRequest => ({ lineId: LINE, input: {}, mode: 'simulation', source: 'disk', ...over });
@@ -79,6 +80,20 @@ describe('What nobody answers in a rehearsal', () => {
     const { report } = await rehearse(b.root, { mode: 'real' });
     expect(find(report, 'uncovered-command')).toMatchObject({ class: 'defect', pieceId: 'a', command: 'npm test --silent', suggestion: 'npm test' });
     expect(report.pieces[0]).toMatchObject({ pieceId: 'a', denied: 1 });
+  });
+
+  it('stamps a finding with the version of the piece as it was given, so it can be compared with the draft', async () => {
+    // the rehearsal switches the model, the effort and the agent, and denies the outward items: none of that is the piece's version
+    const b = buildFactory(line('  - { id: a, machine: a }'), { a: simMachine({ requests: ['npm test'] }) });
+    fs.appendFileSync(path.join(b.root, 'sectors/s/models/m/machines/a/machine.yaml'), 'outward: [gh pr create]\n');
+    for (const mode of ['real', 'simulation'] as const) {
+      const { report } = await rehearse(b.root, { mode });
+      const given = loadFactory(b.root);
+      const expected = pieceVersion(given, given.sectors[0].lines[0], 'a');
+      expect(expected).toBeTruthy();
+      expect(report.pieces[0].version).toBe(expected);
+      for (const x of report.findings) expect(x.version).toBe(expected);
+    }
   });
 
   it('holds back what a machine says acts outside, as a note and not as a defect', async () => {
@@ -280,5 +295,8 @@ describe('The plan shown before it spends', () => {
     expect(suggestionFor('cat notes.md')).toBe('cat');
     expect(suggestionFor('git -C x status')).toBe('git');
     expect(suggestionFor('make')).toBe('make');
+    // a program that runs whatever it is given is not offered bare
+    expect(suggestionFor('python script.py')).toBe('python script.py');
+    expect(suggestionFor('rm -rf build')).toBe('rm -rf build');
   });
 });

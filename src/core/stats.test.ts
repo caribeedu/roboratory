@@ -145,7 +145,7 @@ describe('Metrics', () => {
       const now = computeStats(changed.f, runsOf(e));
       expect(piece(now, 'a').currentVersion).not.toBe(before);
       // the current version has no runs, so the version before it is what is shown, and says so
-      expect(piece(now, 'a').rows).toEqual([]);
+      expect(piece(now, 'a').rows).toEqual([expect.objectContaining({ version: before, current: false, runs: 1 })]);
       const all = computeStats(changed.f, runsOf(e), { allVersions: true });
       expect(all.lines[0].pieces[0].rows).toHaveLength(1);
       expect(all.lines[0].pieces[0].rows[0]).toMatchObject({ version: before, current: false, runs: 1 });

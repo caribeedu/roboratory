@@ -20,7 +20,9 @@ describe('A rehearsal asked of the engine', () => {
   it('refuses to spend without a yes, and says why', async () => {
     const { svc } = open(line('  - { id: a, machine: a }'), { a: simMachine() });
     await expect(svc.rehearse(req({ mode: 'real' }))).rejects.toThrow(/spends money/);
-    expect((await svc.rehearse(req({ mode: 'real', approved: true }))).status).toBe('done');
+    // and without a ceiling above zero, however it is asked
+    await expect(svc.rehearse(req({ mode: 'real', approved: true }))).rejects.toThrow(/cost ceiling/);
+    expect((await svc.rehearse(req({ mode: 'real', approved: true, maxCostUsd: 0.5 }))).status).toBe('done');
     svc.close();
   });
 
@@ -29,7 +31,7 @@ describe('A rehearsal asked of the engine', () => {
     await expect(svc.rehearse(req({ source: 'draft' }))).rejects.toThrow(/Build mode is not open/);
     svc.close();
     const needs = open(line('  - { id: a, machine: a }').replace('intake: { kind: manual }', 'intake: { kind: manual, inputs: [{ name: ticket, required: true }] }'), { a: simMachine() });
-    await expect(needs.svc.rehearse(req({ mode: 'real', approved: true }))).rejects.toThrow(/Missing input: ticket/);
+    await expect(needs.svc.rehearse(req({ mode: 'real', approved: true, maxCostUsd: 0.5 }))).rejects.toThrow(/Missing input: ticket/);
     // in the simulation it is filled in, as the dry run always did
     expect((await needs.svc.rehearse(req())).status).toBe('done');
     needs.svc.close();
@@ -45,7 +47,7 @@ describe('A rehearsal asked of the engine', () => {
 
   it('pushes its progress as the pieces change, and the last one has the findings', async () => {
     const { svc, progress } = open(line('  - { id: a, machine: a }\n  - { id: ok, gate: {} }'), { a: simMachine({ requests: ['npm test'] }) });
-    await svc.rehearse(req({ mode: 'real', approved: true }));
+    await svc.rehearse(req({ mode: 'real', approved: true, maxCostUsd: 0.5 }));
     expect(progress.length).toBeGreaterThan(1);
     expect(progress.some((p) => p.pieces.a === 'busy')).toBe(true);
     expect(progress.at(-1)!.findings.map((f) => f.kind)).toEqual(expect.arrayContaining(['uncovered-command', 'gate']));
@@ -59,9 +61,9 @@ describe('A rehearsal asked of the engine', () => {
     await svc.buildApply({ op: 'writeFile', path: 'sectors/s/models/m/machines/a/machine.yaml', content: 'schema_version: 1\nagent: sim\nsim:\n  seconds: 1\n  requests: ["npm test"]\n  output: { ok: true }\n' });
     const disk = fs.readFileSync(path.join(b.root, 'sectors/s/models/m/machines/a/machine.yaml'), 'utf8');
 
-    const fromDraft = await svc.rehearse(req({ mode: 'real', approved: true, source: 'draft' }));
+    const fromDraft = await svc.rehearse(req({ mode: 'real', approved: true, maxCostUsd: 0.5, source: 'draft' }));
     expect(fromDraft.findings.map((f) => f.kind)).toContain('uncovered-command');
-    const fromDisk = await svc.rehearse(req({ mode: 'real', approved: true, source: 'disk' }));
+    const fromDisk = await svc.rehearse(req({ mode: 'real', approved: true, maxCostUsd: 0.5, source: 'disk' }));
     expect(fromDisk.findings.map((f) => f.kind)).not.toContain('uncovered-command');
     expect(fs.readFileSync(path.join(b.root, 'sectors/s/models/m/machines/a/machine.yaml'), 'utf8')).toBe(disk);
     expect(svc.buildOpen).toBe(true);
@@ -70,9 +72,9 @@ describe('A rehearsal asked of the engine', () => {
 
   it('runs one at a time, and a stop ends the one that runs', async () => {
     const { svc } = open(line('  - { id: a, machine: a }'), { a: simMachine({ seconds: 600 }) });
-    const first = svc.rehearse(req({ mode: 'real', approved: true }));
+    const first = svc.rehearse(req({ mode: 'real', approved: true, maxCostUsd: 0.5 }));
     await until(() => svc.rehearsalRunning);
-    await expect(svc.rehearse(req({ mode: 'real', approved: true }))).rejects.toThrow(/already running/);
+    await expect(svc.rehearse(req({ mode: 'real', approved: true, maxCostUsd: 0.5 }))).rejects.toThrow(/already running/);
     svc.rehearsalStop();
     expect((await first).status).toBe('aborted');
     expect(svc.rehearsalRunning).toBe(false);

@@ -49,13 +49,13 @@ export function Metrics({ factory, onPiece }: { factory: Factory; onPiece: (p: {
           </header>
           <table>
             <thead>
-              <tr><th>Piece</th><th>Version</th><th>Runs</th><th>Cost per run</th><th>Time (median / longest)</th><th>Attempts</th><th>Reworks</th><th>Asks</th><th>Fires</th><th>Checker passes</th><th title="asked / repeated / denied">Permissions</th></tr>
+              <tr><th>Piece</th><th>Version</th><th>Runs</th><th>Cost per run</th><th>Time (median / longest)</th><th>Attempts</th><th>Reworks</th><th>Asks</th><th>Blocks</th><th>Fires</th><th>Checker passes</th><th title="asked / repeated / denied">Permissions</th></tr>
             </thead>
             <tbody>
               {l.pieces.map((p) => {
                 const rows = visibleRows(p, all);
                 const open = <button className="link" onClick={() => onPiece({ sectorId: l.sectorId, lineId: l.lineId, pieceId: p.pieceId })}>{p.label}</button>;
-                if (!rows.length) return <tr key={p.pieceId}><td>{open}</td><td colSpan={10} className="muted">No runs yet.</td></tr>;
+                if (!rows.length) return <tr key={p.pieceId}><td>{open}</td><td colSpan={11} className="muted">No runs yet.</td></tr>;
                 return rows.map((r, i) => (
                   <tr key={`${p.pieceId}@${r.version}`} className={r.current ? '' : 'earlier'}>
                     <td>{i === 0 ? <>{open}{p.checker && <span className="chip idle" title="A piece with a return belt leaving it">checker</span>}</> : null}</td>
@@ -64,9 +64,9 @@ export function Metrics({ factory, onPiece }: { factory: Factory; onPiece: (p: {
                     <td title={`${money(r.cost.total)} in all`}>{money(r.cost.median)}</td>
                     <td>{duration(r.duration.median)} / {duration(r.duration.max)}</td>
                     <td>{r.attempts.mean.toFixed(1)} (most {r.attempts.max})</td>
-                    <td>{r.reworks}</td><td>{r.questions}</td><td>{r.fires}</td>
+                    <td>{r.reworks}</td><td>{r.questions}</td><td>{r.blocks}</td><td>{r.fires}</td>
                     <td>{r.passes ? `${r.passes - r.provedWrong} of ${r.passes} held` : '–'}</td>
-                    <td>{r.permissions.requests} / {r.permissions.repeated} / {r.permissions.denied}</td>
+                    <td title={r.permissions.requests ? `median wait for an answer: ${duration(r.permissions.waitMedianMs)}` : undefined}>{r.permissions.requests} / {r.permissions.repeated} / {r.permissions.denied}</td>
                   </tr>
                 ));
               })}

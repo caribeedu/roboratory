@@ -15,9 +15,9 @@ const cells = (r: VersionRow): string[] => [
   `${r.attempts.mean.toFixed(1)} / ${r.attempts.max}`,
   String(r.reworks), String(r.questions), String(r.blocks), String(r.fires),
   r.passes ? `${r.passes - r.provedWrong} of ${r.passes} held` : '-',
-  `${r.permissions.requests} / ${r.permissions.repeated} / ${r.permissions.denied}`,
+  `${r.permissions.requests} / ${r.permissions.repeated} / ${r.permissions.denied}${r.permissions.requests ? `, answered in ${duration(r.permissions.waitMedianMs)}` : ''}`,
 ];
-const HEAD = ['version', 'runs', 'cost per run', 'time (median / longest)', 'attempts (mean / most)', 'reworks', 'asks', 'blocks', 'fires', 'checker passes', 'permissions (asked / repeated / denied)'];
+const HEAD = ['version', 'runs', 'cost per run', 'time (median / longest)', 'attempts (mean / most)', 'reworks', 'asks', 'blocks', 'fires', 'checker passes', 'permissions (asked / repeated / denied, median wait)'];
 
 export function formatStats(stats: Stats, allVersions = false): string {
   if (!stats.lines.length) return 'No lines match.\n';

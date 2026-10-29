@@ -125,7 +125,6 @@ export function computeStats(f: FactoryDef, runs: RunEvents[], filter: StatsFilt
         for (const [key, visits] of byKey) {
           if (!key.startsWith(`${p.id}@`)) continue;
           const version = key.slice(p.id.length + 1);
-          if (version !== current && !filter.allVersions) continue;
           const tokens = zero(); visits.forEach((v) => add(tokens, v.tokens));
           const waits = visits.flatMap((v) => v.waits);
           const sum = (pick: (v: Visit) => number) => visits.reduce((a, v) => a + pick(v), 0);
@@ -141,7 +140,9 @@ export function computeStats(f: FactoryDef, runs: RunEvents[], filter: StatsFilt
           });
         }
         rows.sort((a, b) => b.firstSeen - a.firstSeen);
-        pieces.push({ pieceId: p.id, label: p.label, machine: p.machine, checker: checkers.has(p.id), currentVersion: current, rows });
+        // the current version, or while it has no runs the newest one before it; every version on request
+        const now = rows.filter((r) => r.current);
+        pieces.push({ pieceId: p.id, label: p.label, machine: p.machine, checker: checkers.has(p.id), currentVersion: current, rows: filter.allVersions ? rows : now.length ? now : rows.slice(0, 1) });
       }
       const shown = pieces.flatMap((p) => p.rows);
       const tokens = zero(); shown.forEach((r) => add(tokens, r.tokens));

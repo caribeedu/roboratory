@@ -53,6 +53,8 @@ export async function prepareCopy(source: RehearsalSource, lineId: string): Prom
     if (line.repo && fs.existsSync(path.join(line.repo, '.git'))) {
       repo = path.join(tmp, 'repo');
       await git(tmp, ['clone', '--quiet', '--local', '--no-hardlinks', line.repo, repo]);
+      // the clone must not be able to push into the real repository
+      await git(repo, ['remote', 'remove', 'origin']);
     }
     return { folder, repo, cleanup };
   } catch (e) { cleanup(); throw e; }
@@ -115,15 +117,19 @@ export function planOf(f: FactoryDef, req: RehearsalRequest, reference?: Rehears
 
 // ---------- the findings ----------
 
+const BROAD = new Set(['python', 'python3', 'node', 'sh', 'bash', 'zsh', 'pwsh', 'powershell', 'perl', 'ruby', 'rm', 'curl', 'wget', 'sudo', 'npx', 'xargs', 'env', 'eval']);
+
 /** The prefix of a command that a list would take: its first word, and a second when that looks like a subcommand. */
 export function suggestionFor(part: string): string {
   const w = part.trim().split(/\s+/);
+  // a program that runs whatever it is given is offered whole, so one click does not allow all of it
+  if (w.length > 1 && BROAD.has(w[0])) return part.trim();
   return w.length > 1 && /^[a-z][\w-]*$/i.test(w[1]) ? `${w[0]} ${w[1]}` : w[0] ?? part;
 }
 
-function findingsOf(f: FactoryDef, line: LineDef, events: Event[], status: RehearsalReport['status'], over: { piece?: string; message?: string }): Finding[] {
+/** `version` of a finding is the piece's version in the factory as it was given, not as the rehearsal adapted it, so it can be compared with the draft's. */
+function findingsOf(f: FactoryDef, line: LineDef, events: Event[], status: RehearsalReport['status'], over: { piece?: string; message?: string }, version: Map<string, string | null>): Finding[] {
   const out: Finding[] = [];
-  const version = new Map<string, string>();
   const seen = new Set<string>();
   const add = (x: Omit<Finding, 'id'>) => {
     // a block ends in a fire with the same words: one finding, not two
@@ -135,8 +141,7 @@ function findingsOf(f: FactoryDef, line: LineDef, events: Event[], status: Rehea
   const machineOf = (piece: string) => line.model.pieces.find((p) => p.id === piece)?.machine ?? piece;
   const outward = (piece: string) => line.model.machines[machineOf(piece)]?.outward ?? [];
   for (const e of events) {
-    if (e.type === 'piece.start' && e.version) version.set(e.piece, e.version);
-    const v = e.piece ? version.get(e.piece) : undefined;
+    const v = e.piece ? version.get(e.piece) ?? undefined : undefined;
     switch (e.type) {
       case 'piece.fire': {
         const exhausted = /rework lap/.test(String(e.error));
@@ -147,7 +152,7 @@ function findingsOf(f: FactoryDef, line: LineDef, events: Event[], status: Rehea
       case 'piece.blocked': add({ class: 'defect', kind: 'blocked', pieceId: e.piece, version: v, message: `Blocked: ${e.reason}`, where: `role.md of ${machineOf(e.piece)}` }); break;
       case 'piece.ask': add({ class: 'note', kind: 'question', pieceId: e.piece, version: v, message: `Asked: ${e.question?.question ?? ''}`, where: `role.md of ${machineOf(e.piece)}, if it should not need to ask` }); break;
       case 'piece.hold': add({ class: 'note', kind: 'gate', pieceId: e.piece, version: v, message: 'A gate held the box; the rehearsal released it.', where: 'nothing to do' }); break;
-      case 'rework': if (!e.exhausted) add({ class: 'note', kind: 'rework', pieceId: e.to, version: version.get(e.to), message: `Sent back by ${e.from} (lap ${e.lap} of ${e.laps}).`, where: 'nothing to do' }); break;
+      case 'rework': if (!e.exhausted) add({ class: 'note', kind: 'rework', pieceId: e.to, version: version.get(e.to) ?? undefined, message: `Sent back by ${e.from} (lap ${e.lap} of ${e.laps}).`, where: 'nothing to do' }); break;
       case 'permission.request': {
         const part = /^"(.*)" is not in the list$/.exec(String(e.why ?? ''))?.[1] ?? String(e.summary);
         add({ class: 'defect', kind: 'uncovered-command', pieceId: e.piece, version: v, command: String(e.summary), suggestion: suggestionFor(part), message: `Asked to run \`${e.summary}\`, which no list covers.`, where: `allow in machine.yaml of ${machineOf(e.piece)}, or its role if it should not run it` });
@@ -184,13 +189,22 @@ export interface RehearsalEnv {
 }
 
 export async function runRehearsal(copy: RehearsalCopy, req: RehearsalRequest, env: RehearsalEnv): Promise<RehearsalReport> {
+  try { return await rehearseCopy(copy, req, env); } finally {
+    // a folder an agent still holds on Windows must not cost the report that was written
+    if (!req.keep) try { copy.cleanup(); } catch { /* left in the temporary folder */ }
+  }
+}
+
+async function rehearseCopy(copy: RehearsalCopy, req: RehearsalRequest, env: RehearsalEnv): Promise<RehearsalReport> {
   const startedAt = Date.now();
   const id = `${new Date(startedAt).toISOString().replace(/[-:T]/g, '').slice(0, 14)}-${crypto.randomBytes(2).toString('hex')}`;
   const loaded = loadFactory(copy.folder);
   if (loaded.warnings.length && !loaded.sectors.some((s) => s.lines.some((l) => l.id === req.lineId))) throw new Error(`The copy does not load: ${loaded.warnings[0]}`);
   const { f, line } = adapt(loaded, req.lineId, req);
+  if (line.repo && !copy.repo) throw new Error(`The line's repository ${line.repo} is not a git repository, so there is nothing to clone for the rehearsal.`);
   if (copy.repo) line.repo = copy.repo;
-  const versions = new Map(line.model.pieces.map((p) => [p.id, pieceVersion(f, line, p.id)] as const));
+  const original = lineOf(loaded, req.lineId);
+  const versions = new Map(original.model.pieces.map((p) => [p.id, pieceVersion(loaded, original, p.id)] as const));
   const engine = new Engine(f, { beltMs: env.beltMs ?? 40, maxCostUsd: req.mode === 'real' ? req.maxCostUsd : undefined, permissionTool: env.permissionTool, serverRoot: env.serverRoot });
   env.onEngine?.(engine);
   let status: RehearsalReport['status'] = 'done';
@@ -201,7 +215,7 @@ export async function runRehearsal(copy: RehearsalCopy, req: RehearsalRequest, e
     if (!env.onProgress) return;
     const view = engine.lineView(line.id);
     const events = runId ? engine.runEvents(runId) : [];
-    const p: RehearsalProgress = { pieces: Object.fromEntries(Object.entries(view.pieces).map(([k, v]) => [k, v.state])), costUsd: engine.costSoFar, findings: findingsOf(f, line, events, 'done', {}) };
+    const p: RehearsalProgress = { pieces: Object.fromEntries(Object.entries(view.pieces).map(([k, v]) => [k, v.state])), costUsd: engine.costSoFar, findings: findingsOf(f, line, events, 'done', {}, versions) };
     const key = JSON.stringify(p);
     if (force || key !== last) { last = key; env.onProgress(p); }
   };
@@ -232,7 +246,7 @@ export async function runRehearsal(copy: RehearsalCopy, req: RehearsalRequest, e
     }
     push(true);
     const events = runId ? engine.runEvents(runId) : [];
-    const findings = findingsOf(f, line, events, status, {});
+    const findings = findingsOf(f, line, events, status, {}, versions);
     const pieces = line.model.pieces.filter((p) => p.machine).map((p) => {
       const mine = events.filter((e) => e.piece === p.id);
       return {
@@ -251,7 +265,6 @@ export async function runRehearsal(copy: RehearsalCopy, req: RehearsalRequest, e
     return report;
   } finally {
     engine.dispose();
-    if (!req.keep) copy.cleanup();
   }
 }
 

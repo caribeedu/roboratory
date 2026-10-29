@@ -178,6 +178,7 @@ export class FactoryService {
     const { e, f } = this.need();
     if (this.rehearsing) throw new Error('A rehearsal is already running.');
     if (req.mode === 'real' && !req.approved) throw new Error('A real rehearsal spends money: show what it will run and ask first (invariant 8).');
+    if (req.mode === 'real' && !(req.maxCostUsd! > 0)) throw new Error('A real rehearsal needs a cost ceiling above zero (invariant 8).');
     const source = this.sourceOf(req);
     const { f: of } = loadSource(source);
     const line = of.sectors.flatMap((s) => s.lines).find((l) => l.id === req.lineId);

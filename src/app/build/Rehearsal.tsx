@@ -75,7 +75,7 @@ export function PieceRehearsal({ lineId, pieceId, label, op }: { lineId: string;
   return (
     <section className="sec" aria-label="Rehearsal">
       <div className="sec-head"><span className="sec-title">Rehearsal</span></div>
-      <ul className="findings">{mine.map((f) => <FindingRow key={f.id} finding={f} lineId={lineId} stale={isStale(r.state, f)} label={label} op={op} />)}</ul>
+      <ul className="findings">{mine.map((f) => <FindingRow key={`${r.state!.report.id}:${f.id}`} finding={f} lineId={lineId} stale={isStale(r.state, f)} label={label} op={op} />)}</ul>
     </section>
   );
 }
