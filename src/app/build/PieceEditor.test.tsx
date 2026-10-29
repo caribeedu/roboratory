@@ -356,6 +356,8 @@ describe('A machine', () => {
     const { op, user } = await edit('build');
     await commit(user, 'Never allowed', 'rm -rf, git push --force');
     expect(op).toHaveBeenLastCalledWith(expect.objectContaining({ conf: { deny: ['rm -rf', 'git push --force'] } }));
+    await commit(user, 'Acts outside', 'git push, gh pr create');
+    expect(op).toHaveBeenLastCalledWith(expect.objectContaining({ conf: { outward: ['git push', 'gh pr create'] } }));
     await user.click(screen.getByLabelText('Read-only'));
     expect(op).toHaveBeenLastCalledWith(expect.objectContaining({ conf: { read_only: true } }));
   });

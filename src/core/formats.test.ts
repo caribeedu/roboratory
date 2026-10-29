@@ -26,13 +26,14 @@ dirs: ["~/repos"]
 tools: [mcp__slack]
 allow: [npm test, Edit]
 deny: [rm -rf]
+outward: [git push]
 read_only: true
 `)).toEqual([]);
       expect(check('machine', 'schema_version: 1\nagent: sim\ntimeout: 90\nsim: { seconds: 2, anything: [1, 2], at: { all: true } }\n')).toEqual([]);
     });
 
     it('reads an empty value as none, as the loader always has', () => {
-      expect(check('machine', 'schema_version: 1\nallow:\ndeny:\ntools:\nroles:\ndirs:\nmodel:\ngoal:\nsim:\n')).toEqual([]);
+      expect(check('machine', 'schema_version: 1\nallow:\ndeny:\noutward:\ntools:\nroles:\ndirs:\nmodel:\ngoal:\nsim:\n')).toEqual([]);
     });
 
     it('needs its version, and says what to write', () => {

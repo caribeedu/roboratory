@@ -21,6 +21,8 @@ export interface MachineConf {
   allow?: string[];
   /** commands it must never run; an empty list removes the key */
   deny?: string[];
+  /** its commands and tools that act outside the machine (D48); an empty list removes the key */
+  outward?: string[];
   /** no file edits and no `git push`; false removes the key */
   read_only?: boolean;
 }

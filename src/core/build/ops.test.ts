@@ -144,11 +144,11 @@ describe('build-mode edits', () => {
     const root = factory(LINE, { build: machine(), check: machine() });
     const d = new Draft(root);
     const read = (rel: string) => d.read(path.join(root, rel));
-    apply(d, { op: 'setMachine', lineId: 's/a', pieceId: 'build', conf: { deny: ['rm -rf'], read_only: true } });
+    apply(d, { op: 'setMachine', lineId: 's/a', pieceId: 'build', conf: { deny: ['rm -rf'], outward: ['gh pr create'], read_only: true } });
     apply(d, { op: 'setModel', lineId: 's/a', deny: ['make clean'] });
     apply(d, { op: 'setSector', sectorId: 's', deny: ['gh pr merge'] });
     apply(d, { op: 'setFactory', deny: ['sudo'] });
-    expect(read('sectors/s/models/m/machines/build/machine.yaml')).toContain('deny: [rm -rf]\nread_only: true');
+    expect(read('sectors/s/models/m/machines/build/machine.yaml')).toContain('deny: [rm -rf]\noutward: [gh pr create]\nread_only: true');
     expect(lineOf(d)).toContain('deny: [make clean]');
     expect(read('sectors/s/sector.yaml')).toContain('deny: [gh pr merge]');
     expect(read('factory.yaml')).toContain('deny: [sudo]');
@@ -156,8 +156,8 @@ describe('build-mode edits', () => {
     expect(f.deny).toEqual(['sudo']);
     expect(f.sectors[0].deny).toEqual(['gh pr merge']);
     expect(f.sectors[0].lines[0].model).toMatchObject({ deny: ['make clean'] });
-    expect(f.sectors[0].lines[0].model.machines.build).toMatchObject({ deny: ['rm -rf'], readOnly: true });
-    apply(d, { op: 'setMachine', lineId: 's/a', pieceId: 'build', conf: { deny: [], read_only: false } });
+    expect(f.sectors[0].lines[0].model.machines.build).toMatchObject({ deny: ['rm -rf'], outward: ['gh pr create'], readOnly: true });
+    apply(d, { op: 'setMachine', lineId: 's/a', pieceId: 'build', conf: { deny: [], outward: [], read_only: false } });
     apply(d, { op: 'setFactory', deny: [] });
     expect(read('sectors/s/models/m/machines/build/machine.yaml')).toBe('schema_version: 1\nagent: sim\n');
     expect(read('factory.yaml')).toBe('name: T\n');

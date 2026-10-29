@@ -128,6 +128,7 @@ function loadMachine(io: LoadIo, name: string, dirs: { dir: string; shared: bool
       tools: Array.isArray(conf.tools) ? conf.tools.map((t) => str(t)) : [],
       allow: strList(conf.allow),
       deny: strList(conf.deny),
+      outward: strList(conf.outward),
       readOnly: conf.read_only === true,
       sim: isObj(conf.sim) ? conf.sim : undefined,
     };

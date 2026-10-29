@@ -70,6 +70,8 @@ export interface MachineDef {
   allow: string[];
   /** commands it must never run; adds to the factory's, the sector's and the line's (D44) */
   deny: string[];
+  /** its commands and tools that act outside the machine; a rehearsal refuses them, a run does not care (D48) */
+  outward: string[];
   /** no file-editing tools and no `git push` (D44) */
   readOnly: boolean;
   /** extra directories the agent may use, e.g. ~/repos */

@@ -269,6 +269,7 @@ function MachineForms({ view, line, piece, op }: { view: BuildView; line: Line; 
         <Row label="Folders" hint="Extra folders the agent may read and edit, besides its run folder."><ListField label="Folders" value={arr('dirs')} placeholder="~/repos/my-service" onCommit={(dirs) => set({ dirs })} /></Row>
         <Row label="Allowed commands" hint="Commands it may run besides the defaults, as prefixes: npm test, gh pr view. Anything else waits for you."><ListField label="Allowed commands" value={arr('allow')} onCommit={(allow) => set({ allow })} /></Row>
         <Row label="Never allowed" hint="Commands it must never run, added to the factory's, the sector's and the line's."><ListField label="Never allowed" value={arr('deny')} onCommit={(deny) => set({ deny })} /></Row>
+        <Row label="Acts outside" hint="Its commands and tools that act outside the machine, such as git push or mcp__slack__post. A rehearsal refuses them; a run does not care."><ListField label="Acts outside" value={arr('outward')} onCommit={(outward) => set({ outward })} /></Row>
         <Row label="Read-only" hint="No file edits and no git push. Commands it is allowed still run."><label><input type="checkbox" aria-label="Read-only" checked={conf.read_only === true} onChange={(e) => set({ read_only: e.target.checked })} /> read-only</label></Row>
       </Section>
       <RoleForms view={view} dir={dir} roles={arr('roles')} setRoles={(roles) => set({ roles })} op={op}

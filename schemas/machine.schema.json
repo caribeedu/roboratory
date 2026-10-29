@@ -19,6 +19,7 @@
     "tools": { "type": ["array", "null"], "items": { "type": "string" }, "description": "MCP servers or tools the agent may use, as mcp__server or mcp__server__tool." },
     "allow": { "type": ["array", "null"], "items": { "type": "string" }, "description": "Commands the machine may run besides the defaults, as prefixes (npm test), or tool names (Edit). Anything else is asked of a person." },
     "deny": { "type": ["array", "null"], "items": { "type": "string" }, "description": "Commands the machine must never run, added to the factory's, the sector's and the line's." },
+    "outward": { "type": ["array", "null"], "items": { "type": "string" }, "description": "Commands and tools of this machine that act outside it (git push, gh pr create, mcp__slack__post). A normal run ignores this; a rehearsal refuses each one." },
     "read_only": { "type": "boolean", "description": "No file edits and no git push. The commands in allow still run." },
     "sim": { "type": ["object", "null"], "description": "How the simulated agent behaves (agent: sim). Free-form." }
   }
