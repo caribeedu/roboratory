@@ -77,6 +77,10 @@ A run starts when a work order enters at an **intake**, and every run follows th
 
 - **Measure and rehearse:** the Metrics tab and `roboratory stats` show what each version of a piece costs and how it behaves; the Rehearse button of build mode (and `roboratory rehearse`) runs a line once on a copy with nobody to answer, for cents with Haiku or free in simulation, and marks what it finds on the Floor.
 
+  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/metrics.png?v=2" alt="The Metrics tab: each piece of a line by version, with runs, cost, time, attempts, reworks and permissions" width="900">
+
+  <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/rehearsal.png?v=2" alt="The rehearsal dialog in build mode, with its result and a note on the Floor" width="900">
+
 - **Ask the managers** through the megaphone: answers come with evidence and proposals as buttons; changes show a diff and are written only when you accept.
 
   <img src="https://raw.githubusercontent.com/caribeedu/roboratory/main/docs/screenshots/manager-proposal.png?v=2" alt="A Sector Manager proposing a change, shown as a diff" width="900">

@@ -26,7 +26,7 @@ npm start
 | `npm run cli -- <command>` | Runs the engine and the `roboratory` command from source (bundled with esbuild into `.vite/cli/`) |
 | `roboratory rehearse <line> --simulation` | Rehearses a line with the simulated agent, for free (the `e2e/tools/factory-shots.mjs` tool does it for every line of the demo) |
 | `node e2e/tools/shoot.mjs <dir>`, `factory-shots.mjs` | Drive the packaged app and save screenshots |
-| `node e2e/tools/readme-shots.mjs`, `piece-images.mjs`, `render-svg.mjs` | Regenerate the README's images: a line at work and build mode, one picture per piece drawn with the app's own sprites, and an SVG rendered to PNG |
+| `node e2e/tools/readme-shots.mjs`, `piece-images.mjs`, `render-svg.mjs` | Regenerate the README's images: a line at work, the Metrics tab, build mode and a rehearsal, one picture per piece drawn with the app's own sprites, and an SVG rendered to PNG |
 | `node e2e/tools/scenario.mjs`, `real-agent-check.mjs` | A staged demo day, and a paid run with the real Claude agent |
 
 The e2e specs and tools launch the packaged app: they find it in `out/` for your platform (`ROBORATORY_OUT_DIR` changes the folder, `ROBORATORY_EXE` points at a specific executable). **Locally the specs keep the window hidden** (`ROBORATORY_BACKGROUND=1`, set by `launch` in `e2e/support/app.ts`), so they never take the focus of whoever is using the computer; `E2E_SHOW=1` shows it, to watch a spec. The CI always shows it.

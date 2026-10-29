@@ -1,4 +1,4 @@
-// Screenshots for the README that need a specific frame: the Floor, a line at work, and build mode.
+// Screenshots for the README that need a specific frame: the Floor, a line at work, the Metrics tab, build mode and a rehearsal.
 // Usage: node e2e/tools/readme-shots.mjs [out-dir]   (default docs/screenshots)
 import { _electron as electron } from 'playwright';
 import fs from 'node:fs';
@@ -34,9 +34,28 @@ await wait(9000);
 await win.screenshot({ path: path.join(out, 'line.png'), clip: { x: 60, y: 274, width: 1200, height: 200 } });
 console.log('wrote line.png');
 
+// the Metrics tab over the runs so far
+await win.keyboard.press('3');
+await wait(1200);
+await win.screenshot({ path: path.join(out, 'metrics.png'), clip: { x: 0, y: 46, width: 1440, height: 360 } });
+console.log('wrote metrics.png');
+await win.keyboard.press('1');
+await wait(600);
+
 // build mode on the Floor
 await win.getByRole('button', { name: 'Build', exact: true }).click();
 await wait(1200);
 await win.screenshot({ path: path.join(out, 'build-mode.png') });
 console.log('wrote build-mode.png');
+
+// a rehearsal of the engineering line in the draft, in simulation, with its findings
+await win.locator('button.mini', { hasText: '⚙ Line' }).first().click();
+await win.getByRole('button', { name: 'Rehearse', exact: true }).click();
+const dialog = win.getByRole('dialog', { name: /Rehearse/ });
+await dialog.getByLabel(/ticket/i).fill('PROJ-812').catch(() => {});
+await dialog.getByRole('button', { name: /Start/ }).click();
+await dialog.getByText(/The line reached the pallet|stopped|defect/i).first().waitFor({ timeout: 60000 });
+await wait(800);
+await win.screenshot({ path: path.join(out, 'rehearsal.png') });
+console.log('wrote rehearsal.png');
 await app.close();
