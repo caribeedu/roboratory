@@ -3,7 +3,7 @@
 import { spawn } from 'node:child_process';
 import { isToolName, READ_TOOLS } from '../permissions';
 import { extractJson, launch, short, spawnCollect } from './process';
-import type { AgentRequest, AgentResult } from './types';
+import type { AgentRequest, AgentResult, Tokens } from './types';
 
 /**
  * The schema Claude Code gets. With alternatives (a question, D21, or blocked, D22), the contract
@@ -56,7 +56,8 @@ export function claudeArgs(req: AgentRequest): string[] {
   const bash = (c: string) => `Bash(${c}:*)`;
   const tools = req.allow.filter((a) => isToolName(a) && !(perm && a === 'Bash'));
   const allowed = req.shell ? [...tools, ...(perm ? [] : commands.map(bash)), ...req.tools] : [...READ_TOOLS, ...req.tools];
-  const disallowed = ['Agent', ...req.deny.filter((d) => isToolName(d) || !perm).map((d) => (isToolName(d) ? d : bash(d)))];
+  // the engine reads shell commands as Bash does (D44); Claude Code's PowerShell tool would walk around that, so the machine is left with Bash
+  const disallowed = ['Agent', ...(perm ? ['PowerShell'] : []), ...req.deny.filter((d) => isToolName(d) || !perm).map((d) => (isToolName(d) ? d : bash(d)))];
   const rules = req.shell ? shellRules(commands, req.allow.includes('Bash'), !!perm) : '';
   // no sub-agents: a step's work stays in one clean context, one folder and one transcript (D9)
   const args = ['-p', rules ? `${req.prompt}\n\n${rules}` : req.prompt, '--output-format', 'stream-json', '--verbose', '--json-schema', JSON.stringify(req.schema), '--permission-mode', perm ? 'default' : 'dontAsk', '--allowedTools', allowed.join(','), '--disallowedTools', [...new Set(disallowed)].join(','), '--append-system-prompt', req.role];
@@ -100,6 +101,16 @@ export function resultLine(content: unknown, isError = false): string {
   return short(`${isError ? 'error: ' : ''}${text || '(empty)'}`, 220);
 }
 
+/** The model that did most of the work and the tokens of a result event: `usage` for the totals, `modelUsage` for the model by cost. */
+export function usageOf(result: Record<string, unknown>): { model?: string; tokens?: Tokens } {
+  const n = (v: unknown) => (typeof v === 'number' ? v : 0);
+  const u = (result.usage ?? {}) as Record<string, unknown>;
+  const byModel = Object.entries((result.modelUsage ?? {}) as Record<string, Record<string, unknown>>);
+  const main = byModel.sort((a, b) => n(b[1]?.costUSD) - n(a[1]?.costUSD))[0]?.[0];
+  const tokens = { input: n(u.input_tokens), output: n(u.output_tokens), cacheRead: n(u.cache_read_input_tokens), cacheWrite: n(u.cache_creation_input_tokens) };
+  return { ...(main ? { model: main } : {}), tokens };
+}
+
 export async function runClaude(req: AgentRequest): Promise<AgentResult> {
   const bin = process.env.ROBORATORY_CLAUDE_BIN || 'claude';
   let result: Record<string, unknown> | undefined;
@@ -131,7 +142,7 @@ export async function runClaude(req: AgentRequest): Promise<AgentResult> {
   }
   const answer = result.structured_output ?? extractJson(String(result.result ?? ''));
   const output = req.question ? unwrapClaude(answer) : answer;
-  return { output, text: String(result.result ?? ''), costUsd: cost };
+  return { output, text: String(result.result ?? ''), costUsd: cost, ...usageOf(result) };
 }
 
 /** Which MCP servers the user's Claude Code has configured (parsed from `claude mcp list`). */

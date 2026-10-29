@@ -66,7 +66,7 @@ type Listener<T> = (v: T) => void;
 export interface FakeBridge {
   api: { [K in keyof RoboratoryApi]: RoboratoryApi[K] extends (...a: infer A) => infer R ? ((...a: A) => R) & ReturnType<typeof vi.fn> : never };
   /** push something from the main process, as the real bridge would */
-  emit: { snapshot(s: Snapshot): void; logs(l: unknown[]): void; messages(key: string): void; build(v: unknown): void; engine(s: unknown): void; cli(s: string): void };
+  emit: { snapshot(s: Snapshot): void; logs(l: unknown[]): void; messages(key: string): void; build(v: unknown): void; engine(s: unknown): void; cli(s: string): void; rehearsal(p: unknown): void };
 }
 
 /**
@@ -80,14 +80,14 @@ export function installBridge(over: Record<string, unknown> = {}): FakeBridge {
   const api: Record<string, unknown> = {
     state: call('state', { snapshot: snapshot(), logs: [], recent: [], demoPath: '/demo', engine: { state: 'running', appVersion: '1.0.0', version: '1.0.0' } }),
     openFactory: call('openFactory', true), openFactoryAt: call('openFactoryAt'), createDemo: call('createDemo'), closeFactory: call('closeFactory'),
-    run: call('run', 'run-1'), retry: call('retry'), release: call('release'), answer: call('answer'), allow: call('allow'), deny: call('deny'), halt: call('halt'), resume: call('resume'),
+    run: call('run', 'run-1'), retry: call('retry'), release: call('release'), answer: call('answer'), allow: call('allow'), deny: call('deny'), stats: call('stats', { lines: [] }), rehearsalPlan: call('rehearsalPlan'), rehearse: call('rehearse'), rehearsalStop: call('rehearsalStop'), halt: call('halt'), resume: call('resume'),
     runs: call('runs', []), runDetail: call('runDetail', null), ask: call('ask'), messages: call('messages', []),
     acceptProposal: call('acceptProposal'), rejectProposal: call('rejectProposal'), reveal: call('reveal'),
     buildStart: call('buildStart'), buildApply: call('buildApply'), buildUndo: call('buildUndo'), buildRedo: call('buildRedo'),
     buildFields: call('buildFields', { fields: [], open: false }), buildServers: call('buildServers', null), buildRead: call('buildRead', null),
     buildList: call('buildList', []), buildSave: call('buildSave'), buildDiscard: call('buildDiscard'),
     cliStatus: call('cliStatus', 'installed'), cliInstall: call('cliInstall', 'installed'), engineStart: call('engineStart'), engineRestartWhenIdle: call('engineRestartWhenIdle'),
-    onBuild: on('build'), onSnapshot: on('snapshot'), onLogs: on('logs'), onMessages: on('messages'), onEngine: on('engine'), onCli: on('cli'),
+    onBuild: on('build'), onRehearsal: on('rehearsal'), onSnapshot: on('snapshot'), onLogs: on('logs'), onMessages: on('messages'), onEngine: on('engine'), onCli: on('cli'),
     ...over,
   };
   (window as unknown as { roboratory: unknown }).roboratory = api;
@@ -95,7 +95,7 @@ export function installBridge(over: Record<string, unknown> = {}): FakeBridge {
   afterEach(() => { for (const k of Object.keys(listeners)) delete listeners[k]; delete (window as unknown as { roboratory?: unknown }).roboratory; });
   return {
     api: api as FakeBridge['api'],
-    emit: { snapshot: emitter('snapshot'), logs: emitter('logs'), messages: emitter('messages'), build: emitter('build'), engine: emitter('engine'), cli: emitter('cli') },
+    emit: { snapshot: emitter('snapshot'), logs: emitter('logs'), messages: emitter('messages'), build: emitter('build'), engine: emitter('engine'), cli: emitter('cli'), rehearsal: emitter('rehearsal') },
   };
 }
 

@@ -41,6 +41,8 @@ export interface SimSpec {
   /** files the agent writes in its folder, and the commit message when it commits them */
   write?: Record<string, string>;
   commit?: string;
+  /** what a step is said to cost, in dollars */
+  cost?: number;
   /** shell commands the agent tries to run, in order; a denial stops it with the reason when `stopIfDenied` */
   requests?: string[];
   stopIfDenied?: boolean;
@@ -59,6 +61,7 @@ export function simMachine(spec: SimSpec = {}): Files {
   if (spec.badOutput) sim.bad_output = spec.badOutput;
   if (spec.write) sim.write = spec.write;
   if (spec.commit) sim.commit = spec.commit;
+  if (spec.cost !== undefined) sim.cost = spec.cost;
   if (spec.requests) sim.requests = spec.requests;
   if (spec.stopIfDenied) sim.stop_if_denied = true;
   const yaml: Record<string, unknown> = { schema_version: 1, agent: 'sim', ...(spec.attempts ? { attempts: spec.attempts } : {}), ...(spec.goal ? { goal: spec.goal } : {}), sim };

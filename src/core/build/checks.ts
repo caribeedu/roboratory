@@ -87,7 +87,7 @@ function checkModel(m: LineModel): Issue[] {
   return out;
 }
 
-const NEVER_AUTO: VerbName[] = ['release', 'apply', 'allow', 'deny'];
+const NEVER_AUTO: VerbName[] = ['release', 'apply', 'allow', 'deny', 'rehearse'];
 
 export function checkFactory(f: FactoryDef): Issue[] {
   const out: Issue[] = f.warnings.map((w) => ({ kind: 'load' as const, message: w }));

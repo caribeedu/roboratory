@@ -6,6 +6,7 @@ import { ago, api, useNow } from '../store';
 import { describeParts } from '../../shared/expr';
 import { BoxView, fieldDescriptions } from '../BoxView';
 import { Markdown } from '../Markdown';
+import { PieceHistory } from './PieceHistory';
 
 type Line = NonNullable<Snapshot['factory']>['sectors'][number]['lines'][number];
 type Piece = Line['pieces'][number];
@@ -200,6 +201,7 @@ function MachinePanel({ line, piece, pv, logs, act, onOpenRun, halted }: { line:
   return (
     <>
       {pv.permissions?.map((a) => <PermissionCard key={a.id} ask={a} act={act} />)}
+      <PieceHistory lineId={line.id} pieceId={piece.id} rev={pv.lastRunId ?? pv.runId} />
       <dl className="kv">
         <dt>Run</dt><dd>{pv.runId ? <button className="link" onClick={() => onOpenRun(pv.runId!)}>{pv.runId}</button> : '—'}</dd>
         <dt>Attempt</dt><dd>{pv.attempt ? `${pv.attempt} of ${pv.attempts}` : '—'}</dd>

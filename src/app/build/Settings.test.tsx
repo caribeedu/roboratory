@@ -1,6 +1,7 @@
 // Build mode above the pieces: a line, its sector, the whole factory, and making new lines and sectors.
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { RehearsalCtx } from './Rehearsal';
 import { Settings, type SettingsPanel } from './Settings';
 import { buildView, installBridge, LINE_ID, makeFactory } from '../../test/ui';
 import type { BuildOp } from '../../shared/build';
@@ -37,6 +38,20 @@ describe('Line settings', () => {
     const { op, user } = open(line);
     await commit(user, 'Line never allowed', 'make clean');
     expect(op).toHaveBeenLastCalledWith({ op: 'setModel', lineId: LINE_ID, deny: ['make clean'] });
+  });
+
+  it('opens the rehearsal of the line, and counts what the last one found there', async () => {
+    const open = vi.fn();
+    const state = { lineId: LINE_ID, versions: {}, report: { id: 'r', lineId: LINE_ID, mode: 'simulation' as const, startedAt: 0, endedAt: 1, status: 'done' as const, costUsd: 0, pieces: [], findings: [{ id: 'a', class: 'defect' as const, kind: 'fire' as const, pieceId: 'build', message: 'x', where: 'y' }, { id: 'b', class: 'note' as const, kind: 'gate' as const, pieceId: 'launch', message: 'x', where: 'y' }] } };
+    installBridge();
+    const user = userEvent.setup();
+    render(
+      <RehearsalCtx.Provider value={{ state, open, marks: {} }}>
+        <Settings panel={line} view={buildView()} sectorId="releases" op={vi.fn(async () => true)} onClose={vi.fn()} onCreateSector={vi.fn()} />
+      </RehearsalCtx.Provider>,
+    );
+    await user.click(await screen.findByRole('button', { name: 'Rehearse (2)' }));
+    expect(open).toHaveBeenCalledWith(LINE_ID);
   });
 
   it('renames the line, sets its direction and its target repository', async () => {

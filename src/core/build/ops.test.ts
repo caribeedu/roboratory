@@ -144,11 +144,11 @@ describe('build-mode edits', () => {
     const root = factory(LINE, { build: machine(), check: machine() });
     const d = new Draft(root);
     const read = (rel: string) => d.read(path.join(root, rel));
-    apply(d, { op: 'setMachine', lineId: 's/a', pieceId: 'build', conf: { deny: ['rm -rf'], read_only: true } });
+    apply(d, { op: 'setMachine', lineId: 's/a', pieceId: 'build', conf: { deny: ['rm -rf'], outward: ['gh pr create'], read_only: true } });
     apply(d, { op: 'setModel', lineId: 's/a', deny: ['make clean'] });
     apply(d, { op: 'setSector', sectorId: 's', deny: ['gh pr merge'] });
     apply(d, { op: 'setFactory', deny: ['sudo'] });
-    expect(read('sectors/s/models/m/machines/build/machine.yaml')).toContain('deny: [rm -rf]\nread_only: true');
+    expect(read('sectors/s/models/m/machines/build/machine.yaml')).toContain('deny: [rm -rf]\noutward: [gh pr create]\nread_only: true');
     expect(lineOf(d)).toContain('deny: [make clean]');
     expect(read('sectors/s/sector.yaml')).toContain('deny: [gh pr merge]');
     expect(read('factory.yaml')).toContain('deny: [sudo]');
@@ -156,8 +156,8 @@ describe('build-mode edits', () => {
     expect(f.deny).toEqual(['sudo']);
     expect(f.sectors[0].deny).toEqual(['gh pr merge']);
     expect(f.sectors[0].lines[0].model).toMatchObject({ deny: ['make clean'] });
-    expect(f.sectors[0].lines[0].model.machines.build).toMatchObject({ deny: ['rm -rf'], readOnly: true });
-    apply(d, { op: 'setMachine', lineId: 's/a', pieceId: 'build', conf: { deny: [], read_only: false } });
+    expect(f.sectors[0].lines[0].model.machines.build).toMatchObject({ deny: ['rm -rf'], outward: ['gh pr create'], readOnly: true });
+    apply(d, { op: 'setMachine', lineId: 's/a', pieceId: 'build', conf: { deny: [], outward: [], read_only: false } });
     apply(d, { op: 'setFactory', deny: [] });
     expect(read('sectors/s/models/m/machines/build/machine.yaml')).toBe('schema_version: 1\nagent: sim\n');
     expect(read('factory.yaml')).toBe('name: T\n');
@@ -173,6 +173,18 @@ describe('build-mode edits', () => {
     expect(d.read(path.join(root, 'sectors/s/models/m/machines/build/machine.yaml'))).toBe('schema_version: 1\nagent: sim\nmodel: haiku\n');
     expect(lineOf(d)).toMatch(/^schema_version: 1\n/m);
     expect(d.load().problems?.filter((p) => /schema_version/.test(p.message))).toEqual([]);
+  });
+
+  it('adds a command to the allow or the outward list of a machine, once, keeping the rest of the file', () => {
+    const root = factory(LINE, { build: { ...machine(), 'machine.yaml': 'schema_version: 1\n# the builder\nagent: sim\nallow: [npm test]\n' }, check: machine() });
+    const d = new Draft(root);
+    const file = path.join(root, 'sectors/s/models/m/machines/build/machine.yaml');
+    apply(d, { op: 'addCommand', lineId: 's/a', pieceId: 'build', list: 'allow', command: 'gh pr view' });
+    apply(d, { op: 'addCommand', lineId: 's/a', pieceId: 'build', list: 'allow', command: 'gh pr view' });
+    apply(d, { op: 'addCommand', lineId: 's/a', pieceId: 'build', list: 'outward', command: ' git push ' });
+    expect(d.read(file)).toBe('schema_version: 1\n# the builder\nagent: sim\nallow: [npm test, gh pr view]\noutward: [git push]\n');
+    expect(() => apply(d, { op: 'addCommand', lineId: 's/a', pieceId: 'ghost', list: 'allow', command: 'x' })).toThrow(/not a machine/);
+    expect(() => apply(d, { op: 'addCommand', lineId: 's/a', pieceId: 'build', list: 'allow', command: '  ' })).toThrow(/Write the command/);
   });
 
   it('writing back what the disk holds drops the change', () => {

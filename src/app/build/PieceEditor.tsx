@@ -7,6 +7,8 @@ import { Markdown } from '../Markdown';
 import { Head, Rule, Section } from '../panels/Inspector';
 import { api } from '../store';
 import { Commit, DraftRev, GoalField, ListField, Row, useDraftFile, useRefusal } from './forms';
+import { PieceHistory } from '../panels/PieceHistory';
+import { PieceRehearsal } from './Rehearsal';
 import { RuleBuilder } from './RuleBuilder';
 
 type Line = NonNullable<Snapshot['factory']>['sectors'][number]['lines'][number];
@@ -33,6 +35,7 @@ export function PieceEditor({ view, line, piece, op, onConnect, onClose, onLive 
           const mine = view.issues.filter((i) => i.pieceId === piece.id && i.lineIds.includes(line.id));
           return mine.length ? <ul className="issue-list" aria-label="Problems">{mine.map((i, k) => <li key={k}>{i.message}</li>)}</ul> : null;
         })()}
+        <PieceRehearsal lineId={line.id} pieceId={piece.id} label={(id) => labelOf(line, id)} op={op} />
         {onLive && <button className="link small live-link" onClick={onLive}>Open the live panel (runs, gates, dispatch)</button>}
         {sameModel.length > 1 && (
           <div className="reach-note">
@@ -250,6 +253,7 @@ function MachineForms({ view, line, piece, op }: { view: BuildView; line: Line; 
   const arr = (k: string) => (Array.isArray(conf[k]) ? (conf[k] as unknown[]).map(String) : []);
   return (
     <>
+      <PieceHistory lineId={line.id} pieceId={piece.id} draft rev={view} />
       <Section title="Agent">
         <Row label="Agent" hint={String(conf.agent ?? 'claude') === 'sim' ? 'The simulated agent costs nothing.' : 'Real agents spend money on every run.'}>
           <select aria-label="Agent" value={String(conf.agent ?? 'claude')} onChange={(e) => set({ agent: e.target.value })}>{AGENTS.map((a) => <option key={a}>{a}</option>)}</select>
@@ -267,6 +271,7 @@ function MachineForms({ view, line, piece, op }: { view: BuildView; line: Line; 
         <Row label="Folders" hint="Extra folders the agent may read and edit, besides its run folder."><ListField label="Folders" value={arr('dirs')} placeholder="~/repos/my-service" onCommit={(dirs) => set({ dirs })} /></Row>
         <Row label="Allowed commands" hint="Commands it may run besides the defaults, as prefixes: npm test, gh pr view. Anything else waits for you."><ListField label="Allowed commands" value={arr('allow')} onCommit={(allow) => set({ allow })} /></Row>
         <Row label="Never allowed" hint="Commands it must never run, added to the factory's, the sector's and the line's."><ListField label="Never allowed" value={arr('deny')} onCommit={(deny) => set({ deny })} /></Row>
+        <Row label="Acts outside" hint="Its commands and tools that act outside the machine, such as git push or mcp__slack__post. A rehearsal refuses them; a run does not care."><ListField label="Acts outside" value={arr('outward')} onCommit={(outward) => set({ outward })} /></Row>
         <Row label="Read-only" hint="No file edits and no git push. Commands it is allowed still run."><label><input type="checkbox" aria-label="Read-only" checked={conf.read_only === true} onChange={(e) => set({ read_only: e.target.checked })} /> read-only</label></Row>
       </Section>
       <RoleForms view={view} dir={dir} roles={arr('roles')} setRoles={(roles) => set({ roles })} op={op}

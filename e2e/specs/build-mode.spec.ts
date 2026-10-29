@@ -1,5 +1,4 @@
 // Build mode (D41), driven through the window only: build a line from scratch, change a real one with a small diff, and the locks.
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
@@ -44,7 +43,7 @@ const finish = async (page: Page) => {
 };
 
 test.describe('Building a line from scratch', () => {
-  test('makes a sector, a line with a machine, a signal and a decision gate that sends work back, and saves it all', async ({ window, roboratory, sandbox }) => {
+  test('makes a sector, a line with a machine, a signal and a decision gate that sends work back, and saves it all', async ({ window, roboratory, sandbox, cli }) => {
     await roboratory.openDemo();
     await startBuilding(window);
 
@@ -91,19 +90,11 @@ test.describe('Building a line from scratch', () => {
     const deploy = fs.readFileSync(path.join(sandbox.demo, 'sectors/operations/models/deploy/line.yaml'), 'utf8');
     expect(deploy).toMatch(/machine: machine/);
     expect(deploy).toMatch(/back: true/);
-    await expect.poll(() => dryRun(sandbox, 'operations')).toMatch(/OK +operations\/deploy: done/);
+    const rehearsal = cli('rehearse', 'operations/deploy', '--simulation');
+    expect(rehearsal.code, rehearsal.out + rehearsal.err).toBe(0);
+    expect(rehearsal.out).toContain('reached the pallet');
   });
 });
-
-/** Runs the saved sector through the engine with simulated agents; only that sector, as the demo's other lines point at repositories beside the factory. */
-function dryRun(sandbox: Sandbox, sector: string) {
-  const only = path.join(sandbox.dir, `only-${sector}`);
-  if (!fs.existsSync(only)) {
-    fs.cpSync(sandbox.demo, only, { recursive: true, filter: (p) => !p.includes(`${path.sep}.runs`) });
-    for (const s of fs.readdirSync(path.join(only, 'sectors'))) if (s !== sector) fs.rmSync(path.join(only, 'sectors', s), { recursive: true });
-  }
-  try { return execFileSync(process.execPath, ['e2e/tools/factory-sim-check.mjs', only], { encoding: 'utf8', windowsHide: true, timeout: patience(120_000) }); } catch (e) { return String((e as { stdout?: string }).stdout ?? e); }
-}
 
 test.describe('Changing a line that exists', () => {
   const lineFile = (sandbox: Sandbox) => path.join(sandbox.demo, 'sectors/incidents/models/triage-to-mitigation/line.yaml');

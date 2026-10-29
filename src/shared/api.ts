@@ -1,6 +1,6 @@
 // The bridge between the renderer and the main process (exposed by preload.ts).
 import type { BuildOp, BuildView, FieldInfo } from './build';
-import type { LogEntry, ManagerMessage, RunSummary, Snapshot } from './types';
+import type { LogEntry, ManagerMessage, RehearsalPlan, RehearsalProgress, RehearsalReport, RehearsalRequest, RunSummary, Snapshot, Stats, StatsFilter } from './types';
 
 export type ScopeArg = { kind: 'sector'; sectorId: string } | { kind: 'factory' };
 
@@ -29,6 +29,13 @@ export interface RoboratoryApi {
   retry(lineId: string, pieceId: string, hint: string): Promise<void>;
   release(lineId: string, pieceId: string, confirmations: number, decision?: { choice: string; note: string }): Promise<void>;
   answer(lineId: string, pieceId: string, text: string): Promise<void>;
+  /** What a rehearsal would run, before it spends anything (D48). */
+  rehearsalPlan(req: RehearsalRequest): Promise<RehearsalPlan>;
+  /** Rehearses a line on a copy; the progress comes through `onRehearsal`. The real mode needs `approved`. */
+  rehearse(req: RehearsalRequest): Promise<RehearsalReport>;
+  /** Stops the rehearsal that is running. */
+  rehearsalStop(): Promise<void>;
+  onRehearsal(cb: (p: RehearsalProgress) => void): () => void;
   /** Lets a machine make the call it asked for, this once (D44). */
   allow(requestId: string): Promise<void>;
   /** Refuses it; the reason goes back to the agent. */
@@ -36,6 +43,8 @@ export interface RoboratoryApi {
   halt(lineId: string): Promise<void>;
   resume(lineId: string): Promise<void>;
   runs(): Promise<RunSummary[]>;
+  /** How the pieces behave over the factory's runs (D47). */
+  stats(filter?: StatsFilter): Promise<Stats>;
   runDetail(runId: string): Promise<RunDetail | null>;
   ask(scope: ScopeArg, question: string): Promise<void>;
   messages(scope: ScopeArg): Promise<ManagerMessage[]>;

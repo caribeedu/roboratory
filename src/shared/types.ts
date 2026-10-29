@@ -70,6 +70,8 @@ export interface MachineDef {
   allow: string[];
   /** commands it must never run; adds to the factory's, the sector's and the line's (D44) */
   deny: string[];
+  /** its commands and tools that act outside the machine; a rehearsal refuses them, a run does not care (D48) */
+  outward: string[];
   /** no file-editing tools and no `git push` (D44) */
   readOnly: boolean;
   /** extra directories the agent may use, e.g. ~/repos */
@@ -151,7 +153,7 @@ export interface FactoryDef {
 
 export interface LoadProblem { model?: string; pieceId?: string; message: string }
 
-export type VerbName = 'run' | 'retry' | 'release' | 'halt' | 'resume' | 'apply' | 'answer' | 'allow' | 'deny';
+export type VerbName = 'run' | 'retry' | 'release' | 'halt' | 'resume' | 'apply' | 'answer' | 'allow' | 'deny' | 'rehearse';
 
 // ---------- runtime state ----------
 
@@ -307,4 +309,138 @@ export interface Snapshot {
   lines: Record<string, LineView>;
   attention: AttentionItem[];
   now: number;
+}
+
+// ---------- metrics (D47) ----------
+
+/** What a step used, as the agent's CLI reports it. The dollar figure that goes with it is the CLI's own estimate. */
+export interface Tokens { input: number; output: number; cacheRead: number; cacheWrite: number }
+
+export interface StatsFilter {
+  sectorId?: string;
+  lineId?: string;
+  /** only runs that started at or after this time (ms) */
+  since?: number;
+  runId?: string;
+  /** the earlier versions of a piece too, not only its current one */
+  allVersions?: boolean;
+  /** the current version is the one in the build-mode draft, not the one on disk */
+  draft?: boolean;
+}
+
+/** A piece in one version, over every run of that version. */
+export interface VersionRow {
+  version: string;
+  current: boolean;
+  /** when a run first started this version */
+  firstSeen: number;
+  runs: number;
+  models: string[];
+  tokens: Tokens;
+  /** estimates: the agent CLI works the dollars out itself */
+  cost: { total: number; median: number };
+  /** the agent's working time in a run, without the time spent waiting for you (ms) */
+  duration: { median: number; max: number };
+  attempts: { mean: number; max: number };
+  reworks: number;
+  questions: number;
+  blocks: number;
+  fires: number;
+  /** passes of a checker, and those a later event proved wrong */
+  passes: number;
+  provedWrong: number;
+  permissions: { requests: number; repeated: number; denied: number; waitMedianMs: number };
+}
+
+export interface PieceStats {
+  pieceId: string;
+  label: string;
+  machine: string;
+  /** a piece with a return belt leaving it (D15) */
+  checker: boolean;
+  /** the version on disk (or in the draft) right now */
+  currentVersion: string;
+  /** newest first */
+  rows: VersionRow[];
+}
+
+export interface LineStats {
+  lineId: string;
+  sectorId: string;
+  name: string;
+  /** runs of the line that the rows come from */
+  runs: number;
+  total: Pick<VersionRow, 'tokens' | 'reworks' | 'questions' | 'blocks' | 'fires' | 'passes' | 'provedWrong'> & { cost: number; permissions: Omit<VersionRow['permissions'], 'waitMedianMs'> };
+  pieces: PieceStats[];
+}
+
+export interface Stats { lines: LineStats[] }
+
+// ---------- the rehearsal (D48) ----------
+
+export type RehearsalMode = 'real' | 'simulation';
+
+/** What a caller asks of a rehearsal. `source` is where the factory comes from: the files on disk, or the build-mode draft. */
+export interface RehearsalRequest {
+  lineId: string;
+  input: Record<string, string>;
+  mode: RehearsalMode;
+  source: 'disk' | 'draft';
+  /** the signals become `true` instead of running (real mode) */
+  skipSignals?: boolean;
+  /** the cost ceiling, in dollars; only the real mode spends */
+  maxCostUsd?: number;
+  /** keep the copy of the factory when it ends */
+  keep?: boolean;
+  /** a person has seen what will run and agreed to what it may cost; the real mode refuses to start without it (invariant 8) */
+  approved?: boolean;
+}
+
+/** What a rehearsal will run, shown before it spends anything. */
+export interface RehearsalPlan {
+  lineId: string;
+  lineName: string;
+  mode: RehearsalMode;
+  source: 'disk' | 'draft';
+  inputs: { name: string; label?: string; required: boolean; placeholder?: string; multiline?: boolean }[];
+  machines: { pieceId: string; label: string; agent: string; /** the model it will run with */ model?: string; allow: string[]; tools: string[]; outward: string[]; /** folders outside the copy that the machine may reach; the copy does not replace them */ dirs: string[] }[];
+  signals: { pieceId: string; label: string; command: string; runs: boolean }[];
+  maxCostUsd?: number;
+  /** what a real run of this line has cost, as a median of the runs there are */
+  reference?: { runs: number; medianUsd: number };
+}
+
+export type FindingKind = 'fire' | 'contract' | 'blocked' | 'rework-exhausted' | 'uncovered-command' | 'forbidden-command' | 'ceiling' | 'timeout' | 'question' | 'gate' | 'outward' | 'rework';
+
+/** Something a rehearsal found. A defect is a fault of the factory; a note is something to know. */
+export interface Finding {
+  id: string;
+  class: 'defect' | 'note';
+  kind: FindingKind;
+  pieceId: string;
+  message: string;
+  /** where to look */
+  where: string;
+  /** for a command no list covers: the command, and the prefix a list would take */
+  command?: string;
+  suggestion?: string;
+  /** the version of the piece when it was found; it is out of date once the piece's version changes */
+  version?: string;
+}
+
+export interface RehearsalProgress { pieces: Record<string, string>; costUsd: number; findings: Finding[] }
+
+export interface RehearsalReport {
+  id: string;
+  lineId: string;
+  mode: RehearsalMode;
+  startedAt: number;
+  endedAt: number;
+  status: 'done' | 'stopped' | 'ceiling' | 'timeout' | 'aborted';
+  costUsd: number;
+  runId?: string;
+  pieces: { pieceId: string; label: string; version?: string; attempts: number; reworks: number; questions: number; denied: number; costUsd: number }[];
+  findings: Finding[];
+  /** the copy of the factory, when it was kept */
+  kept?: string;
 }

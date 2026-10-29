@@ -204,14 +204,14 @@ test.describe('Who may talk to the engine', () => {
   });
 });
 
-test.describe('Dry-running a factory through the engine', () => {
-  test('every line of the demo reaches its pallet in a simulated run', async ({ roboratory, sandbox }) => {
+test.describe('Rehearsing a factory in simulation (D48)', () => {
+  test('every line of the demo reaches its pallet in a rehearsal that costs nothing', async ({ roboratory, cli }) => {
     await roboratory.openDemo();
-    stopEngine(sandbox.demo);
-    const run = spawnSync(process.execPath, ['e2e/tools/factory-sim-check.mjs', sandbox.demo], { encoding: 'utf8', timeout: patience(280_000), windowsHide: true });
-    expect(run.stdout).toMatch(/OK +engineering\/orders-api: done/);
-    expect(run.stdout).toMatch(/OK +incidents\/orders-api: done/);
-    expect(run.stdout).toMatch(/OK +releases\/orders-api: done/);
-    expect(run.status, run.stdout + run.stderr).toBe(0);
+    for (const line of ['engineering/orders-api', 'incidents/orders-api', 'releases/orders-api']) {
+      const r = cli('rehearse', line, '--simulation');
+      expect(r.code, r.out + r.err).toBe(0);
+      expect(r.out).toContain('reached the pallet');
+      expect(r.out).toContain('No defects.');
+    }
   });
 });

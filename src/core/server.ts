@@ -145,6 +145,10 @@ const calls: Record<string, Handler> = {
   halt: (s, l) => s.halt(l),
   resume: (s, l) => s.resume(l),
   runs: (s) => s.runs(),
+  stats: (s, filter) => s.stats(filter),
+  rehearsalPlan: (s, req) => s.rehearsalPlan(req),
+  rehearse: (s, req) => s.rehearse(req),
+  rehearsalStop: (s) => s.rehearsalStop(),
   runDetail: (s, id) => s.runDetail(id),
   ask: (s, scope, q) => s.ask(scope, q),
   messages: (s, scope) => s.messages(scope),
@@ -183,6 +187,7 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
     logs: (l) => push('logs', l),
     messages: (k) => push('messages', k),
     build: (v) => push('build', v),
+    rehearsal: (p) => push('rehearsal', p),
   }, { permissionTool: opts.permissionTool });
   let closed = false;
   let failed = false;
@@ -229,6 +234,15 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
       const ended = new AbortController();
       c.once('close', () => ended.abort());
       return service.permit(session, call, ended.signal);
+    },
+    // a rehearsal spends money, so it ends with the connection that asked for it (Ctrl-C in the command, the window closing)
+    rehearse: (c: net.Socket, req: Parameters<FactoryService['rehearse']>[0]) => {
+      if (restarting) throw new Error('The engine is restarting and starts no rehearsal. Try again in a moment.');
+      // only the connection that owns the rehearsal ends it: a call refused because one is running must not carry its stop
+      if (service.rehearsalRunning) return service.rehearse(req);
+      const stop = () => service.rehearsalStop();
+      c.once('close', stop);
+      return service.rehearse(req).finally(() => { c.off('close', stop); drained(); });
     },
     // a stream of what is worth acting on, for `roboratory watch`
     watch: (c: net.Socket) => { watchers.add(c); return true; },
@@ -293,14 +307,14 @@ export async function startServer(root: string, opts: ServerOptions): Promise<En
   });
 
   // deferred so the reply to the call that caused it is written first
-  function drained() { setImmediate(() => { if (restarting && !closed && (service.engine?.runningCount() ?? 0) === 0) void close(); }); }
+  function drained() { setImmediate(() => { if (restarting && !closed && (service.engine?.runningCount() ?? 0) === 0 && !service.rehearsalRunning) void close(); }); }
   service.engine?.on('change', drained);
 
   // ends by itself once nothing is running and nobody is connected
   const grace = opts.idleGraceMs ?? 60_000;
   let idleSince = Date.now();
   idleTimer = setInterval(() => {
-    const busy = clients.size > 0 || (service.engine?.activeLineIds().size ?? 0) > 0;
+    const busy = clients.size > 0 || (service.engine?.activeLineIds().size ?? 0) > 0 || service.rehearsalRunning;
     if (busy) idleSince = Date.now();
     else if (Date.now() - idleSince >= grace) void close();
   }, Math.min(5000, Math.max(20, grace / 4)));

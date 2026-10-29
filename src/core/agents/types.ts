@@ -1,5 +1,8 @@
 // What the engine and managers hand an agent adapter, and what they get back.
+import type { Tokens } from '../../shared/types';
 import type { Waits } from './waits';
+
+export type { Tokens };
 
 export interface AgentEvent { kind: 'tool' | 'ret' | 'text' | 'info'; text: string }
 
@@ -57,7 +60,7 @@ export interface AgentRequest {
   signal?: AbortSignal;
 }
 
-export interface AgentResult { output?: unknown; text?: string; error?: string; costUsd?: number }
+export interface AgentResult { output?: unknown; text?: string; error?: string; costUsd?: number; model?: string; tokens?: Tokens }
 
 /**
  * The port the engine and the managers call (D45): one adapter per agent. What is specific to an agent's CLI

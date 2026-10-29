@@ -59,5 +59,6 @@ export async function runSim(req: AgentRequest): Promise<AgentResult> {
   const out = req.simFail && sim.bad_output ? sim.bad_output : seq ? seq[Math.min(call, seq.length - 1)] : sim.output;
   const output = renderDeep(out ?? {}, ctx);
   req.onEvent({ kind: 'text', text: JSON.stringify(output) });
-  return { output };
+  // what a step of the simulated agent is said to cost, so the metrics and the cost ceiling can be tried for free
+  return typeof sim.cost === 'number' ? { output, costUsd: sim.cost, model: 'sim' } : { output };
 }

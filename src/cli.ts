@@ -6,7 +6,9 @@ import { EngineClient, launchFor } from './core/client';
 import { engineIsOlder } from './core/buildid';
 import { runPermissionTool } from './core/permission-tool';
 import { liveLock, startServer } from './core/server';
-import type { Snapshot } from './shared/types';
+import { formatStats, parsePeriod } from './core/statsformat';
+import { formatPlan, formatProgress, formatReport } from './core/rehearsalformat';
+import type { RehearsalPlan, RehearsalProgress, RehearsalReport, RehearsalRequest, Snapshot, Stats } from './shared/types';
 
 export const USAGE = `roboratory <command> [options]
 
@@ -21,6 +23,10 @@ export const USAGE = `roboratory <command> [options]
   retry <line> <machine> [--hint h]
   halt <line>
   resume <line>
+  rehearse <line> [--input k=v ...] [--simulation] [--skip-signals] [--max-cost n] [--keep] [--yes]
+                                run a line once on a copy with nobody to answer, to find defects of roles and permissions
+  stats [--sector s] [--line l] [--since 7d] [--run id] [--all-versions] [--json]
+                                how each piece behaves over the runs: cost (estimated), time, attempts, reworks, asks, fires, permissions
   restart --when-idle           restart the engine once no machine or signal is running
   watch                         print what needs you (gates, questions, fires, reworks) and the end of runs
 
@@ -28,7 +34,11 @@ The factory is --factory <dir>, the ROBORATORY_FACTORY variable, or the folder y
 <line> is a line id as shown by \`status\`, or its last part when that is unambiguous.
 `;
 
-export interface CliEnv { version: string; build?: string; script: string; out: (s: string) => void; err: (s: string) => void }
+export interface CliEnv {
+  version: string; build?: string; script: string; out: (s: string) => void; err: (s: string) => void;
+  /** asks a yes or no question of the person at the terminal; without it, a command that needs a yes needs --yes */
+  ask?: (question: string) => Promise<boolean>;
+}
 
 interface Parsed { cmd: string; pos: string[]; flags: Record<string, string[]> }
 
@@ -41,7 +51,7 @@ function parse(argv: string[]): Parsed {
     if (a.startsWith('--')) {
       const eq = a.indexOf('=');
       const key = eq > 0 ? a.slice(2, eq) : a.slice(2);
-      const bool = key === 'when-idle' || key === 'json';
+      const bool = ['when-idle', 'json', 'all-versions', 'simulation', 'skip-signals', 'keep', 'yes'].includes(key);
       const val = eq > 0 ? a.slice(eq + 1) : bool ? 'true' : rest[++i];
       if (val === undefined) throw new Error(`--${key} needs a value`);
       (flags[key] ??= []).push(val);
@@ -65,6 +75,17 @@ function factoryRoot(flags: Record<string, string[]>): string {
   }
 }
 
+/** The `--input key=value` options of a command. */
+function inputsOf(p: Parsed): Record<string, string> {
+  const input: Record<string, string> = {};
+  for (const kv of p.flags.input ?? []) {
+    const i = kv.indexOf('=');
+    if (i < 1) throw new Error(`--input wants key=value, got "${kv}"`);
+    input[kv.slice(0, i)] = kv.slice(i + 1);
+  }
+  return input;
+}
+
 function resolveLine(snap: Snapshot, name: string): string {
   const ids = Object.keys(snap.lines);
   if (ids.includes(name)) return name;
@@ -81,7 +102,7 @@ export async function main(argv: string[], env: CliEnv): Promise<number> {
   try { p = parse(argv); } catch (e) { env.err(`${(e as Error).message}\n`); return 2; }
   if (!p.cmd || p.cmd === 'help' || p.cmd === '--help' || p.cmd === '-h') { env.out(USAGE); return p.cmd ? 0 : 2; }
   if (p.cmd === '--version' || p.cmd === 'version') { env.out(`${env.version}\n`); return 0; }
-  const known = ['serve', 'stop', 'status', 'run', 'release', 'answer', 'allow', 'deny', 'retry', 'halt', 'resume', 'restart', 'watch', 'permission-tool'];
+  const known = ['serve', 'stop', 'status', 'run', 'release', 'answer', 'allow', 'deny', 'retry', 'halt', 'resume', 'restart', 'watch', 'stats', 'rehearse', 'permission-tool'];
   if (!known.includes(p.cmd)) { env.err(`Unknown command "${p.cmd}".\n\n${USAGE}`); return 2; }
 
   try {
@@ -129,13 +150,7 @@ export async function main(argv: string[], env: CliEnv): Promise<number> {
       switch (p.cmd) {
         case 'run': {
           need(1, 'run <line> [--input k=v ...]');
-          const input: Record<string, string> = {};
-          for (const kv of p.flags.input ?? []) {
-            const i = kv.indexOf('=');
-            if (i < 1) throw new Error(`--input wants key=value, got "${kv}"`);
-            input[kv.slice(0, i)] = kv.slice(i + 1);
-          }
-          const id = await c.call<string>('run', resolveLine(snapshot, p.pos[0]), input);
+          const id = await c.call<string>('run', resolveLine(snapshot, p.pos[0]), inputsOf(p));
           env.out(`${id}\n`);
           return 0;
         }
@@ -171,6 +186,42 @@ export async function main(argv: string[], env: CliEnv): Promise<number> {
           }
           return 0;
         case 'watch': return await watch(c, snapshot, env);
+        case 'rehearse': {
+          need(1, 'rehearse <line> [--input k=v ...] [--simulation] [--skip-signals] [--max-cost n] [--keep] [--yes]');
+          const maxCost = p.flags['max-cost'] ? Number(p.flags['max-cost'][0]) : 1;
+          if (!(maxCost > 0)) throw new Error('--max-cost wants an amount in dollars, like 1.50');
+          const req: RehearsalRequest = {
+            lineId: resolveLine(snapshot, p.pos[0]), input: inputsOf(p), mode: p.flags.simulation ? 'simulation' : 'real', source: 'disk',
+            skipSignals: !!p.flags['skip-signals'], maxCostUsd: maxCost, keep: !!p.flags.keep,
+          };
+          const plan = await c.call<RehearsalPlan>('rehearsalPlan', req);
+          env.out(formatPlan(plan));
+          if (req.mode === 'real') {
+            if (!p.flags.yes) {
+              if (!env.ask) throw new Error('A real rehearsal spends money. Pass --yes to run it without being asked.');
+              if (!(await env.ask('Run it?'))) { env.out('Not run.\n'); return 1; }
+            }
+            req.approved = true;
+          }
+          const labels = new Map([...plan.machines, ...plan.signals].map((x) => [x.pieceId, x.label] as const));
+          let seen: Record<string, string> = {};
+          c.on('rehearsal', (pr: RehearsalProgress) => { for (const l of formatProgress(seen, pr, (id) => labels.get(id) ?? id)) env.out(l + '\n'); seen = pr.pieces; });
+          const report = await c.call<RehearsalReport>('rehearse', req);
+          env.out('\n' + formatReport(report));
+          return report.findings.some((f) => f.class === 'defect') ? 1 : 0;
+        }
+        case 'stats': {
+          const allVersions = !!p.flags['all-versions'];
+          const sector = p.flags.sector?.[0];
+          const lineName = p.flags.line?.[0];
+          const stats = await c.call<Stats>('stats', {
+            allVersions, runId: p.flags.run?.[0], sectorId: sector,
+            lineId: lineName ? resolveLine(snapshot, lineName) : undefined,
+            since: p.flags.since ? Date.now() - parsePeriod(p.flags.since[0]) : undefined,
+          });
+          env.out(p.flags.json ? JSON.stringify(stats, null, 2) + '\n' : formatStats(stats, allVersions));
+          return 0;
+        }
       }
     } finally { c.close(); }
     return 0;

@@ -6,12 +6,6 @@ Everything that is planned, open or accepted as a limit, checked against the cod
 
 From the assessment of the first real ticket run ([ASSESSMENT.md](ASSESSMENT.md)): trust before automation. Each version below is planned; each change of design needs its decision in DECISIONS.md before code. Real-agent runs stay limited to checks until checkers prove their work (v0.11), because that is the weak point the assessment found. The engine already runs without the app (D43), and permission requests are built (D44), which the manager's investigations of v0.12 depend on. What a version delivered moves to [CHANGELOG.md](../CHANGELOG.md). Items with no version are in §2 and after.
 
-### v0.10 — Metrics and a cheap rehearsal
-
-1. **Metrics per machine** from `run.jsonl` (`roboratory stats`): cost, duration, attempts, laps, denied commands, questions, blocks, and checker passes later proved wrong (a pass followed by a question or rework further down the line). Costs say whether they are estimates.
-2. **The need to allow for the rest of the run.** A permission is for one call (D44). The metrics above decide whether a wider allowance is worth having, from `run.jsonl`: requests per run and per machine; how many allows repeat a command already allowed in the same run, and their share of all allows; the wait before each answer, and how many requests were denied. If repeated allows are a large share, an allowance limited to a command prefix and one run is designed with its own decision; if not, it stays out. The threshold is set from the first runs' numbers, not before them.
-3. **A cheap rehearsal with real permissions** (`roboratory rehearse`): the real roles, signals and permissions, a cheap model, and every outward action denied, to find role and permission defects for cents. It finds defects of roles and permissions, not of quality. `e2e/tools/factory-sim-check.mjs` keeps checking the flow for free.
-
 ### v0.11 — Checkers prove their work
 
 The contracts of checker machines (validator, code reviewer) require what was verified: each item with the command and its result, or a link, and what was not verified. A signal after each checker confirms the list is not empty, the links exist and the listed read-only commands give the same result again; a pass without evidence fails the check itself. D18 applied to checkers. The metrics of v0.10 measure the effect.
@@ -40,9 +34,10 @@ None of these exist in the code yet.
 5. **First-factory tutorial** (D38).
 6. **Replaying a run on the Floor** (D40).
 7. **A git identity per machine** (D9, D10). Today every machine commits as "Roboratory" (`src/core/git.ts`).
-8. **Container isolation for machines** (D32). Permission requests (D44) cover shell commands and MCP tools; they do not cover file writes outside a machine's folders or network access, and a `read_only` machine can still write through a command in its `allow`. A container or OS sandbox is what would cover them, and it would let those become requests or rules too. The expectation is written here so the permission model does not grow around those gaps first.
+8. **Container isolation for machines** (D32). Permission requests (D44) cover shell commands and MCP tools; they do not cover file writes outside a machine's folders or network access, and a `read_only` machine can still write through a command in its `allow`. A container or OS sandbox is what would cover them, and it would let those become requests or rules too. The expectation is written here so the permission model does not grow around those gaps first. It comes after v0.11 and v0.12.
 9. **Remote or shared factories.**
 10. **An interactive terminal in a machine's folder.** No PTY is in the project.
+11. **What a run is missing, and why, on the Floor.** The third problem of the [assessment](ASSESSMENT.md): the Metrics tab and the history line put what a piece usually costs and takes on the screen, but not what this run still lacks, why, and what it has cost so far, which are read in panels and transcripts. A signal's checks show only once it runs.
 
 ## 4. Not yet verified with real agents
 

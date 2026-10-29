@@ -203,11 +203,23 @@ function setMachine(d: Draft, l: LineDef, op: Extract<BuildOp, { op: 'setMachine
   if (!m) fail(`"${op.pieceId}" is not a machine.`);
   const conf: MachineConf = op.conf;
   // an empty list and an off switch are the defaults, so the key is removed rather than written
-  const set: Record<string, unknown> = { ...conf, deny: denyValue(conf.deny), read_only: conf.read_only === false ? null : conf.read_only };
+  const set: Record<string, unknown> = { ...conf, deny: denyValue(conf.deny), outward: denyValue(conf.outward), read_only: conf.read_only === false ? null : conf.read_only };
   d.editYaml(path.join(m!.dir, 'machine.yaml'), (doc) => setMap(doc, doc.contents as YAMLMap, set));
 }
 
 const denyValue = (deny: string[] | undefined) => (deny && !deny.length ? null : deny);
+
+/** Adds a command to one of a machine's lists, keeping the file as it was written. */
+function addCommand(d: Draft, l: LineDef, op: Extract<BuildOp, { op: 'addCommand' }>) {
+  const p = l.model.pieces.find((x) => x.id === op.pieceId);
+  const m = p?.machine ? l.model.machines[p.machine] : undefined;
+  if (!m) fail(`"${op.pieceId}" is not a machine.`);
+  const command = op.command.trim();
+  if (!command) fail('Write the command to add.');
+  const current = op.list === 'allow' ? m!.allow : m!.outward;
+  if (current.includes(command)) return;
+  d.editYaml(path.join(m!.dir, 'machine.yaml'), (doc) => setMap(doc, doc.contents as YAMLMap, { [op.list]: [...current, command] }));
+}
 
 function managerValues(m: ManagerConf) { return { agent: m.agent, model: m.model, tools: m.tools }; }
 const policyValue = (p: Policy) => Object.fromEntries(Object.entries(p).filter(([, r]) => (r?.auto ?? 0) > 0).map(([k, r]) => [k, { auto: r!.auto }]));
@@ -276,6 +288,7 @@ export function apply(d: Draft, op: BuildOp) {
     case 'setRule': return setRule(d, findLine(f, op.lineId), op);
     case 'setPiece': return setPiece(d, findLine(f, op.lineId), op);
     case 'setMachine': return setMachine(d, findLine(f, op.lineId), op);
+    case 'addCommand': return addCommand(d, findLine(f, op.lineId), op);
     case 'setIntake': {
       const l = findLine(f, op.lineId);
       d.editYaml(lineFile(l), (doc) => {

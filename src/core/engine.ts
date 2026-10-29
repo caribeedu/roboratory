@@ -6,15 +6,17 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import Ajv, { type ValidateFunction } from 'ajv';
-import { describe, evaluate } from '../shared/expr';
+import { evaluate } from '../shared/expr';
 import type {
   AttentionItem, BoxView, FactoryDef, HumanQuestion, LineDef, LineView, LogEntry, MachineDef, PieceDef, PieceState, PieceView, RunStatus, RunSummary, VerbName,
 } from '../shared/types';
 import { runAgent, type AgentEvent, type PermissionAccess, type PermissionCall, type PermissionDecision } from './agents';
 import { Waits } from './agents/waits';
 import { addWorktree, commitLeftovers, factoryVersion, git, headOf, mergeInto, removeWorktree } from './git';
-import { decideTool, effectiveRules, type Rules } from './permissions';
+import { linePlace } from './lineplace';
+import { decideTool, type Rules } from './permissions';
 import { renderCommand } from './template';
+import { composedRole, machineRules, pieceVersion } from './version';
 
 export const RUNS_DIR = '.runs';
 const ajv = new Ajv({ allErrors: true, strict: false });
@@ -69,8 +71,12 @@ const NEEDS_HUMAN = {
 
 export interface EngineOptions {
   beltMs?: number; now?: () => number; signalTimeoutMs?: number;
+  /** a ceiling on what the runs of this engine may cost (D48): once their cost passes it, no new step starts and the ones running finish */
+  maxCostUsd?: number;
   /** how to start `roboratory permission-tool`, for agents that ask through a tool of their own (D44) */
   permissionTool?: PermissionAccess['tool'];
+  /** the factory whose engine serves the permission tool's calls, when that is not this engine's own factory (a rehearsal on a copy, D48) */
+  serverRoot?: string;
 }
 
 /** A permission request waiting on a person (D44). */
@@ -99,7 +105,11 @@ export class Engine extends EventEmitter {
   private seq = 0;
   private simFailed = new Set<string>();
   private paused = false;
+  private maxCostUsd?: number;
+  private spent = 0;
+  private overBudget = false;
   private permissionTool?: PermissionAccess['tool'];
+  private serverRoot?: string;
   /** the permission requests of the machines running now, by the session each one was started with */
   private sessions = new Map<string, (call: PermissionCall, gone?: AbortSignal) => Promise<PermissionDecision>>();
   private asks = new Map<string, AskRt>();
@@ -113,6 +123,8 @@ export class Engine extends EventEmitter {
     this.now = opts.now ?? Date.now;
     this.signalTimeoutMs = opts.signalTimeoutMs ?? 10 * 60000;
     this.permissionTool = opts.permissionTool;
+    this.serverRoot = opts.serverRoot;
+    this.maxCostUsd = opts.maxCostUsd;
     for (const s of factory.sectors) for (const l of s.lines) this.lines.set(l.id, this.makeLine(l));
   }
 
@@ -133,7 +145,11 @@ export class Engine extends EventEmitter {
     this.emit('log', entry);
   }
 
+  private disposed = false;
+
   private record(run: RunRt, ev: Record<string, unknown>) {
+    // an engine that was disposed may have its folder removed under it (a rehearsal's copy); what is still unwinding writes nothing
+    if (this.disposed) return;
     const from = ev.type === 'verb' && this.source ? { source: this.source } : {};
     const full = { t: this.now(), ...ev, ...from };
     fs.appendFileSync(path.join(run.dir, 'run.jsonl'), JSON.stringify(full) + '\n');
@@ -143,6 +159,9 @@ export class Engine extends EventEmitter {
   private sectorOf(line: LineDef) { return this.factory.sectors.find((s) => s.id === line.sectorId)!; }
 
   // ---------- permission requests (D44) ----------
+
+  /** Whether a machine of this engine is running under `session`. */
+  hasSession(session: string) { return this.sessions.has(session); }
 
   /** The engine's decision on a tool call of the machine started with `session`; the permission tool process asks it over the socket. */
   permitSession(session: string, call: PermissionCall, gone?: AbortSignal): Promise<PermissionDecision> {
@@ -205,15 +224,6 @@ export class Engine extends EventEmitter {
     const why = reason.trim();
     this.decided(a, 'deny', actor, why);
     a.settle({ behavior: 'deny', message: why || 'A person denied this command.' });
-  }
-
-  /** What a machine may run (D44): its own lists and the defaults, with every level's hard denials added. */
-  private rulesFor(line: LineDef, machine: MachineDef) {
-    const rules = effectiveRules({
-      allow: machine.allow, readOnly: machine.readOnly, shell: true,
-      deny: [...this.factory.deny, ...(this.sectorOf(line)?.deny ?? []), ...line.model.deny, ...machine.deny],
-    });
-    return { ...rules, readOnly: machine.readOnly, shell: true };
   }
 
   // ---------- verbs (D30): every action goes through here and is audited ----------
@@ -610,6 +620,8 @@ export class Engine extends EventEmitter {
     if (line.halted || p.current || !p.queue.length) return;
     // while the engine waits to restart (D43), nothing new starts; gates still take boxes, they run no process
     if (this.paused && p.def.kind !== 'gate') return;
+    // past the cost ceiling (D48) nothing new starts either
+    if (this.overBudget && p.def.kind !== 'gate') return;
     const work = p.queue.shift()!;
     const run = this.runs.get(work.runId);
     if (!run) return;
@@ -715,19 +727,22 @@ export class Engine extends EventEmitter {
     const simFail = !!machine.sim?.fail_first_run && !this.simFailed.has(key) && !w.hint;
     const call = run.calls.get(def.id) ?? 0;
     run.calls.set(def.id, call + 1);
-    const sector = this.sectorOf(run.line);
-    const role = [machine.role, this.factory.culture, sector?.culture].filter((x) => x && x.trim()).join('\n\n');
+    const role = composedRole(this.factory, run.line, machine);
+    const version = pieceVersion(this.factory, run.line, def.id);
 
     let lastError = '';
     for (let attempt = w.attempt ?? 1; attempt <= machine.attempts; attempt++) {
+      // a stopped engine starts no more agents, and a spent budget starts no retry
+      if (this.disposed) return;
+      if (this.overBudget && attempt > (w.attempt ?? 1)) { this.stop(run, p, `Stopped at the cost ceiling after ${attempt - 1}/${machine.attempts} attempts. Last error: ${lastError}`); return; }
       if (line.halted) { w.attempt = attempt; line.deferred.push(() => { p.current = undefined; p.queue.unshift(w); p.state = 'idle'; this.pump(line, p); }); p.state = 'idle'; this.changed(); return; }
       p.attempt = attempt;
-      this.record(run, { type: 'piece.start', piece: def.id, attempt, box: w.box.payload });
+      this.record(run, { type: 'piece.start', piece: def.id, attempt, version, box: w.box.payload });
       this.log({ level: 'sector', sectorId: run.line.sectorId, lineId: run.line.id, pieceId: def.id, runId: run.summary.id, kind: 'info', text: `${def.label}: attempt ${attempt}/${machine.attempts} (${machine.agent})` });
       this.changed();
       const abort = new AbortController();
       p.abort = abort;
-      const rules = this.rulesFor(run.line, machine);
+      const rules = machineRules(this.factory, run.line, machine);
       const waits = new Waits();
       const session = crypto.randomUUID();
       const decide = (call: PermissionCall, gone?: AbortSignal) => this.permit(run, def, rules, waits, call, gone);
@@ -740,7 +755,7 @@ export class Engine extends EventEmitter {
         simCtx: { box: w.box.payload, params: run.line.params, run: { id: run.summary.id }, git: { branch }, call },
         prompt: machinePrompt(run, this.factory.lineContext ? def.id : undefined, def.label, w.box.payload, machine.contract, siblings, lastError, w.hint, boxFile),
         signal: abort.signal,
-        permission: { session, root: this.factory.root, tool: this.permissionTool, decide, waits },
+        permission: { session, root: this.serverRoot ?? this.factory.root, tool: this.permissionTool, decide, waits },
         onEvent: (e: AgentEvent) => {
           this.record(run, { type: 'agent', piece: def.id, attempt, kind: e.kind, text: e.text });
           this.log({ level: 'machine', sectorId: run.line.sectorId, lineId: run.line.id, pieceId: def.id, runId: run.summary.id, kind: e.kind === 'ret' ? 'text' : e.kind === 'tool' ? 'tool' : 'text', text: e.kind === 'ret' ? `◂ ${e.text}` : e.kind === 'tool' ? `▸ ${e.text}` : e.text });
@@ -751,7 +766,8 @@ export class Engine extends EventEmitter {
         this.settleAsks(run.summary.id, def.id, 'The machine stopped before an answer came.');
       }
       p.abort = undefined;
-      if (res.costUsd !== undefined) this.record(run, { type: 'cost', piece: def.id, usd: res.costUsd });
+      if (res.costUsd !== undefined) this.spend(run, def.label, res.costUsd);
+      if (res.costUsd !== undefined) this.record(run, { type: 'cost', piece: def.id, usd: res.costUsd, model: res.model ?? machine.model ?? machine.agent, tokens: res.tokens ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } });
       // whatever came back (an answer, a question, a block, an error) is about an input that has since been replaced
       if (this.staleInput(run, w, def.id)) { this.dropStale(line, run, p); return; }
       const ask = (res.output as { needs_human?: HumanQuestion } | undefined)?.needs_human;
@@ -907,6 +923,21 @@ export class Engine extends EventEmitter {
     return items.sort((a, b) => b.severity - a.severity || a.since - b.since);
   }
 
+  /** What the runs of this engine have cost so far, as the agents report it (estimates). */
+  get costSoFar() { return this.spent; }
+
+  /** Whether the cost ceiling stopped new work. */
+  get costCeilingHit() { return this.overBudget; }
+
+  private spend(run: RunRt, label: string, usd: number) {
+    this.spent += usd;
+    if (this.maxCostUsd === undefined || this.overBudget || this.spent < this.maxCostUsd) return;
+    this.overBudget = true;
+    this.log({ level: 'factory', sectorId: run.line.sectorId, lineId: run.line.id, runId: run.summary.id, kind: 'warn', text: `${label}: the cost ceiling of US$ ${this.maxCostUsd.toFixed(2)} is reached (US$ ${this.spent.toFixed(2)} so far); no new step starts, and the ones running finish` });
+    this.emit('budget', this.spent);
+    this.changed();
+  }
+
   /** Stops starting machines and signals; the ones running finish. Queued work is rebuilt from the run files after a restart. */
   pauseDispatch() { this.paused = true; this.changed(); }
 
@@ -927,12 +958,26 @@ export class Engine extends EventEmitter {
 
   runSummaries(): RunSummary[] { return [...this.runs.values()].map((r) => r.summary).sort((a, b) => b.startedAt - a.startedAt); }
 
+  /** A run's events. The metrics read every run on each call, so a run file is parsed again only when it has changed. */
   runEvents(runId: string): Record<string, unknown>[] {
     const run = this.runs.get(runId);
     if (!run) return [];
     const file = path.join(run.dir, 'run.jsonl');
-    return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
+    let st: fs.Stats;
+    try { st = fs.statSync(file); } catch { return []; }
+    const key = `${st.mtimeMs}:${st.size}`;
+    const hit = this.eventCache.get(file);
+    if (hit?.key === key) { this.eventCache.delete(file); this.eventCache.set(file, hit); return hit.events; }
+    const lines = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean);
+    // a line that is still being written is read on the next call
+    const events = lines.flatMap((l, i) => { try { return [JSON.parse(l)]; } catch (e) { if (i === lines.length - 1) return []; throw e; } });
+    this.eventCache.delete(file);
+    this.eventCache.set(file, { key, events });
+    if (this.eventCache.size > Engine.CACHED_RUNS) this.eventCache.delete(this.eventCache.keys().next().value!);
+    return events;
   }
+  private eventCache = new Map<string, { key: string; events: Record<string, unknown>[] }>();
+  private static readonly CACHED_RUNS = 64;
 
   runDiff(runId: string): string | undefined {
     const run = this.runs.get(runId);
@@ -1066,6 +1111,7 @@ export class Engine extends EventEmitter {
   }
 
   dispose() {
+    this.disposed = true;
     for (const l of this.lines.values()) {
       for (const b of l.belts) clearTimeout(b.timer);
       for (const p of l.pieces.values()) p.abort?.abort();
@@ -1083,31 +1129,6 @@ function reopen(run: RunRt, target: string, reopened: string[], reset: string[])
   for (const id of sources) { run.done.delete(id); run.skippedPieces.delete(id); }
   for (const [id, arr] of run.arrivals) if (id !== target && !run.done.has(id)) for (const src of [...arr.keys()]) if (sources.has(src)) arr.delete(src);
   for (const k of [...run.skipped]) { const [src, dst] = k.split('>'); if (sources.has(src) && !run.done.has(dst)) run.skipped.delete(k); }
-}
-
-/**
- * Where a machine stands in its line, for its prompt: the line in order, what feeds it, where its
- * box goes (rules in plain words) and which machines come after it, so it does its own step only.
- */
-export function linePlace(line: LineDef, pieceId: string): string {
-  const pieces = line.model.pieces;
-  const name = (id: string) => { const p = pieces.find((x) => x.id === id); return p ? (p.kind === 'intake' ? `${line.model.intake.label || 'Intake'} (intake)` : p.kind === 'pallet' ? `${p.label} (pallet)` : `${p.label} (${p.kind})`) : id; };
-  const me = pieces.find((p) => p.id === pieceId);
-  if (!me) return '';
-  const goalOf = (p: typeof me) => p.goal ?? (p.machine ? line.model.machines[p.machine]?.goal : undefined);
-  const ins = me.needs.map((n) => `- ${n.back ? 'sent back by' : 'from'} ${name(n.from)}${n.when ? ` when ${describe(n.when)}` : ''}`);
-  const outs = pieces.flatMap((p) => p.needs.filter((n) => n.from === pieceId).map((n) => `- ${n.back ? 'back to' : 'to'} ${name(p.id)}${n.when ? ` when ${describe(n.when)}` : ''}`));
-  const after = new Set<string>(); const stack = [pieceId];
-  while (stack.length) { const id = stack.pop()!; for (const p of pieces) if (p.needs.some((n) => n.from === id && !n.back) && !after.has(p.id)) { after.add(p.id); stack.push(p.id); } }
-  const later = pieces.filter((p) => after.has(p.id) && p.kind !== 'pallet').map((p) => `- ${name(p.id)}${goalOf(p) ? `: ${goalOf(p)}` : ''}`);
-  return [
-    `Your place in the line "${line.name}":`,
-    `The line, in order: ${pieces.map((p) => (p.id === pieceId ? `${name(p.id)} ← you` : name(p.id))).join(' → ')}`,
-    goalOf(me) ? `Your goal: ${goalOf(me)}` : '',
-    ins.length ? `Your box comes:\n${ins.join('\n')}` : '',
-    outs.length ? `Your box goes:\n${outs.join('\n')}` : '',
-    later.length ? `After you, each piece does its own step:\n${later.join('\n')}\nDo only your step; leave theirs to them.` : '',
-  ].filter(Boolean).join('\n');
 }
 
 /** The human actions of a run so far, in order, for every machine of the run (D26). */

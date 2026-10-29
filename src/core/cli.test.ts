@@ -203,6 +203,33 @@ setTimeout(() => console.log(JSON.stringify({ type: 'result', subtype: 'success'
       }
     }, 60_000);
 
+    it("answers a rehearsal's agent through the same tool, refusing what no list covers, and finds it as a defect (D48)", async () => {
+      const before = process.env.ROBORATORY_CLAUDE_BIN;
+      process.env.ROBORATORY_CLAUDE_BIN = asker();
+      const { root } = buildFactory(line('  - { id: a, machine: a }'), {
+        a: claudeMachine({ 'contract.json': '{"type":"object","required":["decision"],"properties":{"decision":{"type":"string"}}}' }),
+      });
+      try {
+        const r = cli(root, 'rehearse', 's/l', '--yes');
+        expect(r.err).toBe('');
+        expect(r.code).toBe(1);
+        expect(r.out).toContain('Asked to run `npm test`, which no list covers.');
+        expect(r.out).toContain('1 defect');
+        // the agent was told why, in the run the rehearsal kept beside its report
+        const reports = path.join(root, '.runs', 'rehearsals');
+        const [id] = fs.readdirSync(reports);
+        const runs = path.join(reports, id, 'runs');
+        const events = fs.readFileSync(path.join(runs, fs.readdirSync(runs)[0], 'run.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+        const said = JSON.parse(events.find((e) => e.type === 'piece.done' && e.piece === 'a')!.box.decision);
+        expect(said).toEqual({ behavior: 'deny', message: 'rehearsal: nobody answers' });
+        // and nothing of it is in the factory's own runs
+        expect(fs.existsSync(path.join(root, '.runs', 's', 'l'))).toBe(false);
+      } finally {
+        if (before === undefined) delete process.env.ROBORATORY_CLAUDE_BIN; else process.env.ROBORATORY_CLAUDE_BIN = before;
+        stopEngine(root);
+      }
+    }, 90_000);
+
     it('carries a command from the agent to you and your answer back, as the command line', async () => {
       const before = process.env.ROBORATORY_CLAUDE_BIN;
       process.env.ROBORATORY_CLAUDE_BIN = asker();
